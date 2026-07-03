@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TDW Equipment Manager</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar" aria-label="Thanh điều hướng">
+        <div class="brand">
+          <img class="brand-logo" src="assets/tdw-logo.jpg" alt="TDW" />
+          <div>
+            <strong>TDW</strong>
+            <span>Better Service For Life</span>
+          </div>
+        </div>
+        <nav class="nav-pills" aria-label="Module">
+          <a class="active" href="#" data-view="overview">Tổng quan</a>
+          <a href="#" data-view="devices">Thiết bị</a>
+          <a href="#" data-view="maintenance">Bảo trì</a>
+          <a href="#" data-view="reports">Báo cáo</a>
+          <a href="#" data-view="settings">Cấu hình</a>
+        </nav>
+        <div class="top-actions">
+          <button class="icon-button" type="button" aria-label="Cài đặt bộ lọc">=</button>
+          <button class="primary-button" id="addAssetButton" type="button">+ Thêm thiết bị</button>
+        </div>
+      </header>
+
+      <section class="hero">
+        <div>
+          <button class="back-button" type="button" aria-label="Quay lại">‹</button>
+          <h1 class="hero-title-blue">QUẢN LÝ THIẾT BỊ TDW</h1>
+          <p class="hero-copy">Theo dõi máy tính, máy in, màn hình, ổ cứng và thiết bị vận hành trong công ty TDW.</p>
+        </div>
+        <div class="sync-pill" id="dataSource">Google Sheet</div>
+      </section>
+
+      <section class="metrics" id="metrics"></section>
+
+      <section class="dashboard-insights dashboard-insights-standalone" id="dashboardInsights"></section>
+
+      <section class="toolbar" aria-label="Bộ lọc thiết bị">
+        <div class="active-filter">
+          <span>Active filters</span>
+          <strong id="filterCount">0</strong>
+        </div>
+        <label class="search">
+          <span>Tìm kiếm</span>
+          <input id="searchInput" type="search" placeholder="Tên máy, người dùng, ghi chú..." />
+        </label>
+        <label>
+          <span>Nhóm</span>
+          <select id="groupFilter"></select>
+        </label>
+        <label>
+          <span>Năm</span>
+          <select id="yearFilter"></select>
+        </label>
+        <label>
+          <span>Bộ phận</span>
+          <select id="departmentFilter"></select>
+        </label>
+        <label>
+          <span>Tình trạng</span>
+          <select id="statusFilter"></select>
+        </label>
+      </section>
+
+      <section class="content" id="mainContent">
+        <div class="list-panel">
+          <div class="panel-head">
+            <h2>Danh sách thiết bị</h2>
+            <span id="resultCount">0 thiết bị</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mã tài sản</th>
+                  <th>Thiết bị</th>
+                  <th>Nhóm</th>
+                  <th>Năm</th>
+                  <th>Người dùng</th>
+                  <th>Phần mềm</th>
+                  <th>Tình trạng</th>
+                </tr>
+              </thead>
+              <tbody id="assetRows">
+                <tr><td colspan="7" class="muted">Đang tải dữ liệu từ Google Sheet...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination" id="pagination"></div>
+        </div>
+        <aside class="detail" id="assetDetail">
+          <p class="muted">Chọn một thiết bị để xem chi tiết.</p>
+        </aside>
+      </section>
+
+      <div class="modal-backdrop" id="assetModal" hidden>
+        <form class="modal" id="assetForm">
+          <div class="modal-head">
+            <div>
+              <p class="eyebrow">Thiết bị TDW</p>
+              <h2 id="assetFormTitle">Thêm thiết bị</h2>
+            </div>
+            <button class="icon-button" type="button" id="closeAssetModal" aria-label="Đóng">×</button>
+          </div>
+          <input type="hidden" name="asset_id" />
+          <input type="hidden" name="created_at" />
+          <div class="form-grid">
+            <label class="span-2">Tên thiết bị<input name="asset_name" required /></label>
+            <label>Mã tài sản<input name="asset_code" placeholder="Tự tạo nếu bỏ trống" /></label>
+            <label>Nhóm<select name="asset_group" required></select></label>
+            <label>Loại thiết bị<select name="asset_type"></select></label>
+            <label>Hãng<input name="brand" /></label>
+            <label>Năm<input name="purchase_year" inputmode="numeric" /></label>
+            <label>Số lượng<input name="quantity" inputmode="numeric" /></label>
+            <label>Người dùng/phòng ban<input name="assigned_to" /></label>
+            <label>Phòng ban<select name="department"></select></label>
+            <label>Tình trạng<select name="status" required></select></label>
+            <label>Phần mềm<select name="software_license"></select></label>
+            <label class="span-2">Ghi chú<textarea name="note" rows="3"></textarea></label>
+          </div>
+          <div class="modal-actions">
+            <button class="secondary-button" type="button" id="cancelAssetForm">Hủy</button>
+            <button class="primary-button" type="submit" id="saveAssetButton">Lưu thiết bị</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-backdrop" id="settingModal" hidden>
+        <form class="modal compact-modal" id="settingForm">
+          <div class="modal-head">
+            <div>
+              <p class="eyebrow">CẤU HÌNH</p>
+              <h2 id="settingFormTitle">THÊM CẤU HÌNH</h2>
+            </div>
+            <button class="icon-button" type="button" id="closeSettingModal" aria-label="Đóng">×</button>
+          </div>
+          <input type="hidden" name="setting_id" />
+          <div class="form-grid">
+            <label>Loại<select name="setting_type"></select></label>
+            <label>Thứ tự<input name="sort_order" inputmode="numeric" value="999" /></label>
+            <label class="span-2">Giá trị<input name="setting_value" required placeholder="VD: PHONG_HCNS hoặc Office 2016" /></label>
+            <label class="span-2">Tên hiển thị<input name="display_name" required placeholder="VD: Phòng HCNS" /></label>
+          </div>
+          <div class="modal-actions">
+            <button class="secondary-button" type="button" id="cancelSettingForm">Hủy</button>
+            <button class="primary-button" type="submit">Lưu cấu hình</button>
+          </div>
+        </form>
+      </div>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

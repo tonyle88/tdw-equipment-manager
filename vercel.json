@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "public": true,
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/app/index.html"
+    },
+    {
+      "source": "/styles.css",
+      "destination": "/app/styles.css"
+    },
+    {
+      "source": "/app.js",
+      "destination": "/app/app.js"
+    },
+    {
+      "source": "/config.js",
+      "destination": "/app/config.js"
+    },
+    {
+      "source": "/assets/:path*",
+      "destination": "/app/assets/:path*"
+    }
+  ]
+}
