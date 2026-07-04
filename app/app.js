@@ -51,6 +51,7 @@ const state = {
       loginScreen: document.querySelector("#loginScreen"),
       loginForm: document.querySelector("#loginForm"),
       loginError: document.querySelector("#loginError"),
+      toastStack: document.querySelector("#toastStack"),
       loginLogo: document.querySelector(".login-logo"),
       brandLogo: document.querySelector(".brand-logo"),
       toolbar: document.querySelector(".toolbar"),
@@ -140,6 +141,24 @@ const state = {
     updateUserChrome();
   }
 
+  function showToast(title, message = "") {
+    if (!els.toastStack) return;
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.innerHTML = `
+      <div class="toast-icon">✓</div>
+      <div>
+        <strong>${escapeHtml(title)}</strong>
+        <span>${escapeHtml(message)}</span>
+      </div>
+    `;
+    els.toastStack.appendChild(toast);
+    window.setTimeout(() => {
+      toast.classList.add("is-hiding");
+      toast.addEventListener("animationend", () => toast.remove(), { once: true });
+    }, 2600);
+  }
+
   function updateUserChrome() {
     if (els.currentUserChip) els.currentUserChip.textContent = state.currentUser ? `${state.currentUser.full_name} · ${state.currentUser.role}` : "";
     document.querySelectorAll("[data-admin-only]").forEach((node) => {
@@ -156,6 +175,7 @@ const state = {
       setAuthToken(payload.token);
       state.currentUser = payload.user;
       await startApp();
+      showToast("Đăng nhập thành công", `Xin chào ${state.currentUser?.full_name || "TDW"}`);
     } catch (error) {
       showLogin(error.message);
     }
