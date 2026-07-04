@@ -97,8 +97,8 @@ const state = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fn, args: serverArgs }),
     });
-    if (!response.ok) throw new Error(`API proxy lỗi ${response.status}`);
-    const payload = await response.json();
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || `API proxy lỗi ${response.status}`);
     if (!payload || payload.ok === false) throw new Error(payload?.error || "API xử lý không thành công");
     return payload;
   }

@@ -22,7 +22,16 @@ async function callGoogleScript(fn, args = []) {
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({ action: fn, args }),
   });
-  const payload = await response.json();
+
+  const responseText = await response.text();
+  let payload;
+  try {
+    payload = JSON.parse(responseText);
+  } catch (error) {
+    const compactText = responseText.replace(/\s+/g, " ").trim().slice(0, 180);
+    throw new Error(`Apps Script không trả JSON. Hãy deploy lại Web App mới. Phản hồi: ${compactText || response.status}`);
+  }
+
   if (!response.ok || payload.ok === false) throw new Error(payload.error || `Apps Script lỗi ${response.status}`);
   return payload;
 }
