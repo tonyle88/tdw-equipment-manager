@@ -4,14 +4,20 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TDW Equipment Manager</title>
+    <link rel="icon" href="assets/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="assets/favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="assets/favicon-192.png" />
+    <link rel="preload" href="assets/tdw-logo.webp" as="image" type="image/webp" />
     <link rel="stylesheet" href="styles.css" />
+    <script src="config.js" defer></script>
+    <script src="app.js" defer></script>
   </head>
   <body>
     <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
 
     <section class="boot-screen" id="bootScreen">
       <div class="boot-card">
-        <img class="boot-logo" src="assets/tdw-logo.jpg" alt="TDW" />
+        <img class="boot-logo" src="assets/tdw-logo.webp" width="104" height="68" alt="TDW" />
         <strong>TDW EQUIPMENT MANAGER</strong>
         <span>Đang kiểm tra phiên đăng nhập...</span>
       </div>
@@ -19,7 +25,7 @@
 
     <section class="login-screen" id="loginScreen" hidden>
       <form class="login-card" id="loginForm">
-        <img class="login-logo" src="" alt="TDW" />
+        <img class="login-logo" src="assets/tdw-logo.webp" width="96" height="62" alt="TDW" />
         <p class="eyebrow">TDW EQUIPMENT MANAGER</p>
         <h1>ĐĂNG NHẬP QUẢN TRỊ</h1>
         <label>Tài khoản<input name="username" autocomplete="username" required /></label>
@@ -32,7 +38,7 @@
     <main class="shell" id="appShell" hidden>
       <header class="topbar" aria-label="Thanh điều hướng">
         <div class="brand">
-          <img class="brand-logo" src="assets/tdw-logo.jpg" alt="TDW" />
+          <img class="brand-logo" src="assets/tdw-logo.webp" width="70" height="46" alt="TDW" />
           <div>
             <strong>TDW</strong>
             <span>Better Service For Life</span>
@@ -216,8 +222,5 @@
         </form>
       </div>
     </main>
-
-    <script src="config.js"></script>
-    <script src="app.js"></script>
   </body>
 </html>
