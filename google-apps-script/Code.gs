@@ -450,17 +450,33 @@ function ensureUsersSheet_(sheet) {
       currentHeaders.push(header);
     }
   });
-  if (sheet.getLastRow() < 2) {
-    const admin = normalizeUser_({
-      username: "admin",
-      full_name: "TDW Admin",
-      role: "admin",
-      permissions: "all",
-      active: "TRUE",
-      password: "TDW@2026",
+  ensureDefaultAdmin_(sheet, desired);
+}
+
+function ensureDefaultAdmin_(sheet, headers) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length > 1) {
+    const headerRow = values[0].map((header) => String(header).trim());
+    const roleIndex = headerRow.indexOf("role");
+    const activeIndex = headerRow.indexOf("active");
+    const hasActiveAdmin = values.some((row, index) => {
+      if (index === 0) return false;
+      const role = String(row[roleIndex] || "").toLowerCase();
+      const active = String(row[activeIndex] || "TRUE").toUpperCase();
+      return role === "admin" && active !== "FALSE";
     });
-    sheet.appendRow(desired.map((header) => admin[header] || ""));
+    if (hasActiveAdmin) return;
   }
+
+  const admin = normalizeUser_({
+    username: "admin",
+    full_name: "TDW Admin",
+    role: "admin",
+    permissions: "all",
+    active: "TRUE",
+    password: "TDW@2026",
+  });
+  sheet.appendRow(headers.map((header) => admin[header] || ""));
 }
 
 function normalizeUser_(user) {
