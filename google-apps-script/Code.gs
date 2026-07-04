@@ -450,7 +450,7 @@ function ensureUsersSheet_(sheet) {
       currentHeaders.push(header);
     }
   });
-  ensureDefaultAdmin_(sheet, desired);
+  ensureDefaultAdmin_(sheet, currentHeaders);
 }
 
 function ensureDefaultAdmin_(sheet, headers) {
