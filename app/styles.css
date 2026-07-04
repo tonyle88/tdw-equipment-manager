@@ -75,6 +75,44 @@
   @keyframes toastOut {
     to { transform: translateY(-10px); opacity: 0; }
   }
+  .boot-screen {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+  }
+  .boot-screen[hidden] { display: none; }
+  .boot-card {
+    width: min(360px, 100%);
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    padding: 28px;
+    border: 1px solid rgba(255,255,255,.74);
+    border-radius: 24px;
+    background: rgba(255,255,255,.84);
+    box-shadow: 0 24px 70px rgba(32,31,68,.16);
+    color: var(--tdw-blue);
+    text-align: center;
+  }
+  .boot-logo {
+    width: 104px;
+    height: 68px;
+    object-fit: contain;
+    padding: 8px;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 12px 24px rgba(17,24,39,.08);
+  }
+  .boot-card strong {
+    font-size: 15px;
+    font-weight: 900;
+  }
+  .boot-card span {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+  }
   .login-screen {
     min-height: 100vh;
     display: grid;

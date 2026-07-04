@@ -68,6 +68,7 @@ const state = {
     Object.assign(els, {
       metrics: document.querySelector("#metrics"),
       appShell: document.querySelector("#appShell"),
+      bootScreen: document.querySelector("#bootScreen"),
       loginScreen: document.querySelector("#loginScreen"),
       loginForm: document.querySelector("#loginForm"),
       loginError: document.querySelector("#loginError"),
@@ -147,6 +148,7 @@ const state = {
   }
 
   function showLogin(error = "") {
+    if (els.bootScreen) els.bootScreen.hidden = true;
     if (els.appShell) els.appShell.hidden = true;
     if (els.loginScreen) els.loginScreen.hidden = false;
     if (els.loginError) {
@@ -156,6 +158,7 @@ const state = {
   }
 
   function showApp() {
+    if (els.bootScreen) els.bootScreen.hidden = true;
     if (els.loginScreen) els.loginScreen.hidden = true;
     if (els.appShell) els.appShell.hidden = false;
     updateUserChrome();
