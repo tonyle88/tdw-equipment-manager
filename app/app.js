@@ -16,6 +16,16 @@ const state = {
 
   const AUTH_STORAGE_KEY = "tdw_equipment_auth_token";
 
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;",
+    }[char]));
+  }
+
   const fallbackLabels = {
     asset_group: {
       MAY_TINH_LAPTOP: "Máy tính - Laptop",
