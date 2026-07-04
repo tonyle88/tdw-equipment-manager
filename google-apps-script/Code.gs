@@ -136,6 +136,9 @@ function doPost(event) {
     if (action === "currentUser") {
       return jsonResponse_(currentUser(args[0] || body.token || ""));
     }
+    if (action === "logoutUser") {
+      return jsonResponse_(logoutUser(args[0] || body.token || ""));
+    }
     if (action === "getAppData") {
       return jsonResponse_(getAppData(args[0] || body.token || ""));
     }
@@ -329,21 +332,28 @@ function loginUser(credentials) {
     const username = String(credentials.username || "").trim().toLowerCase();
     const password = String(credentials.password || "");
     if (!username || !password) throw new Error("Vui lòng nhập tài khoản và mật khẩu");
+    enforceLoginThrottle_(username);
 
     ensureUsersReady_();
     const user = findUserByUsername_(username);
-    if (!user || String(user.active || "TRUE").toUpperCase() === "FALSE") throw new Error("Tài khoản không tồn tại hoặc đã bị khóa");
-    if (hashPassword_(password, user.password_salt) !== user.password_hash) throw new Error("Mật khẩu không đúng");
+    if (!user || String(user.active || "TRUE").toUpperCase() === "FALSE") throwInvalidLogin_(username);
+    if (hashPassword_(password, user.password_salt) !== user.password_hash) throwInvalidLogin_(username);
 
     user.last_login_at = new Date().toISOString();
     upsertObject_(SHEET_NAMES.users, "user_id", user);
 
     const token = Utilities.getUuid() + Utilities.getUuid();
     CacheService.getScriptCache().put(`session_${token}`, user.user_id, 21600);
+    clearLoginFailures_(username);
     return { ok: true, token, user: publicUser_(user), updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
   }
+}
+
+function logoutUser(token) {
+  if (token) CacheService.getScriptCache().remove(`session_${token}`);
+  return { ok: true };
 }
 
 function currentUser(token) {
@@ -430,6 +440,24 @@ function requireEdit_(token) {
   const role = String(user.role || "").toLowerCase();
   if (role === "admin" || permissions === "all" || permissions.split(",").map((item) => item.trim()).indexOf("edit") !== -1) return user;
   throw new Error("Tài khoản này chỉ có quyền xem, không được chỉnh sửa thiết bị");
+}
+
+function enforceLoginThrottle_(username) {
+  const cache = CacheService.getScriptCache();
+  const attempts = Number(cache.get(`login_fail_${username}`) || 0);
+  if (attempts >= 5) throw new Error("Đăng nhập sai quá nhiều lần, vui lòng thử lại sau 15 phút");
+}
+
+function throwInvalidLogin_(username) {
+  const cache = CacheService.getScriptCache();
+  const key = `login_fail_${username}`;
+  const attempts = Number(cache.get(key) || 0) + 1;
+  cache.put(key, String(attempts), 900);
+  throw new Error("Tài khoản hoặc mật khẩu không đúng");
+}
+
+function clearLoginFailures_(username) {
+  CacheService.getScriptCache().remove(`login_fail_${username}`);
 }
 
 function ensureUsersReady_() {

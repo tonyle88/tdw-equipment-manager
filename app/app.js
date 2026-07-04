@@ -26,6 +26,16 @@ const state = {
     }[char]));
   }
 
+  function safeClass(value) {
+    return String(value ?? "").replace(/[^A-Za-z0-9_-]/g, "");
+  }
+
+  function csvCell(value) {
+    const text = String(value ?? "");
+    const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text;
+    return `"${safeText.replace(/"/g, '""')}"`;
+  }
+
   const fallbackLabels = {
     asset_group: {
       MAY_TINH_LAPTOP: "Máy tính - Laptop",
@@ -191,7 +201,15 @@ const state = {
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    const token = state.authToken;
+    if (token) {
+      try {
+        await callServer("logoutUser");
+      } catch (error) {
+        console.warn("Không thể hủy phiên trên server", error);
+      }
+    }
     setAuthToken("");
     state.currentUser = null;
     showLogin();
@@ -375,14 +393,14 @@ const state = {
       return;
     }
     els.rows.innerHTML = visibleRows.map((asset) => `
-      <tr data-id="${asset.asset_id}" class="${asset.asset_id === state.selectedId ? "selected" : ""}">
-        <td>${asset.asset_code}</td>
-        <td class="asset-name">${asset.asset_name || ""}</td>
-        <td>${asset.asset_group_label || ""}</td>
-        <td>${asset.purchase_year || ""}</td>
-        <td>${asset.assigned_to || asset.department || ""}</td>
-        <td>${asset.software_license || ""}</td>
-        <td><span class="badge ${asset.status || ""}">${labelFor("status", asset.status) || "Chưa rõ"}</span></td>
+      <tr data-id="${escapeHtml(asset.asset_id)}" class="${asset.asset_id === state.selectedId ? "selected" : ""}">
+        <td>${escapeHtml(asset.asset_code)}</td>
+        <td class="asset-name">${escapeHtml(asset.asset_name || "")}</td>
+        <td>${escapeHtml(asset.asset_group_label || "")}</td>
+        <td>${escapeHtml(asset.purchase_year || "")}</td>
+        <td>${escapeHtml(asset.assigned_to || asset.department || "")}</td>
+        <td>${escapeHtml(asset.software_license || "")}</td>
+        <td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status) || "Chưa rõ")}</span></td>
       </tr>
     `).join("");
   }
@@ -413,24 +431,24 @@ const state = {
       return;
     }
     els.detail.innerHTML = `
-      <span class="badge ${asset.status || ""}">${labelFor("status", asset.status) || "Chưa rõ"}</span>
-      <h2>${asset.asset_name || "Thiết bị chưa đặt tên"}</h2>
-      <p class="muted">${asset.asset_code}</p>
+      <span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status) || "Chưa rõ")}</span>
+      <h2>${escapeHtml(asset.asset_name || "Thiết bị chưa đặt tên")}</h2>
+      <p class="muted">${escapeHtml(asset.asset_code)}</p>
       <div class="detail-grid">
-        <div class="mini-card"><span>Năm</span><strong>${asset.purchase_year || "Chưa rõ"}</strong></div>
-        <div class="mini-card"><span>Số lượng</span><strong>${asset.quantity || "Chưa rõ"}</strong></div>
-        <div class="mini-card"><span>Loại</span><strong>${asset.asset_type || "Thiết bị"}</strong></div>
-        <div class="mini-card"><span>Hãng</span><strong>${asset.brand || "Chưa tách"}</strong></div>
+        <div class="mini-card"><span>Năm</span><strong>${escapeHtml(asset.purchase_year || "Chưa rõ")}</strong></div>
+        <div class="mini-card"><span>Số lượng</span><strong>${escapeHtml(asset.quantity || "Chưa rõ")}</strong></div>
+        <div class="mini-card"><span>Loại</span><strong>${escapeHtml(asset.asset_type || "Thiết bị")}</strong></div>
+        <div class="mini-card"><span>Hãng</span><strong>${escapeHtml(asset.brand || "Chưa tách")}</strong></div>
       </div>
       <dl>
-        <div><dt>Nhóm</dt><dd>${asset.asset_group_label || ""}</dd></div>
-        <div><dt>Người dùng/phòng ban</dt><dd>${asset.assigned_to || asset.department || ""}</dd></div>
-        <div><dt>Phần mềm</dt><dd>${asset.software_license || "Không có dữ liệu"}</dd></div>
-        <div><dt>Ghi chú</dt><dd>${asset.note || "Không có ghi chú"}</dd></div>
+        <div><dt>Nhóm</dt><dd>${escapeHtml(asset.asset_group_label || "")}</dd></div>
+        <div><dt>Người dùng/phòng ban</dt><dd>${escapeHtml(asset.assigned_to || asset.department || "")}</dd></div>
+        <div><dt>Phần mềm</dt><dd>${escapeHtml(asset.software_license || "Không có dữ liệu")}</dd></div>
+        <div><dt>Ghi chú</dt><dd>${escapeHtml(asset.note || "Không có ghi chú")}</dd></div>
       </dl>
       ${canEditAssets() ? `<div class="detail-actions">
-        <button class="secondary-button" type="button" data-edit-asset="${asset.asset_id}">Sửa</button>
-        <button class="danger-button" type="button" data-delete-asset="${asset.asset_id}">Xóa</button>
+        <button class="secondary-button" type="button" data-edit-asset="${escapeHtml(asset.asset_id)}">Sửa</button>
+        <button class="danger-button" type="button" data-delete-asset="${escapeHtml(asset.asset_id)}">Xóa</button>
       </div>` : ""}
     `;
   }
@@ -578,7 +596,7 @@ const state = {
             <h3>DANH SÁCH ƯU TIÊN</h3>
             <table class="mini-table maintenance-table">
               <thead><tr><th>THIẾT BỊ</th><th>TÌNH TRẠNG</th><th>NGƯỜI DÙNG</th></tr></thead>
-              <tbody>${watchList.slice(0, 12).map((asset) => `<tr><td>${asset.asset_name}</td><td><span class="badge ${asset.status}">${labelFor("status", asset.status)}</span></td><td>${asset.assigned_to || asset.department || ""}</td></tr>`).join("") || `<tr><td colspan="3">CHƯA CÓ THIẾT BỊ CẦN XỬ LÝ.</td></tr>`}</tbody>
+              <tbody>${watchList.slice(0, 12).map((asset) => `<tr><td>${escapeHtml(asset.asset_name)}</td><td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status))}</span></td><td>${escapeHtml(asset.assigned_to || asset.department || "")}</td></tr>`).join("") || `<tr><td colspan="3">CHƯA CÓ THIẾT BỊ CẦN XỬ LÝ.</td></tr>`}</tbody>
             </table>
           </article>
           <article class="module-card">
@@ -637,16 +655,16 @@ const state = {
                   ${settingsByType(type).map((item, index, list) => `
                     <div class="setting-row">
                       <div>
-                        <strong>${item.display_name}</strong>
-                        <small>${item.setting_value} · thứ tự ${item.sort_order}</small>
+                        <strong>${escapeHtml(item.display_name)}</strong>
+                        <small>${escapeHtml(item.setting_value)} · thứ tự ${escapeHtml(item.sort_order)}</small>
                       </div>
                       <div class="setting-actions">
                         <div class="setting-order-buttons" aria-label="Đổi thứ tự">
-                          <button class="secondary-button" type="button" data-move-setting="${item.setting_id}" data-direction="up" ${index === 0 ? "disabled" : ""}>↑</button>
-                          <button class="secondary-button" type="button" data-move-setting="${item.setting_id}" data-direction="down" ${index === list.length - 1 ? "disabled" : ""}>↓</button>
+                          <button class="secondary-button" type="button" data-move-setting="${escapeHtml(item.setting_id)}" data-direction="up" ${index === 0 ? "disabled" : ""}>↑</button>
+                          <button class="secondary-button" type="button" data-move-setting="${escapeHtml(item.setting_id)}" data-direction="down" ${index === list.length - 1 ? "disabled" : ""}>↓</button>
                         </div>
-                        <button class="secondary-button" type="button" data-edit-setting="${item.setting_id}">Sửa</button>
-                        <button class="danger-button" type="button" data-delete-setting="${item.setting_id}">Xóa</button>
+                        <button class="secondary-button" type="button" data-edit-setting="${escapeHtml(item.setting_id)}">Sửa</button>
+                        <button class="danger-button" type="button" data-delete-setting="${escapeHtml(item.setting_id)}">Xóa</button>
                       </div>
                     </div>
                   `).join("") || `<p>Chưa có cấu hình.</p>`}
@@ -769,7 +787,7 @@ const state = {
       state.users = payload.users || [];
       renderUsersList();
     } catch (error) {
-      els.content.querySelector("#usersList").innerHTML = `<p class="muted">Không tải được user: ${error.message}</p>`;
+      els.content.querySelector("#usersList").innerHTML = `<p class="muted">Không tải được user: ${escapeHtml(error.message)}</p>`;
     }
   }
 
@@ -779,15 +797,15 @@ const state = {
     list.innerHTML = state.users.map((user) => `
       <div class="user-row">
         <div>
-          <strong>${user.full_name || user.username}</strong>
-          <small>${user.username}</small>
+          <strong>${escapeHtml(user.full_name || user.username)}</strong>
+          <small>${escapeHtml(user.username)}</small>
         </div>
-        <span class="role-pill ${user.role}">${user.role}</span>
+        <span class="role-pill ${safeClass(user.role)}">${escapeHtml(user.role)}</span>
         <span class="user-status">${user.active ? "Đang hoạt động" : "Đã khóa"}</span>
         <div class="user-row-actions">
-          <button class="secondary-button" type="button" data-edit-user="${user.user_id}">Sửa</button>
-          <button class="secondary-button" type="button" data-reset-user="${user.user_id}">Reset mật khẩu</button>
-          <button class="danger-button" type="button" data-delete-user="${user.user_id}">${user.active ? "Khóa" : "Xóa"}</button>
+          <button class="secondary-button" type="button" data-edit-user="${escapeHtml(user.user_id)}">Sửa</button>
+          <button class="secondary-button" type="button" data-reset-user="${escapeHtml(user.user_id)}">Reset mật khẩu</button>
+          <button class="danger-button" type="button" data-delete-user="${escapeHtml(user.user_id)}">${user.active ? "Khóa" : "Xóa"}</button>
         </div>
       </div>
     `).join("") || `<p class="muted">Chưa có user.</p>`;
@@ -897,7 +915,7 @@ const state = {
     const max = Math.max(1, ...entries.map(([, count]) => count));
     return `<div class="bar-chart">${entries.map(([label, count], index) => `
       <div class="bar-row">
-        <div class="bar-label">${label}</div>
+        <div class="bar-label">${escapeHtml(label)}</div>
         <div class="bar-track" style="--bar-color:${colorForLabel(label, index)};">
           <div class="bar-fill" style="width:${Math.max(8, (count / max) * 100)}%; background:${colorForLabel(label, index)};"></div>
         </div>
@@ -920,13 +938,13 @@ const state = {
     return `
       <div class="pie-wrap">
         <div class="pie-chart" style="background: conic-gradient(${stops});">
-          <div class="pie-center"><strong>${Math.round((top[1] / total) * 100)}%</strong><span>${top[0]}</span></div>
+          <div class="pie-center"><strong>${Math.round((top[1] / total) * 100)}%</strong><span>${escapeHtml(top[0])}</span></div>
         </div>
         <div class="pie-legend">
           ${entries.map(([label, count], index) => `
             <div class="legend-row">
               <i style="background:${colorForLabel(label, index)}"></i>
-              <span>${label}</span>
+              <span>${escapeHtml(label)}</span>
               <strong>${Math.round((count / total) * 100)}%</strong>
             </div>
           `).join("")}
@@ -946,7 +964,7 @@ const state = {
             <div class="report-item">
               <div class="report-item-main">
                 <i style="background:${colorForLabel(label, index)}"></i>
-                <span>${label}</span>
+                <span>${escapeHtml(label)}</span>
               </div>
               <div class="report-item-stat">
                 <strong>${count}</strong>
@@ -962,7 +980,7 @@ const state = {
   function exportCsv() {
     const headers = ["Mã tài sản", "Tên thiết bị", "Nhóm", "Loại", "Năm", "Người dùng", "Phòng ban", "Phần mềm", "Tình trạng", "Ghi chú"];
     const rows = state.assets.map((asset) => [asset.asset_code, asset.asset_name, asset.asset_group_label, asset.asset_type, asset.purchase_year, asset.assigned_to, asset.department, asset.software_license, labelFor("status", asset.status), asset.note]);
-    const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell || "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
