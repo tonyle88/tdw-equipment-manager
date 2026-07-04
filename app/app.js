@@ -12,6 +12,9 @@ const state = {
     authToken: "",
     currentUser: null,
     users: [],
+    usersLoaded: false,
+    usersLoading: null,
+    usersError: "",
   };
 
   const AUTH_STORAGE_KEY = "tdw_equipment_auth_token";
@@ -215,6 +218,10 @@ const state = {
     }
     setAuthToken("");
     state.currentUser = null;
+    state.users = [];
+    state.usersLoaded = false;
+    state.usersLoading = null;
+    state.usersError = "";
     showLogin();
   }
 
@@ -226,6 +233,29 @@ const state = {
     renderMetrics();
     showApp();
     renderDeviceView("overview");
+    if (isAdmin()) preloadUsers().catch(() => null);
+  }
+
+  function preloadUsers({ force = false } = {}) {
+    if (!isAdmin()) return Promise.resolve([]);
+    if (state.usersLoaded && !force) return Promise.resolve(state.users);
+    if (state.usersLoading) return state.usersLoading;
+    state.usersError = "";
+    state.usersLoading = callServer("listUsers")
+      .then((payload) => {
+        state.users = payload.users || [];
+        state.usersLoaded = true;
+        state.usersError = "";
+        return state.users;
+      })
+      .catch((error) => {
+        state.usersError = error.message;
+        throw error;
+      })
+      .finally(() => {
+        state.usersLoading = null;
+      });
+    return state.usersLoading;
   }
 
   function normalizeAssets(rows) {
@@ -785,9 +815,12 @@ const state = {
       </div>
     `;
     els.content.querySelector("#openUserModal").addEventListener("click", () => openUserModal());
+    if (state.usersLoaded) {
+      renderUsersList();
+      return;
+    }
     try {
-      const payload = await callServer("listUsers");
-      state.users = payload.users || [];
+      await preloadUsers({ force: true });
       renderUsersList();
     } catch (error) {
       els.content.querySelector("#usersList").innerHTML = `<p class="muted">Không tải được user: ${escapeHtml(error.message)}</p>`;
@@ -860,6 +893,7 @@ const state = {
     try {
       const user = Object.fromEntries(new FormData(event.target).entries());
       await callServer("saveUser", user);
+      state.usersLoaded = false;
       closeUserModal();
       if (state.activeView === "users") await renderUsersView();
     } catch (error) {
@@ -871,6 +905,7 @@ const state = {
     if (!confirm("Khóa user này?")) return;
     try {
       await callServer("deleteUser", userId);
+      state.usersLoaded = false;
       await renderUsersView();
     } catch (error) {
       alert(error.message);
@@ -882,6 +917,7 @@ const state = {
     if (!newPassword) return;
     try {
       await callServer("resetUserPassword", userId, newPassword);
+      state.usersLoaded = false;
       alert("Đã reset mật khẩu.");
     } catch (error) {
       alert(error.message);
