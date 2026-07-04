@@ -20,6 +20,44 @@
     background: linear-gradient(135deg, #eceaf8 0%, #f7f8fc 48%, #e4e1f2 100%);
     color: var(--ink);
   }
+  .login-screen {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+  }
+  .login-screen[hidden] { display: none; }
+  .login-card {
+    width: min(440px, 100%);
+    display: grid;
+    gap: 16px;
+    padding: 28px;
+    border: 1px solid rgba(255,255,255,.74);
+    border-radius: 24px;
+    background: rgba(255,255,255,.88);
+    box-shadow: 0 24px 70px rgba(32,31,68,.18);
+  }
+  .login-logo {
+    width: 96px;
+    height: 62px;
+    object-fit: contain;
+    padding: 7px;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 12px 24px rgba(17,24,39,.08);
+  }
+  .login-card h1 {
+    color: var(--tdw-blue);
+    font-size: 30px;
+  }
+  .login-error {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    color: #b42318;
+    background: #ffe0e0;
+    font-weight: 800;
+  }
   .shell {
     width: min(1480px, calc(100% - 32px));
     margin: 16px auto;
@@ -69,6 +107,18 @@
   }
   .nav-pills a.active { background: linear-gradient(135deg, var(--tdw-blue-dark), var(--tdw-blue)); color: #fff; }
   .top-actions { gap: 10px; }
+  .user-chip {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 10px 12px;
+    border-radius: 999px;
+    color: var(--tdw-blue);
+    background: #e0f7ff;
+    font-size: 12px;
+    font-weight: 900;
+  }
   button { border: 0; font: inherit; cursor: pointer; }
   .icon-button, .back-button {
     display: inline-grid;
@@ -473,6 +523,38 @@
   }
   .setting-actions .secondary-button, .setting-actions .danger-button { min-height: 32px; padding: 0 10px; }
   .setting-actions button:disabled { opacity: .42; cursor: not-allowed; }
+  .users-panel { display: grid; gap: 14px; padding: 20px; color: #fff; grid-column: 1 / -1; }
+  .users-list { display: grid; gap: 10px; }
+  .user-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) 140px 150px 260px;
+    gap: 12px;
+    align-items: center;
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.09);
+  }
+  .user-row strong, .user-row small { display: block; }
+  .user-row small { margin-top: 3px; color: rgba(255,255,255,.58); font-size: 12px; }
+  .role-pill {
+    justify-self: start;
+    min-width: 92px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    text-align: center;
+    color: #0f172a;
+    background: #e0f2fe;
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+  .role-pill.admin { background: #dcfce7; color: #15803d; }
+  .role-pill.manager { background: #ede9fe; color: #6d28d9; }
+  .role-pill.viewer { background: #ffedd5; color: #c2410c; }
+  .user-status { color: rgba(255,255,255,.74); font-weight: 800; }
+  .user-row-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+  .user-row-actions .secondary-button, .user-row-actions .danger-button { min-height: 34px; padding: 0 10px; }
   .modal-backdrop {
     position: fixed;
     inset: 0;

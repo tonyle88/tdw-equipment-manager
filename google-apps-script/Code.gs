@@ -17,6 +17,7 @@ function doGet(event) {
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
 
+    requireAuth_(event.parameter.token || "");
     const sheetName = (event.parameter.sheet || SHEET_NAMES.assets).trim();
     const rows = readSheetAsObjects_(sheetName);
     return jsonResponse_({
@@ -54,16 +55,19 @@ function getSettings() {
 }
 
 function getAppData() {
+  const user = arguments.length ? requireAuth_(arguments[0]) : null;
   return {
     ok: true,
     assets: readSheetAsObjects_(SHEET_NAMES.assets),
     settings: readSheetAsObjects_(SHEET_NAMES.settings),
+    currentUser: user ? publicUser_(user) : null,
     updated_at: new Date().toISOString(),
   };
 }
 
 function saveAsset(asset) {
   try {
+    if (arguments.length > 1) requireEdit_(arguments[1]);
     const normalized = normalizeAsset_(asset || {});
     const saved = upsertObject_(SHEET_NAMES.assets, "asset_id", normalized);
     return { ok: true, data: saved, updated_at: new Date().toISOString() };
@@ -74,6 +78,7 @@ function saveAsset(asset) {
 
 function deleteAsset(assetId) {
   try {
+    if (arguments.length > 1) requireEdit_(arguments[1]);
     if (!assetId) throw new Error("Missing asset_id");
     const sheet = getSheet_(SHEET_NAMES.assets);
     const values = sheet.getDataRange().getValues();
@@ -92,6 +97,7 @@ function deleteAsset(assetId) {
 
 function saveSetting(setting) {
   try {
+    if (arguments.length > 1) requireAdmin_(arguments[1]);
     const normalized = normalizeSetting_(setting || {});
     const saved = upsertObject_(SHEET_NAMES.settings, "setting_id", normalized);
     return { ok: true, data: saved, updated_at: new Date().toISOString() };
@@ -102,6 +108,7 @@ function saveSetting(setting) {
 
 function deleteSetting(settingId) {
   try {
+    if (arguments.length > 1) requireAdmin_(arguments[1]);
     if (!settingId) throw new Error("Missing setting_id");
     const sheet = getSheet_(SHEET_NAMES.settings);
     const values = sheet.getDataRange().getValues();
@@ -123,17 +130,38 @@ function doPost(event) {
     const action = body.action;
     const args = body.args || [];
 
+    if (action === "loginUser") {
+      return jsonResponse_(loginUser(args[0] || body.credentials || {}));
+    }
+    if (action === "currentUser") {
+      return jsonResponse_(currentUser(args[0] || body.token || ""));
+    }
+    if (action === "getAppData") {
+      return jsonResponse_(getAppData(args[0] || body.token || ""));
+    }
     if (action === "saveAsset" || action === "upsertAsset") {
-      return jsonResponse_(saveAsset(args[0] || body.asset || {}));
+      return jsonResponse_(saveAsset(args[0] || body.asset || {}, args[1] || body.token || ""));
     }
     if (action === "deleteAsset") {
-      return jsonResponse_(deleteAsset(args[0] || body.asset_id || ""));
+      return jsonResponse_(deleteAsset(args[0] || body.asset_id || "", args[1] || body.token || ""));
     }
     if (action === "saveSetting") {
-      return jsonResponse_(saveSetting(args[0] || body.setting || {}));
+      return jsonResponse_(saveSetting(args[0] || body.setting || {}, args[1] || body.token || ""));
     }
     if (action === "deleteSetting") {
-      return jsonResponse_(deleteSetting(args[0] || body.setting_id || ""));
+      return jsonResponse_(deleteSetting(args[0] || body.setting_id || "", args[1] || body.token || ""));
+    }
+    if (action === "listUsers") {
+      return jsonResponse_(listUsers(args[0] || body.token || ""));
+    }
+    if (action === "saveUser") {
+      return jsonResponse_(saveUser(args[0] || body.user || {}, args[1] || body.token || ""));
+    }
+    if (action === "deleteUser") {
+      return jsonResponse_(deleteUser(args[0] || body.user_id || "", args[1] || body.token || ""));
+    }
+    if (action === "resetUserPassword") {
+      return jsonResponse_(resetUserPassword(args[0] || body.user_id || "", args[1] || body.new_password || "", args[2] || body.token || ""));
     }
 
     throw new Error("Unsupported action");
@@ -256,12 +284,19 @@ function nextAssetCode_(groupCode, year) {
 
 function getSheet_(sheetName) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = spreadsheet.getSheetByName(sheetName);
+  let sheet = spreadsheet.getSheetByName(sheetName);
+  if (!sheet && sheetName === SHEET_NAMES.users) {
+    sheet = spreadsheet.insertSheet(sheetName);
+  }
   if (!sheet) throw new Error(`Sheet not found: ${sheetName}`);
   return sheet;
 }
 
 function ensureSheetHeaders_(sheetName, sheet) {
+  if (sheetName === SHEET_NAMES.users) {
+    ensureUsersSheet_(sheet);
+    return;
+  }
   if (sheetName !== SHEET_NAMES.settings) return;
   const firstRow = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
   const headers = firstRow.map((header) => String(header).trim()).filter(Boolean);
@@ -287,4 +322,199 @@ function ensureSheetHeaders_(sheetName, sheet) {
 
 function jsonResponse_(payload) {
   return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function loginUser(credentials) {
+  try {
+    const username = String(credentials.username || "").trim().toLowerCase();
+    const password = String(credentials.password || "");
+    if (!username || !password) throw new Error("Vui lòng nhập tài khoản và mật khẩu");
+
+    ensureUsersReady_();
+    const user = findUserByUsername_(username);
+    if (!user || String(user.active || "TRUE").toUpperCase() === "FALSE") throw new Error("Tài khoản không tồn tại hoặc đã bị khóa");
+    if (hashPassword_(password, user.password_salt) !== user.password_hash) throw new Error("Mật khẩu không đúng");
+
+    user.last_login_at = new Date().toISOString();
+    upsertObject_(SHEET_NAMES.users, "user_id", user);
+
+    const token = Utilities.getUuid() + Utilities.getUuid();
+    CacheService.getScriptCache().put(`session_${token}`, user.user_id, 21600);
+    return { ok: true, token, user: publicUser_(user), updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function currentUser(token) {
+  try {
+    return { ok: true, user: publicUser_(requireAuth_(token)) };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function listUsers(token) {
+  try {
+    requireAdmin_(token);
+    ensureUsersReady_();
+    return { ok: true, users: readUsers_().map(publicUser_) };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function saveUser(user, token) {
+  try {
+    requireAdmin_(token);
+    ensureUsersReady_();
+    const normalized = normalizeUser_(user || {});
+    const duplicate = readUsers_().find((item) => item.username === normalized.username && item.user_id !== normalized.user_id);
+    if (duplicate) throw new Error("Tên đăng nhập đã tồn tại");
+    const saved = upsertObject_(SHEET_NAMES.users, "user_id", normalized);
+    return { ok: true, data: publicUser_(saved), updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function deleteUser(userId, token) {
+  try {
+    const admin = requireAdmin_(token);
+    if (!userId) throw new Error("Missing user_id");
+    if (userId === admin.user_id) throw new Error("Không thể xóa chính tài khoản đang đăng nhập");
+    const user = findUserById_(userId);
+    if (!user) throw new Error("Không tìm thấy user");
+    user.active = "FALSE";
+    upsertObject_(SHEET_NAMES.users, "user_id", user);
+    return { ok: true, user_id: userId, updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function resetUserPassword(userId, newPassword, token) {
+  try {
+    requireAdmin_(token);
+    if (!userId) throw new Error("Missing user_id");
+    if (String(newPassword || "").length < 6) throw new Error("Mật khẩu mới cần ít nhất 6 ký tự");
+    const user = findUserById_(userId);
+    if (!user) throw new Error("Không tìm thấy user");
+    setPassword_(user, newPassword);
+    user.must_change_password = "TRUE";
+    upsertObject_(SHEET_NAMES.users, "user_id", user);
+    return { ok: true, user_id: userId, updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function requireAuth_(token) {
+  ensureUsersReady_();
+  const userId = CacheService.getScriptCache().get(`session_${token || ""}`);
+  if (!userId) throw new Error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+  const user = findUserById_(userId);
+  if (!user || String(user.active || "TRUE").toUpperCase() === "FALSE") throw new Error("Tài khoản không còn hiệu lực");
+  return user;
+}
+
+function requireAdmin_(token) {
+  const user = requireAuth_(token);
+  if (String(user.role || "").toLowerCase() !== "admin") throw new Error("Chỉ admin mới được thực hiện thao tác này");
+  return user;
+}
+
+function requireEdit_(token) {
+  const user = requireAuth_(token);
+  const permissions = String(user.permissions || "").toLowerCase();
+  const role = String(user.role || "").toLowerCase();
+  if (role === "admin" || permissions === "all" || permissions.split(",").map((item) => item.trim()).indexOf("edit") !== -1) return user;
+  throw new Error("Tài khoản này chỉ có quyền xem, không được chỉnh sửa thiết bị");
+}
+
+function ensureUsersReady_() {
+  ensureSheetHeaders_(SHEET_NAMES.users, getSheet_(SHEET_NAMES.users));
+}
+
+function ensureUsersSheet_(sheet) {
+  const desired = ["user_id", "username", "full_name", "role", "permissions", "active", "password_salt", "password_hash", "must_change_password", "created_at", "updated_at", "last_login_at"];
+  const firstRow = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  const headers = firstRow.map((header) => String(header).trim()).filter(Boolean);
+  if (!headers.length) {
+    sheet.getRange(1, 1, 1, desired.length).setValues([desired]);
+  }
+  const currentHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), desired.length)).getValues()[0].map((header) => String(header).trim());
+  desired.forEach((header) => {
+    if (currentHeaders.indexOf(header) === -1) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+      currentHeaders.push(header);
+    }
+  });
+  if (sheet.getLastRow() < 2) {
+    const admin = normalizeUser_({
+      username: "admin",
+      full_name: "TDW Admin",
+      role: "admin",
+      permissions: "all",
+      active: "TRUE",
+      password: "TDW@2026",
+    });
+    sheet.appendRow(desired.map((header) => admin[header] || ""));
+  }
+}
+
+function normalizeUser_(user) {
+  const now = new Date().toISOString();
+  const normalized = Object.assign({}, user);
+  normalized.user_id = normalized.user_id || Utilities.getUuid();
+  normalized.username = String(normalized.username || "").trim().toLowerCase();
+  if (!normalized.username) throw new Error("Tên đăng nhập là bắt buộc");
+  normalized.full_name = String(normalized.full_name || normalized.username).trim();
+  normalized.role = String(normalized.role || "user").trim().toLowerCase();
+  if (["admin", "manager", "user", "viewer"].indexOf(normalized.role) === -1) normalized.role = "user";
+  normalized.permissions = String(normalized.permissions || (normalized.role === "admin" ? "all" : "view")).trim();
+  normalized.active = String(normalized.active || "TRUE").toUpperCase() === "FALSE" ? "FALSE" : "TRUE";
+  normalized.must_change_password = String(normalized.must_change_password || "FALSE").toUpperCase() === "TRUE" ? "TRUE" : "FALSE";
+  normalized.created_at = normalized.created_at || now;
+  normalized.updated_at = now;
+  if (normalized.password || !normalized.password_hash) setPassword_(normalized, normalized.password || "TDW@2026");
+  delete normalized.password;
+  return normalized;
+}
+
+function readUsers_() {
+  return readSheetAsObjects_(SHEET_NAMES.users);
+}
+
+function findUserByUsername_(username) {
+  return readUsers_().find((user) => String(user.username || "").toLowerCase() === username);
+}
+
+function findUserById_(userId) {
+  return readUsers_().find((user) => user.user_id === userId);
+}
+
+function setPassword_(user, password) {
+  user.password_salt = Utilities.getUuid();
+  user.password_hash = hashPassword_(password, user.password_salt);
+}
+
+function hashPassword_(password, salt) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, `${salt}:${password}`, Utilities.Charset.UTF_8);
+  return bytes.map((byte) => (`0${(byte < 0 ? byte + 256 : byte).toString(16)}`).slice(-2)).join("");
+}
+
+function publicUser_(user) {
+  return {
+    user_id: user.user_id,
+    username: user.username,
+    full_name: user.full_name,
+    role: user.role,
+    permissions: user.permissions,
+    active: String(user.active || "TRUE").toUpperCase() !== "FALSE",
+    must_change_password: String(user.must_change_password || "FALSE").toUpperCase() === "TRUE",
+    created_at: user.created_at || "",
+    updated_at: user.updated_at || "",
+    last_login_at: user.last_login_at || "",
+  };
 }

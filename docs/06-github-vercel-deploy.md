@@ -55,3 +55,16 @@ Sau đó Redeploy.
 - `api/google-script.js`: proxy Vercel gọi Apps Script để tránh lỗi CORS.
 - `google-apps-script/`: backend Apps Script liên kết Google Sheet.
 - `vercel.json`: cấu hình route cho Vercel.
+
+## 6. Đăng nhập lần đầu
+
+Sau khi cập nhật `Code.gs` và deploy Apps Script bản mới, hệ thống sẽ tự tạo tab `Users` nếu chưa có.
+
+Tài khoản admin mặc định:
+
+```text
+Username: admin
+Password: TDW@2026
+```
+
+Sau khi đăng nhập, vào tab `Người dùng` để tạo user mới, phân quyền, khóa user hoặc reset mật khẩu.

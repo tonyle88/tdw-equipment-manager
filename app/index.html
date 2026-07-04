@@ -7,7 +7,19 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="shell">
+    <section class="login-screen" id="loginScreen">
+      <form class="login-card" id="loginForm">
+        <img class="login-logo" src="" alt="TDW" />
+        <p class="eyebrow">TDW EQUIPMENT MANAGER</p>
+        <h1>ĐĂNG NHẬP QUẢN TRỊ</h1>
+        <label>Tài khoản<input name="username" autocomplete="username" required /></label>
+        <label>Mật khẩu<input name="password" type="password" autocomplete="current-password" required /></label>
+        <p class="login-error" id="loginError" hidden></p>
+        <button class="primary-button" type="submit">Đăng nhập</button>
+      </form>
+    </section>
+
+    <main class="shell" id="appShell" hidden>
       <header class="topbar" aria-label="Thanh điều hướng">
         <div class="brand">
           <img class="brand-logo" src="assets/tdw-logo.jpg" alt="TDW" />
@@ -22,9 +34,11 @@
           <a href="#" data-view="maintenance">Bảo trì</a>
           <a href="#" data-view="reports">Báo cáo</a>
           <a href="#" data-view="settings">Cấu hình</a>
+          <a href="#" data-view="users" data-admin-only>Người dùng</a>
         </nav>
         <div class="top-actions">
-          <button class="icon-button" type="button" aria-label="Cài đặt bộ lọc">=</button>
+          <span class="user-chip" id="currentUserChip"></span>
+          <button class="icon-button" id="logoutButton" type="button" aria-label="Đăng xuất">⎋</button>
           <button class="primary-button" id="addAssetButton" type="button">+ Thêm thiết bị</button>
         </div>
       </header>
@@ -151,6 +165,43 @@
           <div class="modal-actions">
             <button class="secondary-button" type="button" id="cancelSettingForm">Hủy</button>
             <button class="primary-button" type="submit">Lưu cấu hình</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-backdrop" id="userModal" hidden>
+        <form class="modal compact-modal" id="userForm">
+          <div class="modal-head">
+            <div>
+              <p class="eyebrow">QUẢN TRỊ USER</p>
+              <h2 id="userFormTitle">THÊM USER</h2>
+            </div>
+            <button class="icon-button" type="button" id="closeUserModal" aria-label="Đóng">×</button>
+          </div>
+          <input type="hidden" name="user_id" />
+          <div class="form-grid">
+            <label>Tài khoản<input name="username" required autocomplete="off" /></label>
+            <label>Họ tên<input name="full_name" required autocomplete="off" /></label>
+            <label>Vai trò
+              <select name="role">
+                <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
+                <option value="user">User</option>
+                <option value="viewer">Viewer</option>
+              </select>
+            </label>
+            <label>Trạng thái
+              <select name="active">
+                <option value="TRUE">Đang hoạt động</option>
+                <option value="FALSE">Khóa tài khoản</option>
+              </select>
+            </label>
+            <label class="span-2">Phân quyền<input name="permissions" placeholder="VD: all, view, edit, report" /></label>
+            <label class="span-2">Mật khẩu mới<input name="password" type="password" autocomplete="new-password" placeholder="Nhập khi tạo mới hoặc muốn đổi mật khẩu" /></label>
+          </div>
+          <div class="modal-actions">
+            <button class="secondary-button" type="button" id="cancelUserForm">Hủy</button>
+            <button class="primary-button" type="submit">Lưu user</button>
           </div>
         </form>
       </div>

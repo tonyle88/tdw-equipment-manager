@@ -17,22 +17,6 @@ async function readBody(req) {
 }
 
 async function callGoogleScript(fn, args = []) {
-  if (fn === "getAppData") {
-    const [assetsResponse, settingsResponse] = await Promise.all([
-      fetch(`${SCRIPT_URL}?sheet=Assets`),
-      fetch(`${SCRIPT_URL}?sheet=Settings`),
-    ]);
-    const [assetsPayload, settingsPayload] = await Promise.all([assetsResponse.json(), settingsResponse.json()]);
-    if (assetsPayload.ok === false) throw new Error(assetsPayload.error || "Không đọc được Assets");
-    if (settingsPayload.ok === false) throw new Error(settingsPayload.error || "Không đọc được Settings");
-    return {
-      ok: true,
-      assets: assetsPayload.data || [],
-      settings: settingsPayload.data || [],
-      updated_at: new Date().toISOString(),
-    };
-  }
-
   const response = await fetch(SCRIPT_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },

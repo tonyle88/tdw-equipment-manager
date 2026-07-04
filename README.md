@@ -16,6 +16,8 @@
 - Trang Bảo trì.
 - Trang Báo cáo có biểu đồ và xuất CSV/PDF.
 - Trang Cấu hình quản lý dropdown: phòng ban, tình trạng, loại thiết bị, phần mềm.
+- Đăng nhập trước khi vào app.
+- Admin quản lý user: thêm, sửa, khóa, reset mật khẩu và phân quyền.
 
 ## Deploy lên Vercel
 

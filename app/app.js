@@ -8,7 +8,13 @@ const state = {
     activeView: "overview",
     isSaving: false,
     editingSettingId: "",
+    editingUserId: "",
+    authToken: "",
+    currentUser: null,
+    users: [],
   };
+
+  const AUTH_STORAGE_KEY = "tdw_equipment_auth_token";
 
   const fallbackLabels = {
     asset_group: {
@@ -41,6 +47,12 @@ const state = {
   function collectElements() {
     Object.assign(els, {
       metrics: document.querySelector("#metrics"),
+      appShell: document.querySelector("#appShell"),
+      loginScreen: document.querySelector("#loginScreen"),
+      loginForm: document.querySelector("#loginForm"),
+      loginError: document.querySelector("#loginError"),
+      loginLogo: document.querySelector(".login-logo"),
+      brandLogo: document.querySelector(".brand-logo"),
       toolbar: document.querySelector(".toolbar"),
       content: document.querySelector("#mainContent"),
       rows: document.querySelector("#assetRows"),
@@ -58,6 +70,8 @@ const state = {
       form: document.querySelector("#assetForm"),
       formTitle: document.querySelector("#assetFormTitle"),
       addButton: document.querySelector("#addAssetButton"),
+      logoutButton: document.querySelector("#logoutButton"),
+      currentUserChip: document.querySelector("#currentUserChip"),
       closeModal: document.querySelector("#closeAssetModal"),
       cancelForm: document.querySelector("#cancelAssetForm"),
       saveButton: document.querySelector("#saveAssetButton"),
@@ -66,15 +80,22 @@ const state = {
       settingFormTitle: document.querySelector("#settingFormTitle"),
       closeSettingModal: document.querySelector("#closeSettingModal"),
       cancelSettingForm: document.querySelector("#cancelSettingForm"),
+      userModal: document.querySelector("#userModal"),
+      userForm: document.querySelector("#userForm"),
+      userFormTitle: document.querySelector("#userFormTitle"),
+      closeUserModal: document.querySelector("#closeUserModal"),
+      cancelUserForm: document.querySelector("#cancelUserForm"),
       navLinks: [...document.querySelectorAll(".nav-pills [data-view]")],
     });
+    if (els.loginLogo && els.brandLogo) els.loginLogo.src = els.brandLogo.src;
   }
 
   async function callServer(fn, ...args) {
+    const serverArgs = fn === "loginUser" ? args : [...args, state.authToken];
     const response = await fetch(window.TDW_ASSET_CONFIG.apiProxyUrl || "/api/google-script", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fn, args }),
+      body: JSON.stringify({ fn, args: serverArgs }),
     });
     if (!response.ok) throw new Error(`API proxy lỗi ${response.status}`);
     const payload = await response.json();
@@ -84,8 +105,76 @@ const state = {
 
   async function loadAppData() {
     const payload = await callServer("getAppData");
+    if (payload.currentUser) state.currentUser = payload.currentUser;
     state.settings = normalizeSettings(payload.settings || []);
     state.assets = sortAssets(normalizeAssets(payload.assets || []));
+  }
+
+  function isAdmin() {
+    return state.currentUser?.role === "admin";
+  }
+
+  function canEditAssets() {
+    const permissions = String(state.currentUser?.permissions || "").toLowerCase();
+    return isAdmin() || permissions === "all" || permissions.split(",").map((item) => item.trim()).includes("edit");
+  }
+
+  function setAuthToken(token) {
+    state.authToken = token || "";
+    if (state.authToken) localStorage.setItem(AUTH_STORAGE_KEY, state.authToken);
+    else localStorage.removeItem(AUTH_STORAGE_KEY);
+  }
+
+  function showLogin(error = "") {
+    if (els.appShell) els.appShell.hidden = true;
+    if (els.loginScreen) els.loginScreen.hidden = false;
+    if (els.loginError) {
+      els.loginError.hidden = !error;
+      els.loginError.textContent = error;
+    }
+  }
+
+  function showApp() {
+    if (els.loginScreen) els.loginScreen.hidden = true;
+    if (els.appShell) els.appShell.hidden = false;
+    updateUserChrome();
+  }
+
+  function updateUserChrome() {
+    if (els.currentUserChip) els.currentUserChip.textContent = state.currentUser ? `${state.currentUser.full_name} · ${state.currentUser.role}` : "";
+    document.querySelectorAll("[data-admin-only]").forEach((node) => {
+      node.hidden = !isAdmin();
+    });
+    if (els.addButton) els.addButton.hidden = !canEditAssets();
+  }
+
+  async function handleLogin(event) {
+    event.preventDefault();
+    const credentials = Object.fromEntries(new FormData(event.target).entries());
+    try {
+      const payload = await callServer("loginUser", credentials);
+      setAuthToken(payload.token);
+      state.currentUser = payload.user;
+      await startApp();
+    } catch (error) {
+      showLogin(error.message);
+    }
+  }
+
+  function handleLogout() {
+    setAuthToken("");
+    state.currentUser = null;
+    showLogin();
+  }
+
+  async function startApp() {
+    await loadAppData();
+    els.dataSource.textContent = "Google Sheet";
+    fillFilters();
+    fillFormSelects();
+    renderMetrics();
+    showApp();
+    renderDeviceView("overview");
   }
 
   function normalizeAssets(rows) {
@@ -309,10 +398,10 @@ const state = {
         <div><dt>Phần mềm</dt><dd>${asset.software_license || "Không có dữ liệu"}</dd></div>
         <div><dt>Ghi chú</dt><dd>${asset.note || "Không có ghi chú"}</dd></div>
       </dl>
-      <div class="detail-actions">
+      ${canEditAssets() ? `<div class="detail-actions">
         <button class="secondary-button" type="button" data-edit-asset="${asset.asset_id}">Sửa</button>
         <button class="danger-button" type="button" data-delete-asset="${asset.asset_id}">Xóa</button>
-      </div>
+      </div>` : ""}
     `;
   }
 
@@ -380,18 +469,24 @@ const state = {
     if (state.activeView === "maintenance") renderMaintenanceView();
     if (state.activeView === "reports") renderReportsView();
     if (state.activeView === "settings") renderSettingsView();
+    if (state.activeView === "users") renderUsersView();
   }
 
   function setView(view) {
+    if (view === "users" && !isAdmin()) {
+      alert("Chỉ admin mới được vào trang người dùng");
+      return;
+    }
     state.activeView = view;
     els.navLinks.forEach((link) => link.classList.toggle("active", link.dataset.view === view));
-    els.toolbar.style.display = view === "maintenance" || view === "reports" || view === "settings" ? "none" : "";
+    els.toolbar.style.display = view === "maintenance" || view === "reports" || view === "settings" || view === "users" ? "none" : "";
     const dashboardInsights = document.querySelector("#dashboardInsights");
     if (dashboardInsights) dashboardInsights.hidden = view !== "overview";
     if (view === "overview" || view === "devices") renderDeviceView(view);
     if (view === "maintenance") renderMaintenanceView();
     if (view === "reports") renderReportsView();
     if (view === "settings") renderSettingsView();
+    if (view === "users") renderUsersView();
   }
 
   function renderDeviceView(view) {
@@ -626,6 +721,122 @@ const state = {
     }
   }
 
+  async function renderUsersView() {
+    els.content.innerHTML = `
+      <div class="users-panel">
+        <div class="panel-head">
+          <h2>QUẢN LÝ NGƯỜI DÙNG</h2>
+          <button class="primary-button" type="button" id="openUserModal">+ Thêm user</button>
+        </div>
+        <div class="users-list" id="usersList">
+          <p class="muted">Đang tải danh sách user...</p>
+        </div>
+      </div>
+    `;
+    els.content.querySelector("#openUserModal").addEventListener("click", () => openUserModal());
+    try {
+      const payload = await callServer("listUsers");
+      state.users = payload.users || [];
+      renderUsersList();
+    } catch (error) {
+      els.content.querySelector("#usersList").innerHTML = `<p class="muted">Không tải được user: ${error.message}</p>`;
+    }
+  }
+
+  function renderUsersList() {
+    const list = els.content.querySelector("#usersList");
+    if (!list) return;
+    list.innerHTML = state.users.map((user) => `
+      <div class="user-row">
+        <div>
+          <strong>${user.full_name || user.username}</strong>
+          <small>${user.username}</small>
+        </div>
+        <span class="role-pill ${user.role}">${user.role}</span>
+        <span class="user-status">${user.active ? "Đang hoạt động" : "Đã khóa"}</span>
+        <div class="user-row-actions">
+          <button class="secondary-button" type="button" data-edit-user="${user.user_id}">Sửa</button>
+          <button class="secondary-button" type="button" data-reset-user="${user.user_id}">Reset mật khẩu</button>
+          <button class="danger-button" type="button" data-delete-user="${user.user_id}">${user.active ? "Khóa" : "Xóa"}</button>
+        </div>
+      </div>
+    `).join("") || `<p class="muted">Chưa có user.</p>`;
+
+    list.querySelectorAll("[data-edit-user]").forEach((button) => {
+      button.addEventListener("click", () => openUserModal(state.users.find((user) => user.user_id === button.dataset.editUser)));
+    });
+    list.querySelectorAll("[data-reset-user]").forEach((button) => {
+      button.addEventListener("click", () => handleResetPassword(button.dataset.resetUser));
+    });
+    list.querySelectorAll("[data-delete-user]").forEach((button) => {
+      button.addEventListener("click", () => handleDeleteUser(button.dataset.deleteUser));
+    });
+  }
+
+  function resetUserForm() {
+    const form = els.userForm;
+    state.editingUserId = "";
+    form.reset();
+    form.elements.user_id.value = "";
+    form.elements.role.value = "user";
+    form.elements.active.value = "TRUE";
+    form.elements.permissions.value = "view";
+    els.userFormTitle.textContent = "THÊM USER";
+  }
+
+  function openUserModal(user = null) {
+    resetUserForm();
+    if (user) {
+      state.editingUserId = user.user_id;
+      els.userForm.elements.user_id.value = user.user_id;
+      els.userForm.elements.username.value = user.username;
+      els.userForm.elements.full_name.value = user.full_name;
+      els.userForm.elements.role.value = user.role;
+      els.userForm.elements.active.value = user.active ? "TRUE" : "FALSE";
+      els.userForm.elements.permissions.value = user.permissions || "";
+      els.userFormTitle.textContent = "SỬA USER";
+    }
+    els.userModal.hidden = false;
+  }
+
+  function closeUserModal() {
+    els.userModal.hidden = true;
+    resetUserForm();
+  }
+
+  async function handleUserSubmit(event) {
+    event.preventDefault();
+    try {
+      const user = Object.fromEntries(new FormData(event.target).entries());
+      await callServer("saveUser", user);
+      closeUserModal();
+      if (state.activeView === "users") await renderUsersView();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  async function handleDeleteUser(userId) {
+    if (!confirm("Khóa user này?")) return;
+    try {
+      await callServer("deleteUser", userId);
+      await renderUsersView();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  async function handleResetPassword(userId) {
+    const newPassword = prompt("Nhập mật khẩu mới cho user này:");
+    if (!newPassword) return;
+    try {
+      await callServer("resetUserPassword", userId, newPassword);
+      alert("Đã reset mật khẩu.");
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
   function countBy(items, key, settingType) {
     return items.reduce((acc, item) => {
       const raw = item[key] || "Chưa phân loại";
@@ -758,6 +969,8 @@ const state = {
   }
 
   function bindEvents() {
+    els.loginForm?.addEventListener("submit", handleLogin);
+    els.logoutButton?.addEventListener("click", handleLogout);
     [els.search, els.group, els.year, els.department, els.status]
       .filter(Boolean)
       .forEach((el) => el.addEventListener("input", () => applyFilters({ resetPage: true })));
@@ -774,6 +987,12 @@ const state = {
     els.settingModal.addEventListener("click", (event) => {
       if (event.target === els.settingModal) closeSettingModal();
     });
+    els.userForm.addEventListener("submit", handleUserSubmit);
+    els.closeUserModal.addEventListener("click", closeUserModal);
+    els.cancelUserForm.addEventListener("click", closeUserModal);
+    els.userModal.addEventListener("click", (event) => {
+      if (event.target === els.userModal) closeUserModal();
+    });
     els.navLinks.forEach((link) => {
       link.addEventListener("click", (event) => {
         event.preventDefault();
@@ -785,17 +1004,17 @@ const state = {
 
   async function init() {
     collectElements();
+    bindEvents();
+    state.authToken = localStorage.getItem(AUTH_STORAGE_KEY) || "";
+    if (!state.authToken) {
+      showLogin();
+      return;
+    }
     try {
-      await loadAppData();
-      els.dataSource.textContent = "Google Sheet";
-      fillFilters();
-      fillFormSelects();
-      renderMetrics();
-      bindEvents();
-      renderDeviceView("overview");
+      await startApp();
     } catch (error) {
-      els.rows.innerHTML = `<tr><td colspan="7" class="muted">Không tải được dữ liệu: ${error.message}</td></tr>`;
-      els.dataSource.textContent = "Lỗi dữ liệu";
+      setAuthToken("");
+      showLogin(error.message);
     }
   }
 
