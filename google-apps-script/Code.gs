@@ -19,7 +19,7 @@ function doGet(event) {
 
     requireAuth_(event.parameter.token || "");
     const sheetName = (event.parameter.sheet || SHEET_NAMES.assets).trim();
-    const rows = readSheetAsObjects_(sheetName);
+    const rows = sheetName === SHEET_NAMES.assets ? readActiveAssets_() : readSheetAsObjects_(sheetName);
     return jsonResponse_({
       ok: true,
       sheet: sheetName,
@@ -40,7 +40,7 @@ function getAssets() {
   return {
     ok: true,
     sheet: SHEET_NAMES.assets,
-    data: readSheetAsObjects_(SHEET_NAMES.assets),
+    data: readActiveAssets_(),
     updated_at: new Date().toISOString(),
   };
 }
@@ -58,7 +58,7 @@ function getAppData() {
   const user = arguments.length ? requireAuth_(arguments[0]) : null;
   return {
     ok: true,
-    assets: readSheetAsObjects_(SHEET_NAMES.assets),
+    assets: readActiveAssets_(),
     settings: readSheetAsObjects_(SHEET_NAMES.settings),
     currentUser: user ? publicUser_(user) : null,
     updated_at: new Date().toISOString(),
@@ -78,17 +78,13 @@ function saveAsset(asset) {
 
 function deleteAsset(assetId) {
   try {
-    if (arguments.length > 1) requireEdit_(arguments[1]);
+    const user = arguments.length > 1 ? requireEdit_(arguments[1]) : null;
     if (!assetId) throw new Error("Missing asset_id");
-    const sheet = getSheet_(SHEET_NAMES.assets);
-    const values = sheet.getDataRange().getValues();
-    const headers = values[0].map((header) => String(header).trim());
-    const keyIndex = headers.indexOf("asset_id");
-    if (keyIndex === -1) throw new Error("Missing asset_id column");
-
-    const rowIndex = values.findIndex((row, index) => index > 0 && row[keyIndex] === assetId);
-    if (rowIndex < 1) throw new Error("Không tìm thấy thiết bị để xóa");
-    sheet.deleteRow(rowIndex + 1);
+    const asset = readSheetAsObjects_(SHEET_NAMES.assets).find((item) => item.asset_id === assetId);
+    if (!asset) throw new Error("Không tìm thấy thiết bị để xóa");
+    asset.deleted_at = new Date().toISOString();
+    asset.deleted_by = user ? user.username : "";
+    upsertObject_(SHEET_NAMES.assets, "asset_id", asset);
     return { ok: true, asset_id: assetId, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -194,6 +190,10 @@ function readSheetAsObjects_(sheetName) {
       if (!item.source_row) item.source_row = index + 2;
       return item;
     });
+}
+
+function readActiveAssets_() {
+  return readSheetAsObjects_(SHEET_NAMES.assets).filter((asset) => !String(asset.deleted_at || "").trim());
 }
 
 function upsertObject_(sheetName, keyField, object) {
@@ -336,7 +336,7 @@ function ensureSheetHeaders_(sheetName, sheet) {
 }
 
 function ensureAssetsSheet_(sheet) {
-  const desired = ["serial_number", "location", "warranty_end_date", "unit_price", "last_maintenance_date"];
+  const desired = ["serial_number", "location", "warranty_end_date", "unit_price", "last_maintenance_date", "deleted_at", "deleted_by"];
   const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim());
   desired.forEach((header) => {
     if (headers.indexOf(header) === -1) {
