@@ -832,8 +832,8 @@ const state = {
       const isEdit = Boolean(setting.setting_id);
       await callServer("saveSetting", setting);
       closeSettingModal();
-      await refreshAppData();
       showToast(isEdit ? "Đã cập nhật cấu hình" : "Đã thêm cấu hình", setting.display_name || setting.setting_value || "Cấu hình TDW");
+      await refreshAppData();
     } catch (error) {
       alert(error.message);
     }
