@@ -87,6 +87,11 @@ const state = {
       toastStack: document.querySelector("#toastStack"),
       loginLogo: document.querySelector(".login-logo"),
       brandLogo: document.querySelector(".brand-logo"),
+      passwordChangeModal: document.querySelector("#passwordChangeModal"),
+      passwordChangeForm: document.querySelector("#passwordChangeForm"),
+      passwordChangeError: document.querySelector("#passwordChangeError"),
+      passwordChangeLogout: document.querySelector("#passwordChangeLogout"),
+      passwordChangeSubmit: document.querySelector("#passwordChangeSubmit"),
       toolbar: document.querySelector(".toolbar"),
       content: document.querySelector("#mainContent"),
       rows: document.querySelector("#assetRows"),
@@ -164,6 +169,7 @@ const state = {
     if (els.bootScreen) els.bootScreen.hidden = true;
     if (els.appShell) els.appShell.hidden = true;
     if (els.loginScreen) els.loginScreen.hidden = false;
+    if (els.passwordChangeModal) els.passwordChangeModal.hidden = true;
     setLoginBusy(false);
     if (els.loginError) {
       els.loginError.hidden = !error;
@@ -175,8 +181,19 @@ const state = {
     if (els.authHeader) els.authHeader.hidden = true;
     if (els.bootScreen) els.bootScreen.hidden = true;
     if (els.loginScreen) els.loginScreen.hidden = true;
+    if (els.passwordChangeModal) els.passwordChangeModal.hidden = true;
     if (els.appShell) els.appShell.hidden = false;
     updateUserChrome();
+  }
+
+  function showPasswordChange() {
+    if (els.authHeader) els.authHeader.hidden = false;
+    if (els.bootScreen) els.bootScreen.hidden = true;
+    if (els.loginScreen) els.loginScreen.hidden = true;
+    if (els.appShell) els.appShell.hidden = true;
+    if (els.passwordChangeError) els.passwordChangeError.hidden = true;
+    if (els.passwordChangeForm) els.passwordChangeForm.reset();
+    if (els.passwordChangeModal) els.passwordChangeModal.hidden = false;
   }
 
   function setLoginBusy(isBusy) {
@@ -233,6 +250,11 @@ const state = {
       else localStorage.removeItem(REMEMBER_USERNAME_KEY);
       setAuthToken(payload.token);
       state.currentUser = payload.user;
+      if (state.currentUser?.must_change_password) {
+        setLoginBusy(false);
+        showPasswordChange();
+        return;
+      }
       await startApp();
       showToast("Đăng nhập thành công", `Xin chào ${state.currentUser?.full_name || "TDW"}`);
     } catch (error) {
@@ -259,8 +281,39 @@ const state = {
     showLogin();
   }
 
+  async function handlePasswordChange(event) {
+    event.preventDefault();
+    const form = event.target;
+    const data = Object.fromEntries(new FormData(form).entries());
+    if (data.new_password !== data.confirm_password) {
+      if (els.passwordChangeError) {
+        els.passwordChangeError.textContent = "Mật khẩu nhập lại chưa khớp";
+        els.passwordChangeError.hidden = false;
+      }
+      return;
+    }
+    if (els.passwordChangeSubmit) els.passwordChangeSubmit.disabled = true;
+    try {
+      const payload = await callServer("changeOwnPassword", data.new_password);
+      state.currentUser = payload.user || { ...state.currentUser, must_change_password: false };
+      showToast("Đã đổi mật khẩu", "Tài khoản đã được cập nhật bảo mật");
+      await startApp();
+    } catch (error) {
+      if (els.passwordChangeError) {
+        els.passwordChangeError.textContent = error.message;
+        els.passwordChangeError.hidden = false;
+      }
+    } finally {
+      if (els.passwordChangeSubmit) els.passwordChangeSubmit.disabled = false;
+    }
+  }
+
   async function startApp() {
     await loadAppData();
+    if (state.currentUser?.must_change_password) {
+      showPasswordChange();
+      return;
+    }
     els.dataSource.textContent = "Google Sheet";
     fillFilters();
     fillFormSelects();
@@ -1123,6 +1176,8 @@ const state = {
       event.preventDefault();
       els.loginForm?.requestSubmit();
     });
+    els.passwordChangeForm?.addEventListener("submit", handlePasswordChange);
+    els.passwordChangeLogout?.addEventListener("click", handleLogout);
     els.logoutButton?.addEventListener("click", handleLogout);
     [els.search, els.group, els.year, els.department, els.status]
       .filter(Boolean)

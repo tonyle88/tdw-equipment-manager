@@ -10,6 +10,7 @@ const ALLOWED_FUNCTIONS = new Set([
   "saveUser",
   "deleteUser",
   "resetUserPassword",
+  "changeOwnPassword",
 ]);
 
 const SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL;

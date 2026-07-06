@@ -166,6 +166,9 @@ function doPost(event) {
     if (action === "resetUserPassword") {
       return jsonResponse_(resetUserPassword(args[0] || body.user_id || "", args[1] || body.new_password || "", args[2] || body.token || ""));
     }
+    if (action === "changeOwnPassword") {
+      return jsonResponse_(changeOwnPassword(args[0] || body.new_password || "", args[1] || body.token || ""));
+    }
 
     throw new Error("Unsupported action");
   } catch (error) {
@@ -414,6 +417,19 @@ function resetUserPassword(userId, newPassword, token) {
     user.must_change_password = "TRUE";
     upsertObject_(SHEET_NAMES.users, "user_id", user);
     return { ok: true, user_id: userId, updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function changeOwnPassword(newPassword, token) {
+  try {
+    const user = requireAuth_(token);
+    if (String(newPassword || "").length < 6) throw new Error("Mật khẩu mới cần ít nhất 6 ký tự");
+    setPassword_(user, newPassword);
+    user.must_change_password = "FALSE";
+    const saved = upsertObject_(SHEET_NAMES.users, "user_id", user);
+    return { ok: true, user: publicUser_(saved), updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
   }

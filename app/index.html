@@ -49,6 +49,27 @@
       </form>
     </section>
 
+    <div class="modal-backdrop" id="passwordChangeModal" hidden>
+      <form class="modal compact-modal" id="passwordChangeForm">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">BẢO MẬT TÀI KHOẢN</p>
+            <h2>ĐỔI MẬT KHẨU</h2>
+          </div>
+        </div>
+        <p class="modal-copy">Tài khoản này cần đổi mật khẩu trước khi sử dụng hệ thống.</p>
+        <div class="form-grid">
+          <label class="span-2">Mật khẩu mới<input name="new_password" type="password" autocomplete="new-password" required minlength="6" /></label>
+          <label class="span-2">Nhập lại mật khẩu<input name="confirm_password" type="password" autocomplete="new-password" required minlength="6" /></label>
+        </div>
+        <p class="login-error" id="passwordChangeError" hidden></p>
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" id="passwordChangeLogout">Đăng xuất</button>
+          <button class="primary-button" type="submit" id="passwordChangeSubmit">Lưu mật khẩu</button>
+        </div>
+      </form>
+    </div>
+
     <main class="shell" id="appShell" hidden>
       <header class="topbar" aria-label="Thanh điều hướng">
         <div class="brand">
