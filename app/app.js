@@ -18,6 +18,7 @@ const state = {
   };
 
   const AUTH_STORAGE_KEY = "tdw_equipment_auth_token";
+  const REMEMBER_USERNAME_KEY = "tdw_equipment_remember_username";
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -71,10 +72,18 @@ const state = {
     Object.assign(els, {
       metrics: document.querySelector("#metrics"),
       appShell: document.querySelector("#appShell"),
+      authHeader: document.querySelector("#authHeader"),
       bootScreen: document.querySelector("#bootScreen"),
       loginScreen: document.querySelector("#loginScreen"),
       loginForm: document.querySelector("#loginForm"),
       loginError: document.querySelector("#loginError"),
+      loginStatus: document.querySelector("#loginStatus"),
+      loginSubmit: document.querySelector("#loginSubmit"),
+      loginSubmitText: document.querySelector("#loginSubmitText"),
+      loginUsername: document.querySelector("#loginUsername"),
+      loginPassword: document.querySelector("#loginPassword"),
+      rememberLogin: document.querySelector("#rememberLogin"),
+      togglePassword: document.querySelector("#togglePassword"),
       toastStack: document.querySelector("#toastStack"),
       loginLogo: document.querySelector(".login-logo"),
       brandLogo: document.querySelector(".brand-logo"),
@@ -151,9 +160,11 @@ const state = {
   }
 
   function showLogin(error = "") {
+    if (els.authHeader) els.authHeader.hidden = false;
     if (els.bootScreen) els.bootScreen.hidden = true;
     if (els.appShell) els.appShell.hidden = true;
     if (els.loginScreen) els.loginScreen.hidden = false;
+    setLoginBusy(false);
     if (els.loginError) {
       els.loginError.hidden = !error;
       els.loginError.textContent = error;
@@ -161,10 +172,28 @@ const state = {
   }
 
   function showApp() {
+    if (els.authHeader) els.authHeader.hidden = true;
     if (els.bootScreen) els.bootScreen.hidden = true;
     if (els.loginScreen) els.loginScreen.hidden = true;
     if (els.appShell) els.appShell.hidden = false;
     updateUserChrome();
+  }
+
+  function setLoginBusy(isBusy) {
+    if (els.loginSubmit) els.loginSubmit.disabled = isBusy;
+    if (els.loginSubmitText) els.loginSubmitText.textContent = isBusy ? "Đang đăng nhập..." : "↪ Đăng nhập";
+    if (els.loginStatus) els.loginStatus.hidden = !isBusy;
+    if (els.loginForm) {
+      [...els.loginForm.elements].forEach((field) => {
+        if (field !== els.loginSubmit) field.disabled = isBusy;
+      });
+    }
+  }
+
+  function hydrateLoginMemory() {
+    const remembered = localStorage.getItem(REMEMBER_USERNAME_KEY) || "";
+    if (els.loginUsername && remembered) els.loginUsername.value = remembered;
+    if (els.rememberLogin) els.rememberLogin.checked = Boolean(remembered) || els.rememberLogin.checked;
   }
 
   function showToast(title, message = "") {
@@ -195,14 +224,19 @@ const state = {
 
   async function handleLogin(event) {
     event.preventDefault();
+    if (els.loginError) els.loginError.hidden = true;
+    setLoginBusy(true);
     const credentials = Object.fromEntries(new FormData(event.target).entries());
     try {
       const payload = await callServer("loginUser", credentials);
+      if (els.rememberLogin?.checked) localStorage.setItem(REMEMBER_USERNAME_KEY, String(credentials.username || ""));
+      else localStorage.removeItem(REMEMBER_USERNAME_KEY);
       setAuthToken(payload.token);
       state.currentUser = payload.user;
       await startApp();
       showToast("Đăng nhập thành công", `Xin chào ${state.currentUser?.full_name || "TDW"}`);
     } catch (error) {
+      setLoginBusy(false);
       showLogin(error.message);
     }
   }
@@ -1057,6 +1091,13 @@ const state = {
 
   function bindEvents() {
     els.loginForm?.addEventListener("submit", handleLogin);
+    els.togglePassword?.addEventListener("click", () => {
+      if (!els.loginPassword) return;
+      const isHidden = els.loginPassword.type === "password";
+      els.loginPassword.type = isHidden ? "text" : "password";
+      els.togglePassword.textContent = isHidden ? "🙈" : "👁";
+      els.togglePassword.setAttribute("aria-label", isHidden ? "Ẩn mật khẩu" : "Hiện mật khẩu");
+    });
     els.logoutButton?.addEventListener("click", handleLogout);
     [els.search, els.group, els.year, els.department, els.status]
       .filter(Boolean)
@@ -1092,6 +1133,7 @@ const state = {
   async function init() {
     collectElements();
     bindEvents();
+    hydrateLoginMemory();
     state.authToken = localStorage.getItem(AUTH_STORAGE_KEY) || "";
     if (!state.authToken) {
       showLogin();

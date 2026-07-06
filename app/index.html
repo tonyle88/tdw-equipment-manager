@@ -14,6 +14,13 @@
   </head>
   <body>
     <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
+    <header class="auth-header" id="authHeader">
+      <img src="assets/tdw-logo.webp" width="120" height="44" alt="TDW" />
+      <div>
+        <strong>TDW Equipment Manager</strong>
+        <span>Quản lý thiết bị nội bộ</span>
+      </div>
+    </header>
 
     <section class="boot-screen" id="bootScreen">
       <div class="boot-card">
@@ -25,13 +32,20 @@
 
     <section class="login-screen" id="loginScreen" hidden>
       <form class="login-card" id="loginForm">
-        <img class="login-logo" src="assets/tdw-logo.webp" width="96" height="62" alt="TDW" />
-        <p class="eyebrow">TDW EQUIPMENT MANAGER</p>
-        <h1>ĐĂNG NHẬP QUẢN TRỊ</h1>
-        <label>Tài khoản<input name="username" autocomplete="username" required /></label>
-        <label>Mật khẩu<input name="password" type="password" autocomplete="current-password" required /></label>
+        <div class="login-icon" aria-hidden="true">🔐</div>
+        <h1>Cần đăng nhập tài khoản được cấp quyền</h1>
+        <p class="login-copy">Phiên đăng nhập được bảo vệ. Vui lòng đăng nhập bằng tài khoản và mật khẩu đã được cấp.</p>
+        <label>Tài khoản đăng nhập<input name="username" id="loginUsername" autocomplete="username" placeholder="admin hoặc email TDW" required /></label>
+        <label>Mật khẩu
+          <div class="password-field">
+            <input name="password" id="loginPassword" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu" required />
+            <button class="password-toggle" id="togglePassword" type="button" aria-label="Hiện mật khẩu">👁</button>
+          </div>
+        </label>
+        <label class="remember-row"><input id="rememberLogin" type="checkbox" checked /> <span>Ghi nhớ tài khoản</span></label>
         <p class="login-error" id="loginError" hidden></p>
-        <button class="primary-button" type="submit">Đăng nhập</button>
+        <p class="login-status" id="loginStatus" hidden><span></span> Đang đăng nhập...</p>
+        <button class="primary-button login-submit" id="loginSubmit" type="submit"><span id="loginSubmitText">↪ Đăng nhập</span></button>
       </form>
     </section>
 
