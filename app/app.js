@@ -492,11 +492,7 @@ const state = {
   function fillFilters() {
     fillSelect(els.group, settingOptions("asset_group", state.assets.map((asset) => asset.asset_group)), "Tất cả nhóm");
     fillSelect(els.year, uniqueValues(state.assets.map((asset) => asset.purchase_year)).map((value) => [value, value]), "Tất cả năm");
-    fillSelect(
-      els.department,
-      uniqueValues(state.assets.map((asset) => asset.department)).map((value) => [value, value]),
-      "Tất cả bộ phận",
-    );
+    fillSelect(els.department, settingOptions("department"), "Tất cả bộ phận");
     fillSelect(els.status, settingOptions("status", state.assets.map((asset) => asset.status)), "Tất cả tình trạng");
   }
 
@@ -507,9 +503,9 @@ const state = {
   function fillFormSelects() {
     fillSelect(els.form.elements.asset_group, settingOptions("asset_group"), "");
     fillSelect(els.form.elements.status, settingOptions("status"), "");
-    fillSelect(els.form.elements.asset_type, settingOptions("asset_type", state.assets.map((asset) => asset.asset_type)), "Chọn loại thiết bị");
-    fillSelect(els.form.elements.department, settingOptions("department", state.assets.map((asset) => asset.department)), "Chọn phòng ban");
-    fillSelect(els.form.elements.software_license, settingOptions("software_name", state.assets.map((asset) => asset.software_license)), "Chọn phần mềm");
+    fillSelect(els.form.elements.asset_type, settingOptions("asset_type"), "Chọn loại thiết bị");
+    fillSelect(els.form.elements.department, settingOptions("department"), "Chọn phòng ban");
+    fillSelect(els.form.elements.software_license, settingOptions("software_name"), "Chọn phần mềm");
   }
 
   function renderMetrics() {
