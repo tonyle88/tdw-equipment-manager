@@ -1098,6 +1098,11 @@ const state = {
       els.togglePassword.textContent = isHidden ? "🙈" : "👁";
       els.togglePassword.setAttribute("aria-label", isHidden ? "Ẩn mật khẩu" : "Hiện mật khẩu");
     });
+    els.loginPassword?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      els.loginForm?.requestSubmit();
+    });
     els.logoutButton?.addEventListener("click", handleLogout);
     [els.search, els.group, els.year, els.department, els.status]
       .filter(Boolean)
