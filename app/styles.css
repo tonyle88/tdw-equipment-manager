@@ -737,18 +737,20 @@
   .settings-groups-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
   .setting-group { border: 1px solid rgba(255,255,255,.1); border-radius: 16px; padding: 14px; background: rgba(15,23,42,.18); }
   .setting-group h4 { margin-top: 0; }
-  .setting-row { justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .setting-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
   .setting-row:last-child { border-bottom: 0; }
+  .setting-row > div:first-child { min-width: 0; }
   .setting-row strong, .setting-row small { display: block; }
-  .setting-row strong { color: rgba(255,255,255,.95); font-weight: 900; }
-  .setting-row small { margin-top: 3px; color: rgba(255,255,255,.52); font-size: 12px; }
-  .setting-actions { gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  .setting-row strong { color: rgba(255,255,255,.95); font-weight: 900; line-height: 1.25; }
+  .setting-row small { margin-top: 3px; color: rgba(255,255,255,.52); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .setting-actions { gap: 8px; justify-content: flex-end; flex-wrap: nowrap; white-space: nowrap; }
   .setting-order-buttons {
     gap: 4px;
     padding: 3px;
     border-radius: 12px;
     background: rgba(255,255,255,.08);
   }
+  .setting-order-buttons, .setting-actions .secondary-button, .setting-actions .danger-button { flex: 0 0 auto; }
   .setting-order-buttons .secondary-button {
     min-width: 34px;
     padding: 0;
