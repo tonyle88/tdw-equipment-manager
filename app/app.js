@@ -355,10 +355,15 @@ const state = {
       asset_group_label: asset.asset_group_label || labelFor("asset_group", asset.asset_group),
       asset_type: asset.asset_type || "",
       brand: asset.brand || "",
+      serial_number: asset.serial_number || "",
       purchase_year: asset.purchase_year || "",
       quantity: asset.quantity || "",
+      unit_price: asset.unit_price || "",
+      location: asset.location || "",
       assigned_to: asset.assigned_to || "",
       department: asset.department || "",
+      warranty_end_date: asset.warranty_end_date || "",
+      last_maintenance_date: asset.last_maintenance_date || "",
       software_license: asset.software_license || "",
       status: asset.status || "",
       note: asset.note || "",
@@ -480,7 +485,7 @@ const state = {
     const department = els.department?.value || "";
     const status = els.status?.value || "";
     state.filtered = state.assets.filter((asset) => {
-      const searchText = normalize([asset.asset_code, asset.asset_name, asset.asset_group_label, asset.assigned_to, asset.department, asset.software_license, asset.note].join(" "));
+      const searchText = normalize([asset.asset_code, asset.asset_name, asset.asset_group_label, asset.serial_number, asset.location, asset.assigned_to, asset.department, asset.software_license, asset.note].join(" "));
       const assetDepartment = asset.department || asset.assigned_to || "";
       return (
         (!keyword || searchText.includes(keyword)) &&
@@ -559,9 +564,14 @@ const state = {
         <div class="mini-card"><span>Số lượng</span><strong>${escapeHtml(asset.quantity || "Chưa rõ")}</strong></div>
         <div class="mini-card"><span>Loại</span><strong>${escapeHtml(asset.asset_type || "Thiết bị")}</strong></div>
         <div class="mini-card"><span>Hãng</span><strong>${escapeHtml(asset.brand || "Chưa tách")}</strong></div>
+        <div class="mini-card"><span>Serial</span><strong>${escapeHtml(asset.serial_number || "Chưa có")}</strong></div>
+        <div class="mini-card"><span>Đơn giá</span><strong>${escapeHtml(asset.unit_price || "Chưa có")}</strong></div>
+        <div class="mini-card"><span>Hết bảo hành</span><strong>${escapeHtml(asset.warranty_end_date || "Chưa có")}</strong></div>
+        <div class="mini-card"><span>Bảo trì gần nhất</span><strong>${escapeHtml(asset.last_maintenance_date || "Chưa có")}</strong></div>
       </div>
       <dl>
         <div><dt>Nhóm</dt><dd>${escapeHtml(asset.asset_group_label || "")}</dd></div>
+        <div><dt>Vị trí</dt><dd>${escapeHtml(asset.location || "Chưa có dữ liệu")}</dd></div>
         <div><dt>Người dùng/phòng ban</dt><dd>${escapeHtml(asset.assigned_to || asset.department || "")}</dd></div>
         <div><dt>Phần mềm</dt><dd>${escapeHtml(asset.software_license || "Không có dữ liệu")}</dd></div>
         <div><dt>Ghi chú</dt><dd>${escapeHtml(asset.note || "Không có ghi chú")}</dd></div>
@@ -1124,8 +1134,8 @@ const state = {
   }
 
   function exportCsv() {
-    const headers = ["Mã tài sản", "Tên thiết bị", "Nhóm", "Loại", "Năm", "Người dùng", "Phòng ban", "Phần mềm", "Tình trạng", "Ghi chú"];
-    const rows = state.assets.map((asset) => [asset.asset_code, asset.asset_name, asset.asset_group_label, asset.asset_type, asset.purchase_year, asset.assigned_to, asset.department, asset.software_license, labelFor("status", asset.status), asset.note]);
+    const headers = ["Mã tài sản", "Tên thiết bị", "Nhóm", "Loại", "Serial", "Vị trí", "Năm", "Đơn giá", "Người dùng", "Phòng ban", "Hết bảo hành", "Bảo trì gần nhất", "Phần mềm", "Tình trạng", "Ghi chú"];
+    const rows = state.assets.map((asset) => [asset.asset_code, asset.asset_name, asset.asset_group_label, asset.asset_type, asset.serial_number, asset.location, asset.purchase_year, asset.unit_price, asset.assigned_to, asset.department, asset.warranty_end_date, asset.last_maintenance_date, asset.software_license, labelFor("status", asset.status), asset.note]);
     const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);

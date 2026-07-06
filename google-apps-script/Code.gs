@@ -236,6 +236,11 @@ function normalizeAsset_(asset) {
   normalized.purchase_year = normalized.purchase_year || "";
   normalized.asset_type = normalized.asset_type || "";
   normalized.brand = normalized.brand || "";
+  normalized.serial_number = normalized.serial_number || "";
+  normalized.location = normalized.location || "";
+  normalized.warranty_end_date = normalized.warranty_end_date || "";
+  normalized.unit_price = normalized.unit_price || "";
+  normalized.last_maintenance_date = normalized.last_maintenance_date || "";
   normalized.updated_at = now;
   normalized.created_at = normalized.created_at || now;
   normalized.asset_code = normalized.asset_code || nextAssetCode_(normalized.asset_group, normalized.purchase_year);
@@ -303,6 +308,10 @@ function ensureSheetHeaders_(sheetName, sheet) {
     ensureUsersSheet_(sheet);
     return;
   }
+  if (sheetName === SHEET_NAMES.assets) {
+    ensureAssetsSheet_(sheet);
+    return;
+  }
   if (sheetName !== SHEET_NAMES.settings) return;
   const firstRow = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
   const headers = firstRow.map((header) => String(header).trim()).filter(Boolean);
@@ -324,6 +333,17 @@ function ensureSheetHeaders_(sheetName, sheet) {
     });
     sheet.getRange(2, 1, ids.length, 1).setValues(ids);
   }
+}
+
+function ensureAssetsSheet_(sheet) {
+  const desired = ["serial_number", "location", "warranty_end_date", "unit_price", "last_maintenance_date"];
+  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim());
+  desired.forEach((header) => {
+    if (headers.indexOf(header) === -1) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+      headers.push(header);
+    }
+  });
 }
 
 function jsonResponse_(payload) {

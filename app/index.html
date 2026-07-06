@@ -182,10 +182,15 @@
             <label>Nhóm<select name="asset_group" required></select></label>
             <label>Loại thiết bị<select name="asset_type"></select></label>
             <label>Hãng<input name="brand" /></label>
+            <label>Serial/Số seri<input name="serial_number" /></label>
             <label>Năm<input name="purchase_year" inputmode="numeric" /></label>
             <label>Số lượng<input name="quantity" inputmode="numeric" /></label>
+            <label>Đơn giá<input name="unit_price" type="number" min="0" step="1000" /></label>
+            <label>Vị trí<input name="location" placeholder="VD: Phòng IT - Tầng 2" /></label>
             <label>Người dùng/phòng ban<input name="assigned_to" /></label>
             <label>Phòng ban<select name="department"></select></label>
+            <label>Hết bảo hành<input name="warranty_end_date" type="date" /></label>
+            <label>Bảo trì gần nhất<input name="last_maintenance_date" type="date" /></label>
             <label>Tình trạng<select name="status" required></select></label>
             <label>Phần mềm<select name="software_license"></select></label>
             <label class="span-2">Ghi chú<textarea name="note" rows="3"></textarea></label>
