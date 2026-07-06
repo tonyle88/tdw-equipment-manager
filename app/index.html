@@ -261,6 +261,26 @@
           </div>
         </form>
       </div>
+
+      <div class="modal-backdrop" id="systemModal" hidden>
+        <form class="modal compact-modal" id="systemModalForm">
+          <div class="modal-head">
+            <div>
+              <p class="eyebrow" id="systemModalEyebrow">THÔNG BÁO</p>
+              <h2 id="systemModalTitle">THÔNG BÁO</h2>
+            </div>
+          </div>
+          <p class="modal-copy" id="systemModalMessage"></p>
+          <label class="system-input" id="systemModalInputWrap" hidden>
+            <span id="systemModalInputLabel">Nhập dữ liệu</span>
+            <input id="systemModalInput" autocomplete="off" />
+          </label>
+          <div class="modal-actions">
+            <button class="secondary-button" type="button" id="systemModalCancel">Hủy</button>
+            <button class="primary-button" type="submit" id="systemModalConfirm">Đồng ý</button>
+          </div>
+        </form>
+      </div>
     </main>
   </body>
 </html>

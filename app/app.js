@@ -15,6 +15,7 @@ const state = {
     usersLoaded: false,
     usersLoading: null,
     usersError: "",
+    dialogResolve: null,
   };
 
   const AUTH_STORAGE_KEY = "tdw_equipment_auth_token";
@@ -124,6 +125,16 @@ const state = {
       userFormTitle: document.querySelector("#userFormTitle"),
       closeUserModal: document.querySelector("#closeUserModal"),
       cancelUserForm: document.querySelector("#cancelUserForm"),
+      systemModal: document.querySelector("#systemModal"),
+      systemModalForm: document.querySelector("#systemModalForm"),
+      systemModalEyebrow: document.querySelector("#systemModalEyebrow"),
+      systemModalTitle: document.querySelector("#systemModalTitle"),
+      systemModalMessage: document.querySelector("#systemModalMessage"),
+      systemModalInputWrap: document.querySelector("#systemModalInputWrap"),
+      systemModalInputLabel: document.querySelector("#systemModalInputLabel"),
+      systemModalInput: document.querySelector("#systemModalInput"),
+      systemModalCancel: document.querySelector("#systemModalCancel"),
+      systemModalConfirm: document.querySelector("#systemModalConfirm"),
       navLinks: [...document.querySelectorAll(".nav-pills [data-view]")],
     });
     if (els.loginLogo && els.brandLogo) els.loginLogo.src = els.brandLogo.src;
@@ -229,6 +240,50 @@ const state = {
       toast.classList.add("is-hiding");
       toast.addEventListener("animationend", () => toast.remove(), { once: true });
     }, 2600);
+  }
+
+  function showSystemModal({ eyebrow = "THÔNG BÁO", title, message, confirmText = "Đồng ý", cancelText = "", inputLabel = "", inputType = "text" }) {
+    if (!els.systemModal) return Promise.resolve(false);
+    if (els.systemModalEyebrow) els.systemModalEyebrow.textContent = eyebrow;
+    if (els.systemModalTitle) els.systemModalTitle.textContent = title;
+    if (els.systemModalMessage) els.systemModalMessage.textContent = message || "";
+    if (els.systemModalConfirm) els.systemModalConfirm.textContent = confirmText;
+    if (els.systemModalCancel) {
+      els.systemModalCancel.textContent = cancelText || "Hủy";
+      els.systemModalCancel.hidden = !cancelText;
+    }
+    if (els.systemModalInputWrap && els.systemModalInput) {
+      const hasInput = Boolean(inputLabel);
+      els.systemModalInputWrap.hidden = !hasInput;
+      els.systemModalInput.required = hasInput;
+      els.systemModalInput.value = "";
+      els.systemModalInput.type = inputType;
+      if (els.systemModalInputLabel) els.systemModalInputLabel.textContent = inputLabel;
+    }
+    els.systemModal.hidden = false;
+    if (inputLabel) window.setTimeout(() => els.systemModalInput?.focus(), 0);
+    return new Promise((resolve) => {
+      state.dialogResolve = resolve;
+    });
+  }
+
+  function closeSystemModal(value) {
+    if (els.systemModal) els.systemModal.hidden = true;
+    const resolve = state.dialogResolve;
+    state.dialogResolve = null;
+    if (resolve) resolve(value);
+  }
+
+  function showMessageModal(title, message) {
+    return showSystemModal({ title, message, confirmText: "Đã hiểu" });
+  }
+
+  function showConfirmModal(title, message, confirmText = "Đồng ý") {
+    return showSystemModal({ title, message, confirmText, cancelText: "Hủy" });
+  }
+
+  function showInputModal(title, message, inputLabel, inputType = "text") {
+    return showSystemModal({ title, message, inputLabel, inputType, confirmText: "Lưu", cancelText: "Hủy" });
   }
 
   function updateUserChrome() {
@@ -619,7 +674,7 @@ const state = {
       await refreshAppData({ resetPage: true });
       showToast(isEdit ? "Đã cập nhật thiết bị" : "Đã thêm thiết bị", asset.asset_name || "Thiết bị TDW");
     } catch (error) {
-      alert(error.message);
+      showMessageModal("Không thể lưu thiết bị", error.message);
     } finally {
       state.isSaving = false;
       els.saveButton.textContent = "Lưu thiết bị";
@@ -629,14 +684,15 @@ const state = {
 
   async function handleDeleteAsset(assetId) {
     const asset = state.assets.find((item) => item.asset_id === assetId);
-    if (!asset || !confirm(`Xóa thiết bị "${asset.asset_name}" khỏi Google Sheet?`)) return;
+    const confirmed = asset && await showConfirmModal("XÓA THIẾT BỊ", `Xóa thiết bị "${asset.asset_name}" khỏi danh sách hiển thị?`, "Xóa");
+    if (!confirmed) return;
     try {
       await callServer("deleteAsset", assetId);
       state.selectedId = null;
       await refreshAppData({ resetPage: true });
       showToast("Đã xóa thiết bị", asset.asset_name || "Thiết bị TDW");
     } catch (error) {
-      alert(error.message);
+      showMessageModal("Không thể xóa thiết bị", error.message);
     }
   }
 
@@ -656,7 +712,7 @@ const state = {
 
   function setView(view) {
     if (view === "users" && !isAdmin()) {
-      alert("Chỉ admin mới được vào trang người dùng");
+      showMessageModal("Không đủ quyền", "Chỉ admin mới được vào trang người dùng");
       return;
     }
     state.activeView = view;
@@ -884,7 +940,7 @@ const state = {
       await refreshAppData();
       showToast("Đã đổi thứ tự cấu hình", setting.display_name || "Cấu hình TDW");
     } catch (error) {
-      alert(error.message);
+      showMessageModal("Không thể đổi thứ tự", error.message);
     }
   }
 
@@ -898,19 +954,20 @@ const state = {
       showToast(isEdit ? "Đã cập nhật cấu hình" : "Đã thêm cấu hình", setting.display_name || setting.setting_value || "Cấu hình TDW");
       await refreshAppData();
     } catch (error) {
-      alert(error.message);
+      showMessageModal("Không thể lưu cấu hình", error.message);
     }
   }
 
   async function handleDeleteSetting(settingId) {
-    if (!confirm("Xóa cấu hình này khỏi dropdown?")) return;
     const setting = state.settings.find((item) => item.setting_id === settingId);
+    const confirmed = await showConfirmModal("XÓA CẤU HÌNH", `Xóa cấu hình "${setting?.display_name || "này"}" khỏi dropdown?`, "Xóa");
+    if (!confirmed) return;
     try {
       await callServer("deleteSetting", settingId);
       await refreshAppData();
       showToast("Đã xóa cấu hình", setting?.display_name || "Cấu hình TDW");
     } catch (error) {
-      alert(error.message);
+      showMessageModal("Không thể xóa cấu hình", error.message);
     }
   }
 
@@ -1011,25 +1068,26 @@ const state = {
       if (state.activeView === "users") await renderUsersView();
       showToast(isEdit ? "Đã cập nhật user" : "Đã thêm user", user.full_name || user.username || "User TDW");
     } catch (error) {
-      alert(error.message);
+      showMessageModal("Không thể lưu user", error.message);
     }
   }
 
   async function handleDeleteUser(userId) {
-    if (!confirm("Khóa user này?")) return;
     const user = state.users.find((item) => item.user_id === userId);
+    const confirmed = await showConfirmModal("KHÓA USER", `Khóa user "${user?.full_name || user?.username || "này"}"?`, "Khóa");
+    if (!confirmed) return;
     try {
       await callServer("deleteUser", userId);
       state.usersLoaded = false;
       await renderUsersView();
       showToast("Đã khóa user", user?.full_name || user?.username || "User TDW");
     } catch (error) {
-      alert(error.message);
+      showMessageModal("Không thể khóa user", error.message);
     }
   }
 
   async function handleResetPassword(userId) {
-    const newPassword = prompt("Nhập mật khẩu mới cho user này:");
+    const newPassword = await showInputModal("RESET MẬT KHẨU", "Nhập mật khẩu mới cho user này.", "Mật khẩu mới", "password");
     if (!newPassword) return;
     const user = state.users.find((item) => item.user_id === userId);
     try {
@@ -1037,7 +1095,7 @@ const state = {
       state.usersLoaded = false;
       showToast("Đã reset mật khẩu", user?.full_name || user?.username || "User TDW");
     } catch (error) {
-      alert(error.message);
+      showMessageModal("Không thể reset mật khẩu", error.message);
     }
   }
 
@@ -1213,6 +1271,14 @@ const state = {
     els.cancelUserForm.addEventListener("click", closeUserModal);
     els.userModal.addEventListener("click", (event) => {
       if (event.target === els.userModal) closeUserModal();
+    });
+    els.systemModalForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      closeSystemModal(els.systemModalInputWrap?.hidden ? true : els.systemModalInput?.value);
+    });
+    els.systemModalCancel?.addEventListener("click", () => closeSystemModal(false));
+    els.systemModal?.addEventListener("click", (event) => {
+      if (event.target === els.systemModal) closeSystemModal(false);
     });
     els.navLinks.forEach((link) => {
       link.addEventListener("click", (event) => {
