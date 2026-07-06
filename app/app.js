@@ -765,7 +765,7 @@ const state = {
     state.editingSettingId = "";
     form.reset();
     form.elements.setting_id.value = "";
-    form.elements.sort_order.value = "999";
+    form.elements.sort_order.value = nextSettingOrder(form.elements.setting_type.value);
     els.settingFormTitle.textContent = "THÊM CẤU HÌNH";
   }
 
@@ -788,6 +788,11 @@ const state = {
       els.settingFormTitle.textContent = "SỬA CẤU HÌNH";
     }
     els.settingModal.hidden = false;
+  }
+
+  function nextSettingOrder(type) {
+    const orders = settingsByType(type).map((item) => Number(item.sort_order) || 0);
+    return String(Math.max(0, ...orders) + 1);
   }
 
   function closeSettingModal() {
@@ -1115,6 +1120,9 @@ const state = {
     });
     els.form.addEventListener("submit", handleAssetSubmit);
     els.settingForm.addEventListener("submit", handleSettingSubmit);
+    els.settingForm.elements.setting_type.addEventListener("change", () => {
+      if (!state.editingSettingId) els.settingForm.elements.sort_order.value = nextSettingOrder(els.settingForm.elements.setting_type.value);
+    });
     els.closeSettingModal.addEventListener("click", closeSettingModal);
     els.cancelSettingForm.addEventListener("click", closeSettingModal);
     els.settingModal.addEventListener("click", (event) => {
