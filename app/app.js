@@ -549,9 +549,12 @@ const state = {
     els.saveButton.textContent = "Đang lưu...";
     els.saveButton.disabled = true;
     try {
-      await callServer("saveAsset", getFormAsset());
+      const asset = getFormAsset();
+      const isEdit = Boolean(asset.asset_id);
+      await callServer("saveAsset", asset);
       closeAssetModal();
       await refreshAppData({ resetPage: true });
+      showToast(isEdit ? "Đã cập nhật thiết bị" : "Đã thêm thiết bị", asset.asset_name || "Thiết bị TDW");
     } catch (error) {
       alert(error.message);
     } finally {
@@ -568,6 +571,7 @@ const state = {
       await callServer("deleteAsset", assetId);
       state.selectedId = null;
       await refreshAppData({ resetPage: true });
+      showToast("Đã xóa thiết bị", asset.asset_name || "Thiết bị TDW");
     } catch (error) {
       alert(error.message);
     }
@@ -815,6 +819,7 @@ const state = {
       await callServer("saveSetting", setting);
       await callServer("saveSetting", target);
       await refreshAppData();
+      showToast("Đã đổi thứ tự cấu hình", setting.display_name || "Cấu hình TDW");
     } catch (error) {
       alert(error.message);
     }
@@ -823,9 +828,12 @@ const state = {
   async function handleSettingSubmit(event) {
     event.preventDefault();
     try {
-      await callServer("saveSetting", Object.fromEntries(new FormData(event.target).entries()));
+      const setting = Object.fromEntries(new FormData(event.target).entries());
+      const isEdit = Boolean(setting.setting_id);
+      await callServer("saveSetting", setting);
       closeSettingModal();
       await refreshAppData();
+      showToast(isEdit ? "Đã cập nhật cấu hình" : "Đã thêm cấu hình", setting.display_name || setting.setting_value || "Cấu hình TDW");
     } catch (error) {
       alert(error.message);
     }
@@ -833,9 +841,11 @@ const state = {
 
   async function handleDeleteSetting(settingId) {
     if (!confirm("Xóa cấu hình này khỏi dropdown?")) return;
+    const setting = state.settings.find((item) => item.setting_id === settingId);
     try {
       await callServer("deleteSetting", settingId);
       await refreshAppData();
+      showToast("Đã xóa cấu hình", setting?.display_name || "Cấu hình TDW");
     } catch (error) {
       alert(error.message);
     }
@@ -931,10 +941,12 @@ const state = {
     event.preventDefault();
     try {
       const user = Object.fromEntries(new FormData(event.target).entries());
+      const isEdit = Boolean(user.user_id);
       await callServer("saveUser", user);
       state.usersLoaded = false;
       closeUserModal();
       if (state.activeView === "users") await renderUsersView();
+      showToast(isEdit ? "Đã cập nhật user" : "Đã thêm user", user.full_name || user.username || "User TDW");
     } catch (error) {
       alert(error.message);
     }
@@ -942,10 +954,12 @@ const state = {
 
   async function handleDeleteUser(userId) {
     if (!confirm("Khóa user này?")) return;
+    const user = state.users.find((item) => item.user_id === userId);
     try {
       await callServer("deleteUser", userId);
       state.usersLoaded = false;
       await renderUsersView();
+      showToast("Đã khóa user", user?.full_name || user?.username || "User TDW");
     } catch (error) {
       alert(error.message);
     }
@@ -954,10 +968,11 @@ const state = {
   async function handleResetPassword(userId) {
     const newPassword = prompt("Nhập mật khẩu mới cho user này:");
     if (!newPassword) return;
+    const user = state.users.find((item) => item.user_id === userId);
     try {
       await callServer("resetUserPassword", userId, newPassword);
       state.usersLoaded = false;
-      alert("Đã reset mật khẩu.");
+      showToast("Đã reset mật khẩu", user?.full_name || user?.username || "User TDW");
     } catch (error) {
       alert(error.message);
     }
