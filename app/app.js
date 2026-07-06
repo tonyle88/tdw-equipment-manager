@@ -493,7 +493,7 @@ const state = {
     fillSelect(els.year, uniqueValues(state.assets.map((asset) => asset.purchase_year)).map((value) => [value, value]), "Tất cả năm");
     fillSelect(
       els.department,
-      uniqueValues(state.assets.map((asset) => asset.department || asset.assigned_to)).map((value) => [value, value]),
+      uniqueValues(state.assets.map((asset) => asset.department)).map((value) => [value, value]),
       "Tất cả bộ phận",
     );
     fillSelect(els.status, settingOptions("status", state.assets.map((asset) => asset.status)), "Tất cả tình trạng");
@@ -541,12 +541,11 @@ const state = {
     const status = els.status?.value || "";
     state.filtered = state.assets.filter((asset) => {
       const searchText = normalize([asset.asset_code, asset.asset_name, asset.asset_group_label, asset.serial_number, asset.location, asset.assigned_to, asset.department, asset.software_license, asset.note].join(" "));
-      const assetDepartment = asset.department || asset.assigned_to || "";
       return (
         (!keyword || searchText.includes(keyword)) &&
         (!group || asset.asset_group === group) &&
         (!year || String(asset.purchase_year) === year) &&
-        (!department || assetDepartment === department) &&
+        (!department || asset.department === department) &&
         (!status || asset.status === status)
       );
     });
@@ -578,7 +577,7 @@ const state = {
         <td class="asset-name">${escapeHtml(asset.asset_name || "")}</td>
         <td>${escapeHtml(asset.asset_group_label || "")}</td>
         <td>${escapeHtml(asset.purchase_year || "")}</td>
-        <td>${escapeHtml(asset.assigned_to || asset.department || "")}</td>
+        <td>${escapeHtml([asset.assigned_to, asset.department].filter(Boolean).join(" / "))}</td>
         <td>${escapeHtml(asset.software_license || "")}</td>
         <td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status) || "Chưa rõ")}</span></td>
       </tr>
@@ -627,7 +626,8 @@ const state = {
       <dl>
         <div><dt>Nhóm</dt><dd>${escapeHtml(asset.asset_group_label || "")}</dd></div>
         <div><dt>Vị trí</dt><dd>${escapeHtml(asset.location || "Chưa có dữ liệu")}</dd></div>
-        <div><dt>Người dùng/phòng ban</dt><dd>${escapeHtml(asset.assigned_to || asset.department || "")}</dd></div>
+        <div><dt>Người dùng</dt><dd>${escapeHtml(asset.assigned_to || "Chưa có dữ liệu")}</dd></div>
+        <div><dt>Phòng ban</dt><dd>${escapeHtml(asset.department || "Chưa có dữ liệu")}</dd></div>
         <div><dt>Phần mềm</dt><dd>${escapeHtml(asset.software_license || "Không có dữ liệu")}</dd></div>
         <div><dt>Ghi chú</dt><dd>${escapeHtml(asset.note || "Không có ghi chú")}</dd></div>
       </dl>
@@ -786,7 +786,7 @@ const state = {
             <h3>DANH SÁCH ƯU TIÊN</h3>
             <table class="mini-table maintenance-table">
               <thead><tr><th>THIẾT BỊ</th><th>TÌNH TRẠNG</th><th>NGƯỜI DÙNG</th></tr></thead>
-              <tbody>${watchList.slice(0, 12).map((asset) => `<tr><td>${escapeHtml(asset.asset_name)}</td><td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status))}</span></td><td>${escapeHtml(asset.assigned_to || asset.department || "")}</td></tr>`).join("") || `<tr><td colspan="3">CHƯA CÓ THIẾT BỊ CẦN XỬ LÝ.</td></tr>`}</tbody>
+              <tbody>${watchList.slice(0, 12).map((asset) => `<tr><td>${escapeHtml(asset.asset_name)}</td><td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status))}</span></td><td>${escapeHtml([asset.assigned_to, asset.department].filter(Boolean).join(" / "))}</td></tr>`).join("") || `<tr><td colspan="3">CHƯA CÓ THIẾT BỊ CẦN XỬ LÝ.</td></tr>`}</tbody>
             </table>
           </article>
           <article class="module-card">
