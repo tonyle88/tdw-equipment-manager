@@ -225,8 +225,8 @@ const state = {
   async function handleLogin(event) {
     event.preventDefault();
     if (els.loginError) els.loginError.hidden = true;
-    setLoginBusy(true);
     const credentials = Object.fromEntries(new FormData(event.target).entries());
+    setLoginBusy(true);
     try {
       const payload = await callServer("loginUser", credentials);
       if (els.rememberLogin?.checked) localStorage.setItem(REMEMBER_USERNAME_KEY, String(credentials.username || ""));
