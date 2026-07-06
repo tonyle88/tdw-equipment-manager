@@ -224,12 +224,13 @@ const state = {
     if (els.rememberLogin) els.rememberLogin.checked = Boolean(remembered) || els.rememberLogin.checked;
   }
 
-  function showToast(title, message = "") {
+  function showToast(title, message = "", type = "success") {
     if (!els.toastStack) return;
+    const icons = { success: "✓", error: "✕", info: "ℹ" };
     const toast = document.createElement("div");
-    toast.className = "toast";
+    toast.className = `toast toast--${type}`;
     toast.innerHTML = `
-      <div class="toast-icon">✓</div>
+      <div class="toast-icon">${icons[type] || "✓"}</div>
       <div>
         <strong>${escapeHtml(title)}</strong>
         <span>${escapeHtml(message)}</span>
@@ -239,7 +240,7 @@ const state = {
     window.setTimeout(() => {
       toast.classList.add("is-hiding");
       toast.addEventListener("animationend", () => toast.remove(), { once: true });
-    }, 2600);
+    }, 3000);
   }
 
   function showSystemModal({ eyebrow = "THÔNG BÁO", title, message, confirmText = "Đồng ý", cancelText = "", inputLabel = "", inputType = "text" }) {
@@ -660,25 +661,42 @@ const state = {
     return data;
   }
 
+  function setModalBusy(modal, isBusy) {
+    const buttons = modal.querySelectorAll("button");
+    const inputs = modal.querySelectorAll("input, select, textarea");
+    buttons.forEach((btn) => { btn.disabled = isBusy; });
+    inputs.forEach((inp) => { inp.disabled = isBusy; });
+  }
+
   async function handleAssetSubmit(event) {
     event.preventDefault();
     if (state.isSaving) return;
     state.isSaving = true;
-    els.saveButton.textContent = "Đang lưu...";
-    els.saveButton.disabled = true;
+    const saveBtn = els.saveButton;
+    const originalText = saveBtn.textContent;
+    saveBtn.classList.add("is-loading");
+    saveBtn.disabled = true;
+    setModalBusy(els.modal, true);
+    saveBtn.disabled = true; // keep save disabled
     try {
       const asset = getFormAsset();
       const isEdit = Boolean(asset.asset_id);
       await callServer("saveAsset", asset);
-      closeAssetModal();
-      await refreshAppData({ resetPage: true });
+      // Toast ngay lập tức — trước khi refresh data
       showToast(isEdit ? "Đã cập nhật thiết bị" : "Đã thêm thiết bị", asset.asset_name || "Thiết bị TDW");
+      closeAssetModal();
+      await refreshAppData({ resetPage: !isEdit });
     } catch (error) {
+      setModalBusy(els.modal, false);
+      saveBtn.classList.remove("is-loading");
+      saveBtn.textContent = originalText;
+      saveBtn.disabled = false;
       showMessageModal("Không thể lưu thiết bị", error.message);
     } finally {
       state.isSaving = false;
-      els.saveButton.textContent = "Lưu thiết bị";
-      els.saveButton.disabled = false;
+      saveBtn.classList.remove("is-loading");
+      saveBtn.textContent = originalText;
+      saveBtn.disabled = false;
     }
   }
 
@@ -686,12 +704,16 @@ const state = {
     const asset = state.assets.find((item) => item.asset_id === assetId);
     const confirmed = asset && await showConfirmModal("XÓA THIẾT BỊ", `Xóa thiết bị "${asset.asset_name}" khỏi danh sách hiển thị?`, "Xóa");
     if (!confirmed) return;
+    // Disable delete button ngay lập tức
+    const deleteBtn = els.detail?.querySelector(`[data-delete-asset="${assetId}"]`);
+    if (deleteBtn) { deleteBtn.classList.add("is-loading"); deleteBtn.disabled = true; }
     try {
       await callServer("deleteAsset", assetId);
+      showToast("Đã xóa thiết bị", asset.asset_name || "Thiết bị TDW");
       state.selectedId = null;
       await refreshAppData({ resetPage: true });
-      showToast("Đã xóa thiết bị", asset.asset_name || "Thiết bị TDW");
     } catch (error) {
+      if (deleteBtn) { deleteBtn.classList.remove("is-loading"); deleteBtn.disabled = false; }
       showMessageModal("Không thể xóa thiết bị", error.message);
     }
   }
@@ -931,30 +953,41 @@ const state = {
     const targetIndex = direction === "up" ? index - 1 : index + 1;
     const target = list[targetIndex];
     if (!target) return;
+    // Disable tất cả nút move trong group này khi đang xử lý
+    const moveButtons = els.content?.querySelectorAll(`[data-move-setting]`);
+    moveButtons?.forEach((btn) => { btn.disabled = true; btn.classList.add("is-loading"); });
     const currentOrder = setting.sort_order;
     setting.sort_order = target.sort_order;
     target.sort_order = currentOrder;
     try {
-      await callServer("saveSetting", setting);
-      await callServer("saveSetting", target);
-      await refreshAppData();
+      await Promise.all([callServer("saveSetting", setting), callServer("saveSetting", target)]);
       showToast("Đã đổi thứ tự cấu hình", setting.display_name || "Cấu hình TDW");
+      await refreshAppData();
     } catch (error) {
+      moveButtons?.forEach((btn) => { btn.disabled = false; btn.classList.remove("is-loading"); });
       showMessageModal("Không thể đổi thứ tự", error.message);
     }
   }
 
   async function handleSettingSubmit(event) {
     event.preventDefault();
+    const submitBtn = event.target.querySelector("[type=submit]");
+    if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
+    setModalBusy(els.settingModal, true);
+    submitBtn && (submitBtn.disabled = true);
     try {
       const setting = Object.fromEntries(new FormData(event.target).entries());
       const isEdit = Boolean(setting.setting_id);
       await callServer("saveSetting", setting);
-      closeSettingModal();
       showToast(isEdit ? "Đã cập nhật cấu hình" : "Đã thêm cấu hình", setting.display_name || setting.setting_value || "Cấu hình TDW");
+      closeSettingModal();
       await refreshAppData();
     } catch (error) {
+      setModalBusy(els.settingModal, false);
+      if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
       showMessageModal("Không thể lưu cấu hình", error.message);
+    } finally {
+      if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
     }
   }
 
@@ -962,11 +995,14 @@ const state = {
     const setting = state.settings.find((item) => item.setting_id === settingId);
     const confirmed = await showConfirmModal("XÓA CẤU HÌNH", `Xóa cấu hình "${setting?.display_name || "này"}" khỏi dropdown?`, "Xóa");
     if (!confirmed) return;
+    const deleteBtn = els.content?.querySelector(`[data-delete-setting="${settingId}"]`);
+    if (deleteBtn) { deleteBtn.classList.add("is-loading"); deleteBtn.disabled = true; }
     try {
       await callServer("deleteSetting", settingId);
-      await refreshAppData();
       showToast("Đã xóa cấu hình", setting?.display_name || "Cấu hình TDW");
+      await refreshAppData();
     } catch (error) {
+      if (deleteBtn) { deleteBtn.classList.remove("is-loading"); deleteBtn.disabled = false; }
       showMessageModal("Không thể xóa cấu hình", error.message);
     }
   }
@@ -1059,16 +1095,24 @@ const state = {
 
   async function handleUserSubmit(event) {
     event.preventDefault();
+    const submitBtn = event.target.querySelector("[type=submit]");
+    if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
+    setModalBusy(els.userModal, true);
+    submitBtn && (submitBtn.disabled = true);
     try {
       const user = Object.fromEntries(new FormData(event.target).entries());
       const isEdit = Boolean(user.user_id);
       await callServer("saveUser", user);
+      showToast(isEdit ? "Đã cập nhật user" : "Đã thêm user", user.full_name || user.username || "User TDW");
       state.usersLoaded = false;
       closeUserModal();
       if (state.activeView === "users") await renderUsersView();
-      showToast(isEdit ? "Đã cập nhật user" : "Đã thêm user", user.full_name || user.username || "User TDW");
     } catch (error) {
+      setModalBusy(els.userModal, false);
+      if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
       showMessageModal("Không thể lưu user", error.message);
+    } finally {
+      if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
     }
   }
 
@@ -1076,26 +1120,32 @@ const state = {
     const user = state.users.find((item) => item.user_id === userId);
     const confirmed = await showConfirmModal("KHÓA USER", `Khóa user "${user?.full_name || user?.username || "này"}"?`, "Khóa");
     if (!confirmed) return;
+    const deleteBtn = els.content?.querySelector(`[data-delete-user="${userId}"]`);
+    if (deleteBtn) { deleteBtn.classList.add("is-loading"); deleteBtn.disabled = true; }
     try {
       await callServer("deleteUser", userId);
+      showToast("Đã khóa user", user?.full_name || user?.username || "User TDW");
       state.usersLoaded = false;
       await renderUsersView();
-      showToast("Đã khóa user", user?.full_name || user?.username || "User TDW");
     } catch (error) {
+      if (deleteBtn) { deleteBtn.classList.remove("is-loading"); deleteBtn.disabled = false; }
       showMessageModal("Không thể khóa user", error.message);
     }
   }
 
   async function handleResetPassword(userId) {
-    const newPassword = await showInputModal("RESET MẬT KHẨU", "Nhập mật khẩu mới cho user này.", "Mật khẩu mới", "password");
+    const newPassword = await showInputModal("RESET MẬT KHẨU", "Nhập mật khẩu mới cho user này (tối thiểu 6 ký tự).", "Mật khẩu mới", "password");
     if (!newPassword) return;
+    const resetBtn = els.content?.querySelector(`[data-reset-user="${userId}"]`);
+    if (resetBtn) { resetBtn.classList.add("is-loading"); resetBtn.disabled = true; }
     const user = state.users.find((item) => item.user_id === userId);
     try {
       await callServer("resetUserPassword", userId, newPassword);
-      state.usersLoaded = false;
       showToast("Đã reset mật khẩu", user?.full_name || user?.username || "User TDW");
     } catch (error) {
       showMessageModal("Không thể reset mật khẩu", error.message);
+    } finally {
+      if (resetBtn) { resetBtn.classList.remove("is-loading"); resetBtn.disabled = false; }
     }
   }
 

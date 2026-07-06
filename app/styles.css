@@ -45,6 +45,17 @@
     animation: toastIn .24s ease forwards;
   }
   .toast.is-hiding { animation: toastOut .2s ease forwards; }
+  /* Toast variants */
+  .toast--error {
+    background: linear-gradient(135deg, #991b1b, #b42318 58%, #c0392b);
+    box-shadow: 0 22px 44px rgba(180,35,24,.32);
+  }
+  .toast--error .toast-icon { background: #ffe0e0; color: #b42318; }
+  .toast--info {
+    background: linear-gradient(135deg, #1e3a5f, #1d4ed8 58%, #2563eb);
+    box-shadow: 0 22px 44px rgba(37,99,235,.3);
+  }
+  .toast--info .toast-icon { background: #dbeafe; color: #1d4ed8; }
   .toast-icon {
     display: grid;
     place-items: center;
@@ -382,6 +393,29 @@
   }
   .secondary-button { background: #eef2f7; color: #17202a; }
   .danger-button { background: #ffe0e0; color: #b42318; }
+  /* Loading state cho tất cả button */
+  button.is-loading {
+    position: relative;
+    color: transparent !important;
+    cursor: wait;
+    pointer-events: none;
+  }
+  button.is-loading::after {
+    content: "";
+    position: absolute;
+    inset: 50% 50% auto auto;
+    width: 16px;
+    height: 16px;
+    margin: -8px -8px 0 0;
+    border: 2px solid rgba(255,255,255,.35);
+    border-top-color: currentColor;
+    border-radius: 999px;
+    animation: spin .65s linear infinite;
+    color: #fff;
+  }
+  button.is-loading.secondary-button::after { color: var(--tdw-blue); border-top-color: var(--tdw-blue); }
+  button.is-loading.danger-button::after { color: #b42318; border-top-color: #b42318; }
+  button:disabled:not(.is-loading) { opacity: .5; cursor: not-allowed; }
   .hero { align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
   .hero > div:first-child { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center; }
   .hero .eyebrow, .hero h1, .hero-copy { grid-column: 2; }
