@@ -471,6 +471,10 @@ const state = {
     return setting?.display_name || fallbackLabels[type]?.[value] || value || "";
   }
 
+  function departmentLabel(value) {
+    return labelFor("department", value);
+  }
+
   function settingOptions(type, extraValues = []) {
     const base = state.settings
       .filter((item) => item.setting_type === type && item.active)
@@ -492,7 +496,7 @@ const state = {
   function fillFilters() {
     fillSelect(els.group, settingOptions("asset_group", state.assets.map((asset) => asset.asset_group)), "Tất cả nhóm");
     fillSelect(els.year, uniqueValues(state.assets.map((asset) => asset.purchase_year)).map((value) => [value, value]), "Tất cả năm");
-    fillSelect(els.department, settingOptions("department"), "Tất cả bộ phận");
+    fillSelect(els.department, settingOptions("department", state.assets.map((asset) => asset.department)), "Tất cả bộ phận");
     fillSelect(els.status, settingOptions("status", state.assets.map((asset) => asset.status)), "Tất cả tình trạng");
   }
 
@@ -537,7 +541,7 @@ const state = {
     const department = els.department?.value || "";
     const status = els.status?.value || "";
     state.filtered = state.assets.filter((asset) => {
-      const searchText = normalize([asset.asset_code, asset.asset_name, asset.asset_group_label, asset.serial_number, asset.location, asset.assigned_to, asset.department, asset.software_license, asset.note].join(" "));
+      const searchText = normalize([asset.asset_code, asset.asset_name, asset.asset_group_label, asset.serial_number, asset.location, asset.assigned_to, departmentLabel(asset.department), asset.software_license, asset.note].join(" "));
       return (
         (!keyword || searchText.includes(keyword)) &&
         (!group || asset.asset_group === group) &&
@@ -574,7 +578,7 @@ const state = {
         <td class="asset-name">${escapeHtml(asset.asset_name || "")}</td>
         <td>${escapeHtml(asset.asset_group_label || "")}</td>
         <td>${escapeHtml(asset.purchase_year || "")}</td>
-        <td>${escapeHtml([asset.assigned_to, asset.department].filter(Boolean).join(" / "))}</td>
+        <td>${escapeHtml([asset.assigned_to, departmentLabel(asset.department)].filter(Boolean).join(" / "))}</td>
         <td>${escapeHtml(asset.software_license || "")}</td>
         <td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status) || "Chưa rõ")}</span></td>
       </tr>
@@ -624,7 +628,7 @@ const state = {
         <div><dt>Nhóm</dt><dd>${escapeHtml(asset.asset_group_label || "")}</dd></div>
         <div><dt>Vị trí</dt><dd>${escapeHtml(asset.location || "Chưa có dữ liệu")}</dd></div>
         <div><dt>Người dùng</dt><dd>${escapeHtml(asset.assigned_to || "Chưa có dữ liệu")}</dd></div>
-        <div><dt>Phòng ban</dt><dd>${escapeHtml(asset.department || "Chưa có dữ liệu")}</dd></div>
+        <div><dt>Phòng ban</dt><dd>${escapeHtml(departmentLabel(asset.department) || "Chưa có dữ liệu")}</dd></div>
         <div><dt>Phần mềm</dt><dd>${escapeHtml(asset.software_license || "Không có dữ liệu")}</dd></div>
         <div><dt>Ghi chú</dt><dd>${escapeHtml(asset.note || "Không có ghi chú")}</dd></div>
       </dl>
@@ -801,7 +805,7 @@ const state = {
             <h3>DANH SÁCH ƯU TIÊN</h3>
             <table class="mini-table maintenance-table">
               <thead><tr><th>THIẾT BỊ</th><th>TÌNH TRẠNG</th><th>NGƯỜI DÙNG</th></tr></thead>
-              <tbody>${watchList.slice(0, 12).map((asset) => `<tr><td>${escapeHtml(asset.asset_name)}</td><td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status))}</span></td><td>${escapeHtml([asset.assigned_to, asset.department].filter(Boolean).join(" / "))}</td></tr>`).join("") || `<tr><td colspan="3">CHƯA CÓ THIẾT BỊ CẦN XỬ LÝ.</td></tr>`}</tbody>
+              <tbody>${watchList.slice(0, 12).map((asset) => `<tr><td>${escapeHtml(asset.asset_name)}</td><td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status))}</span></td><td>${escapeHtml([asset.assigned_to, departmentLabel(asset.department)].filter(Boolean).join(" / "))}</td></tr>`).join("") || `<tr><td colspan="3">CHƯA CÓ THIẾT BỊ CẦN XỬ LÝ.</td></tr>`}</tbody>
             </table>
           </article>
           <article class="module-card">
@@ -1228,7 +1232,7 @@ const state = {
 
   function exportCsv() {
     const headers = ["Mã tài sản", "Tên thiết bị", "Nhóm", "Loại", "Serial", "Vị trí", "Năm", "Đơn giá", "Người dùng", "Phòng ban", "Hết bảo hành", "Bảo trì gần nhất", "Phần mềm", "Tình trạng", "Ghi chú"];
-    const rows = state.assets.map((asset) => [asset.asset_code, asset.asset_name, asset.asset_group_label, asset.asset_type, asset.serial_number, asset.location, asset.purchase_year, asset.unit_price, asset.assigned_to, asset.department, asset.warranty_end_date, asset.last_maintenance_date, asset.software_license, labelFor("status", asset.status), asset.note]);
+    const rows = state.assets.map((asset) => [asset.asset_code, asset.asset_name, asset.asset_group_label, asset.asset_type, asset.serial_number, asset.location, asset.purchase_year, asset.unit_price, asset.assigned_to, departmentLabel(asset.department), asset.warranty_end_date, asset.last_maintenance_date, asset.software_license, labelFor("status", asset.status), asset.note]);
     const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
