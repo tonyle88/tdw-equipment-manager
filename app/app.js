@@ -671,15 +671,15 @@ const state = {
   async function handleAssetSubmit(event) {
     event.preventDefault();
     if (state.isSaving) return;
+    const asset = getFormAsset(); // Trích xuất dữ liệu TRƯỚC KHI disable các input
     state.isSaving = true;
     const saveBtn = els.saveButton;
     const originalText = saveBtn.textContent;
     saveBtn.classList.add("is-loading");
     saveBtn.disabled = true;
     setModalBusy(els.modal, true);
-    saveBtn.disabled = true; // keep save disabled
+    saveBtn.disabled = true; // giữ nút lưu bị khóa
     try {
-      const asset = getFormAsset();
       const isEdit = Boolean(asset.asset_id);
       await callServer("saveAsset", asset);
       // Toast ngay lập tức — trước khi refresh data
@@ -971,12 +971,12 @@ const state = {
 
   async function handleSettingSubmit(event) {
     event.preventDefault();
+    const setting = Object.fromEntries(new FormData(event.target).entries()); // Trích xuất dữ liệu TRƯỚC KHI disable các input
     const submitBtn = event.target.querySelector("[type=submit]");
     if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
     setModalBusy(els.settingModal, true);
     submitBtn && (submitBtn.disabled = true);
     try {
-      const setting = Object.fromEntries(new FormData(event.target).entries());
       const isEdit = Boolean(setting.setting_id);
       await callServer("saveSetting", setting);
       showToast(isEdit ? "Đã cập nhật cấu hình" : "Đã thêm cấu hình", setting.display_name || setting.setting_value || "Cấu hình TDW");
@@ -1095,12 +1095,12 @@ const state = {
 
   async function handleUserSubmit(event) {
     event.preventDefault();
+    const user = Object.fromEntries(new FormData(event.target).entries()); // Trích xuất dữ liệu TRƯỚC KHI disable các input
     const submitBtn = event.target.querySelector("[type=submit]");
     if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
     setModalBusy(els.userModal, true);
     submitBtn && (submitBtn.disabled = true);
     try {
-      const user = Object.fromEntries(new FormData(event.target).entries());
       const isEdit = Boolean(user.user_id);
       await callServer("saveUser", user);
       showToast(isEdit ? "Đã cập nhật user" : "Đã thêm user", user.full_name || user.username || "User TDW");
