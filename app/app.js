@@ -41,6 +41,24 @@ const state = {
     return `"${safeText.replace(/"/g, '""')}"`;
   }
 
+  function formatDate(value) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+    const date = new Date(text);
+    if (Number.isNaN(date.getTime())) return text;
+    return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+  }
+
+  function formatMoney(value) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const amount = Number(text.replace(/[^\d.-]/g, ""));
+    if (Number.isNaN(amount)) return text;
+    return `${amount.toLocaleString("en-US")} VND`;
+  }
+
   const fallbackLabels = {
     asset_group: {
       MAY_TINH_LAPTOP: "Máy tính - Laptop",
@@ -620,9 +638,9 @@ const state = {
         <div class="mini-card"><span>Loại</span><strong>${escapeHtml(asset.asset_type || "Thiết bị")}</strong></div>
         <div class="mini-card"><span>Hãng</span><strong>${escapeHtml(asset.brand || "Chưa tách")}</strong></div>
         <div class="mini-card"><span>Serial</span><strong>${escapeHtml(asset.serial_number || "Chưa có")}</strong></div>
-        <div class="mini-card"><span>Đơn giá</span><strong>${escapeHtml(asset.unit_price || "Chưa có")}</strong></div>
-        <div class="mini-card"><span>Hết bảo hành</span><strong>${escapeHtml(asset.warranty_end_date || "Chưa có")}</strong></div>
-        <div class="mini-card"><span>Bảo trì gần nhất</span><strong>${escapeHtml(asset.last_maintenance_date || "Chưa có")}</strong></div>
+        <div class="mini-card"><span>Đơn giá</span><strong>${escapeHtml(formatMoney(asset.unit_price) || "Chưa có")}</strong></div>
+        <div class="mini-card"><span>Hết bảo hành</span><strong>${escapeHtml(formatDate(asset.warranty_end_date) || "Chưa có")}</strong></div>
+        <div class="mini-card"><span>Bảo trì gần nhất</span><strong>${escapeHtml(formatDate(asset.last_maintenance_date) || "Chưa có")}</strong></div>
       </div>
       <dl>
         <div><dt>Nhóm</dt><dd>${escapeHtml(asset.asset_group_label || "")}</dd></div>
@@ -633,8 +651,8 @@ const state = {
         <div><dt>Ghi chú</dt><dd>${escapeHtml(asset.note || "Không có ghi chú")}</dd></div>
       </dl>
       ${canEditAssets() ? `<div class="detail-actions">
-        <button class="secondary-button" type="button" data-edit-asset="${escapeHtml(asset.asset_id)}">Sửa</button>
-        <button class="danger-button" type="button" data-delete-asset="${escapeHtml(asset.asset_id)}">Xóa</button>
+        <button class="secondary-button detail-action-button" type="button" data-edit-asset="${escapeHtml(asset.asset_id)}">✎ Sửa</button>
+        <button class="danger-button detail-action-button" type="button" data-delete-asset="${escapeHtml(asset.asset_id)}">× Xóa</button>
       </div>` : ""}
     `;
   }
