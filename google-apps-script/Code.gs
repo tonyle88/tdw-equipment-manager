@@ -518,9 +518,16 @@ function ensureDefaultAdmin_(sheet, headers) {
     role: "admin",
     permissions: "all",
     active: "TRUE",
-    password: "TDW@2026",
+    password: bootstrapAdminPassword_(),
+    must_change_password: "TRUE",
   });
   sheet.appendRow(headers.map((header) => admin[header] || ""));
+}
+
+function bootstrapAdminPassword_() {
+  const password = PropertiesService.getScriptProperties().getProperty("TDW_BOOTSTRAP_ADMIN_PASSWORD");
+  if (password && password.length >= 6) return password;
+  throw new Error("Thiếu Script Property TDW_BOOTSTRAP_ADMIN_PASSWORD để tạo admin đầu tiên");
 }
 
 function normalizeUser_(user) {
@@ -537,7 +544,8 @@ function normalizeUser_(user) {
   normalized.must_change_password = String(normalized.must_change_password || "FALSE").toUpperCase() === "TRUE" ? "TRUE" : "FALSE";
   normalized.created_at = normalized.created_at || now;
   normalized.updated_at = now;
-  if (normalized.password || !normalized.password_hash) setPassword_(normalized, normalized.password || "TDW@2026");
+  if (normalized.password) setPassword_(normalized, normalized.password);
+  else if (!normalized.password_hash) throw new Error("Mật khẩu là bắt buộc khi tạo user mới");
   delete normalized.password;
   return normalized;
 }
