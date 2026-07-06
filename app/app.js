@@ -4,7 +4,7 @@ const state = {
     filtered: [],
     selectedId: null,
     page: 1,
-    pageSize: 9,
+    pageSize: 13,
     activeView: "overview",
     isSaving: false,
     editingSettingId: "",
@@ -477,6 +477,9 @@ const state = {
 
   function sortAssets(assets) {
     return [...assets].sort((a, b) => {
+      const yearA = Number(String(a.purchase_year || "").replace(/\D/g, "")) || 0;
+      const yearB = Number(String(b.purchase_year || "").replace(/\D/g, "")) || 0;
+      if (yearA !== yearB) return yearB - yearA;
       const dateA = Date.parse(a.created_at || a.updated_at || "") || 0;
       const dateB = Date.parse(b.created_at || b.updated_at || "") || 0;
       if (dateA !== dateB) return dateB - dateA;
