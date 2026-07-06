@@ -671,26 +671,23 @@ const state = {
   async function handleAssetSubmit(event) {
     event.preventDefault();
     if (state.isSaving) return;
-    const asset = getFormAsset(); // Trích xuất dữ liệu TRƯỚC KHI disable các input
+    const asset = getFormAsset(); // Đọc form TRƯỚC mọi thứ khác
+    if (!asset.asset_name?.trim()) {
+      showMessageModal("Thiếu thông tin", "Vui lòng nhập Tên thiết bị");
+      return;
+    }
     state.isSaving = true;
     const saveBtn = els.saveButton;
     const originalText = saveBtn.textContent;
     saveBtn.classList.add("is-loading");
     saveBtn.disabled = true;
-    setModalBusy(els.modal, true);
-    saveBtn.disabled = true; // giữ nút lưu bị khóa
     try {
       const isEdit = Boolean(asset.asset_id);
       await callServer("saveAsset", asset);
-      // Toast ngay lập tức — trước khi refresh data
       showToast(isEdit ? "Đã cập nhật thiết bị" : "Đã thêm thiết bị", asset.asset_name || "Thiết bị TDW");
       closeAssetModal();
       await refreshAppData({ resetPage: !isEdit });
     } catch (error) {
-      setModalBusy(els.modal, false);
-      saveBtn.classList.remove("is-loading");
-      saveBtn.textContent = originalText;
-      saveBtn.disabled = false;
       showMessageModal("Không thể lưu thiết bị", error.message);
     } finally {
       state.isSaving = false;
@@ -971,11 +968,9 @@ const state = {
 
   async function handleSettingSubmit(event) {
     event.preventDefault();
-    const setting = Object.fromEntries(new FormData(event.target).entries()); // Trích xuất dữ liệu TRƯỚC KHI disable các input
+    const setting = Object.fromEntries(new FormData(event.target).entries());
     const submitBtn = event.target.querySelector("[type=submit]");
     if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
-    setModalBusy(els.settingModal, true);
-    submitBtn && (submitBtn.disabled = true);
     try {
       const isEdit = Boolean(setting.setting_id);
       await callServer("saveSetting", setting);
@@ -983,8 +978,6 @@ const state = {
       closeSettingModal();
       await refreshAppData();
     } catch (error) {
-      setModalBusy(els.settingModal, false);
-      if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
       showMessageModal("Không thể lưu cấu hình", error.message);
     } finally {
       if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
@@ -1095,11 +1088,9 @@ const state = {
 
   async function handleUserSubmit(event) {
     event.preventDefault();
-    const user = Object.fromEntries(new FormData(event.target).entries()); // Trích xuất dữ liệu TRƯỚC KHI disable các input
+    const user = Object.fromEntries(new FormData(event.target).entries());
     const submitBtn = event.target.querySelector("[type=submit]");
     if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
-    setModalBusy(els.userModal, true);
-    submitBtn && (submitBtn.disabled = true);
     try {
       const isEdit = Boolean(user.user_id);
       await callServer("saveUser", user);
@@ -1108,8 +1099,6 @@ const state = {
       closeUserModal();
       if (state.activeView === "users") await renderUsersView();
     } catch (error) {
-      setModalBusy(els.userModal, false);
-      if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
       showMessageModal("Không thể lưu user", error.message);
     } finally {
       if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
