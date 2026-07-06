@@ -1,7 +1,18 @@
-const DEFAULT_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycby0DDY9YqmdnT2YtIvyfZTOB9_jauXUq4V-8W00ymb4Bs4Qh-MuB_sk2Uu3C1t7qcnCHA/exec";
+const ALLOWED_FUNCTIONS = new Set([
+  "getAppData",
+  "loginUser",
+  "logoutUser",
+  "saveAsset",
+  "deleteAsset",
+  "saveSetting",
+  "deleteSetting",
+  "listUsers",
+  "saveUser",
+  "deleteUser",
+  "resetUserPassword",
+]);
 
-const SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || DEFAULT_SCRIPT_URL;
+const SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL;
 
 function send(res, statusCode, payload) {
   res.statusCode = statusCode;
@@ -17,6 +28,8 @@ async function readBody(req) {
 }
 
 async function callGoogleScript(fn, args = []) {
+  if (!SCRIPT_URL) throw new Error("Thiếu biến môi trường GOOGLE_SCRIPT_URL trên Vercel.");
+
   const response = await fetch(SCRIPT_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -45,6 +58,14 @@ module.exports = async function handler(req, res) {
   try {
     const bodyText = await readBody(req);
     const body = bodyText ? JSON.parse(bodyText) : {};
+    if (!ALLOWED_FUNCTIONS.has(body.fn)) {
+      send(res, 400, { ok: false, error: "Hàm API không được phép." });
+      return;
+    }
+    if (body.args && !Array.isArray(body.args)) {
+      send(res, 400, { ok: false, error: "Tham số API không hợp lệ." });
+      return;
+    }
     const payload = await callGoogleScript(body.fn, body.args || []);
     send(res, 200, payload);
   } catch (error) {
