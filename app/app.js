@@ -885,7 +885,7 @@ const state = {
       <div class="list-panel">
         <div class="panel-head"><h2>${view === "devices" ? "Quản lý thiết bị" : "Danh sách thiết bị"}</h2><span id="resultCount">0 thiết bị</span></div>
         <div class="table-wrap">
-          <table>
+          <table class="assets-table">
             <thead><tr><th>Mã tài sản</th><th>Thiết bị</th><th>Nhóm</th><th>Năm</th><th>Người dùng</th><th>Phần mềm</th><th>Tình trạng</th></tr></thead>
             <tbody id="assetRows"></tbody>
           </table>
@@ -1011,17 +1011,17 @@ const state = {
         ${canEditAssets() ? `<button class="primary-button" type="button" id="openAddSoftwareBtn">+ Thêm bản quyền</button>` : ""}
       </div>
       
-      <div class="table-container">
+      <div class="table-wrap" style="margin-top: 16px;">
         <table class="data-table">
           <thead>
             <tr>
-              <th>PHẦN MỀM</th>
-              <th>PHIÊN BẢN</th>
-              <th>LICENSE KEY</th>
-              <th>GÁN CHO</th>
-              <th>NGÀY HẾT HẠN</th>
-              <th>TRẠNG THÁI</th>
-              ${canEditAssets() ? `<th></th>` : ""}
+              <th style="width: 25%">PHẦN MỀM</th>
+              <th style="width: 15%">PHIÊN BẢN</th>
+              <th style="width: 20%">LICENSE KEY</th>
+              <th style="width: 15%">GÁN CHO</th>
+              <th style="width: 15%">NGÀY HẾT HẠN</th>
+              <th style="width: 10%">TRẠNG THÁI</th>
+              ${canEditAssets() ? `<th style="width: 60px"></th>` : ""}
             </tr>
           </thead>
           <tbody>
@@ -1083,15 +1083,15 @@ const state = {
         ${isAdmin() ? `<button class="primary-button" type="button" id="openAddDepartmentBtn">+ Thêm phòng ban</button>` : ""}
       </div>
       
-      <div class="table-container">
+      <div class="table-wrap" style="margin-top: 16px;">
         <table class="data-table">
           <thead>
             <tr>
-              <th>PHÒNG BAN</th>
-              <th>TRƯỞNG PHÒNG</th>
-              <th>VỊ TRÍ / KHU VỰC</th>
-              <th>GHI CHÚ</th>
-              ${isAdmin() ? `<th style="width: 100px;"></th>` : ""}
+              <th style="width: 30%">PHÒNG BAN</th>
+              <th style="width: 25%">TRƯỞNG PHÒNG</th>
+              <th style="width: 25%">VỊ TRÍ / KHU VỰC</th>
+              <th style="width: 20%">GHI CHÚ</th>
+              ${isAdmin() ? `<th style="width: 80px;"></th>` : ""}
             </tr>
           </thead>
           <tbody>
@@ -1533,8 +1533,8 @@ const state = {
     const assetSelect = els.maintenanceLogForm.querySelector('[name="asset_id"]');
     
     // Populate Group Filter
-    const groups = getUniqueValues(state.assets, "asset_group");
-    els.maintenanceLogGroupFilter.innerHTML = `<option value="">-- Tất cả thiết bị --</option>` + groups.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(labelFor("asset_group", g))}</option>`).join('');
+    const groups = settingOptions("asset_group");
+    els.maintenanceLogGroupFilter.innerHTML = `<option value="">-- Tất cả thiết bị --</option>` + groups.map(([val, label]) => `<option value="${escapeHtml(val)}">${escapeHtml(label)}</option>`).join('');
     els.maintenanceLogGroupFilter.value = "";
     
     const populateAssets = (groupFilter) => {
