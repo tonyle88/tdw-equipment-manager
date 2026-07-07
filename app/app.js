@@ -1678,16 +1678,64 @@ const state = {
 
   function openSoftwareLicenseModal(licenseId = null, assetIdForNew = null) {
     els.softwareLicenseForm.reset();
-    const assetSelect = els.softwareLicenseForm.querySelector('[name="assigned_asset_id"]');
-    assetSelect.innerHTML = `<option value="">-- Không gán thiết bị --</option>` + state.assets.map(a => `<option value="${escapeHtml(a.asset_id)}">${escapeHtml(a.asset_name)} (${escapeHtml(a.asset_code)})</option>`).join('');
-    
+
+    // Lấy các phần tử của custom picker
+    const filterSel  = document.getElementById("assetPickerFilter");
+    const listDiv    = document.getElementById("assetPickerList");
+    const tagsDiv    = document.getElementById("assetPickerTags");
+    const hiddenInput = document.getElementById("assignedAssetIdInput");
+
+    // State nội bộ: tập hợp id đã chọn
+    let selectedIds = new Set();
+
+    // Lấy danh mục thiết bị từ settings
+    const assetTypes = settingsByType("ASSET_TYPE");
+    filterSel.innerHTML = `<option value="">-- Tất cả danh mục --</option>` +
+      assetTypes.map(t => `<option value="${escapeHtml(t.setting_value)}">${escapeHtml(t.display_name)}</option>`).join("");
+
+    function syncHidden() {
+      hiddenInput.value = [...selectedIds].join(",");
+    }
+
+    function renderTags() {
+      tagsDiv.innerHTML = [...selectedIds].map(id => {
+        const a = state.assets.find(x => x.asset_id === id);
+        if (!a) return "";
+        return `<span class="asset-tag">${escapeHtml(a.asset_name)}<span class="asset-tag-remove" data-id="${escapeHtml(id)}">×</span></span>`;
+      }).join("");
+      tagsDiv.querySelectorAll(".asset-tag-remove").forEach(btn => {
+        btn.addEventListener("click", () => { selectedIds.delete(btn.dataset.id); renderItems(); renderTags(); syncHidden(); });
+      });
+    }
+
+    function renderItems() {
+      const filterVal = filterSel.value;
+      const visible = state.assets.filter(a => !filterVal || a.asset_type === filterVal);
+      if (!visible.length) { listDiv.innerHTML = `<div style="padding:10px;color:var(--muted);font-size:13px;text-align:center">Không có thiết bị nào</div>`; return; }
+      listDiv.innerHTML = visible.map(a => `
+        <label class="asset-picker-item ${selectedIds.has(a.asset_id) ? "selected" : ""}">
+          <input type="checkbox" value="${escapeHtml(a.asset_id)}" ${selectedIds.has(a.asset_id) ? "checked" : ""} />
+          <span class="asset-picker-item-name">${escapeHtml(a.asset_name)}</span>
+          <span class="asset-picker-item-code">${escapeHtml(a.asset_code)}</span>
+        </label>`).join("");
+      listDiv.querySelectorAll("input[type=checkbox]").forEach(cb => {
+        cb.addEventListener("change", () => {
+          if (cb.checked) selectedIds.add(cb.value); else selectedIds.delete(cb.value);
+          cb.closest(".asset-picker-item").classList.toggle("selected", cb.checked);
+          renderTags(); syncHidden();
+        });
+      });
+    }
+
+    filterSel.onchange = renderItems;
+
+    // Điền dữ liệu khi sửa
     if (licenseId && typeof licenseId === "string") {
       const license = state.softwareLicenses.find(l => l.license_id === licenseId);
       if (license) {
         Object.keys(license).forEach(key => {
           if (key === "assigned_asset_id") {
-            const ids = (license[key] || "").split(",");
-            Array.from(assetSelect.options).forEach(opt => opt.selected = ids.includes(opt.value));
+            (license[key] || "").split(",").map(s => s.trim()).filter(Boolean).forEach(id => selectedIds.add(id));
           } else {
             const input = els.softwareLicenseForm.querySelector(`[name="${key}"]`);
             if (input) input.value = license[key];
@@ -1697,12 +1745,13 @@ const state = {
       }
     } else {
       els.softwareLicenseForm.querySelector('[name="license_id"]').value = "";
-      Array.from(assetSelect.options).forEach(opt => opt.selected = false);
-      if (assetIdForNew) {
-        const option = assetSelect.querySelector(`[value="${assetIdForNew}"]`);
-        if (option) option.selected = true;
-      }
+      if (assetIdForNew) selectedIds.add(assetIdForNew);
     }
+
+    renderItems();
+    renderTags();
+    syncHidden();
+
     els.softwareLicenseModal.hidden = false;
   }
 
@@ -1713,16 +1762,8 @@ const state = {
 
   async function handleSoftwareLicenseSubmit(event) {
     event.preventDefault();
-    const formData = new FormData(event.target);
-    
-    // Thu thập tất cả id thiết bị được chọn (vì <select multiple>)
-    const selectedAssets = Array.from(event.target.querySelector('[name="assigned_asset_id"]').selectedOptions)
-      .map(opt => opt.value)
-      .filter(v => v);
-      
-    const license = Object.fromEntries(formData.entries());
-    license.assigned_asset_id = selectedAssets.join(","); // Nối thành chuỗi cách nhau bởi dấu phẩy
-    
+    // hidden input assigned_asset_id đã được cập nhật bởi custom picker
+    const license = Object.fromEntries(new FormData(event.target).entries());
     const submitBtn = event.target.querySelector("[type=submit]");
     if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
     try {

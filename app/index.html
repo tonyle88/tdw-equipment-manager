@@ -347,10 +347,15 @@
             <label>Tên phần mềm<input name="software_name" required placeholder="VD: Windows 11, Office 365" /></label>
             <label>Phiên bản<input name="version" placeholder="VD: Pro, 2021" /></label>
             <label class="span-2">License Key / ID<input name="license_key" placeholder="VD: XXXX-XXXX-XXXX" /></label>
-            <label>Gán cho Thiết bị (Giữ Ctrl/Cmd để chọn nhiều)
-              <select name="assigned_asset_id" multiple size="5" style="height: 130px; padding: 4px;">
+            <div class="span-2 asset-picker-wrapper">
+              <span class="asset-picker-label">Gán cho Thiết bị</span>
+              <select id="assetPickerFilter" class="asset-picker-filter">
+                <option value="">-- Tất cả danh mục --</option>
               </select>
-            </label>
+              <div id="assetPickerList" class="asset-picker-list"></div>
+              <div id="assetPickerTags" class="asset-picker-tags"></div>
+              <input type="hidden" name="assigned_asset_id" id="assignedAssetIdInput" />
+            </div>
             <label>Gán cho Người dùng<input name="assigned_user" placeholder="VD: nguyen.van.a" /></label>
             <label>Ngày hết hạn<input name="expiry_date" type="date" /></label>
             <label>Trạng thái
