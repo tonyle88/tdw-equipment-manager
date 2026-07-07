@@ -1061,7 +1061,9 @@ const state = {
             </thead>
           <tbody>
             ${state.softwareLicenses.map(license => {
-              const asset = state.assets.find(a => a.asset_id === license.assigned_asset_id);
+              const assignedAssetIds = (license.assigned_asset_id || "").split(',').map(id => id.trim()).filter(Boolean);
+              const assignedAssets = assignedAssetIds.map(id => state.assets.find(a => a.asset_id === id)).filter(Boolean);
+              
               const isExpired = license.expiry_date && new Date(license.expiry_date) < new Date();
               const isExpiringSoon = license.expiry_date && new Date(license.expiry_date) < new Date(new Date().setDate(new Date().getDate() + 30));
               
@@ -1082,10 +1084,10 @@ const state = {
                   <td>${escapeHtml(license.version)}</td>
                   <td><code style="background: var(--bg-hover); padding: 2px 6px; border-radius: 4px; font-size: 12px;">${escapeHtml(license.license_key)}</code></td>
                   <td>
-                    ${asset ? `<span>🖥 ${escapeHtml(asset.asset_name)}</span>` : ""}
-                    ${license.assigned_user ? `<div>👤 ${escapeHtml(license.assigned_user)}</div>` : ""}
+                    ${assignedAssets.map(asset => `<div style="margin-bottom: 2px;"><span>🖥 ${escapeHtml(asset.asset_name)}</span></div>`).join('')}
+                    ${license.assigned_user ? `<div style="margin-top: 2px;">👤 ${escapeHtml(license.assigned_user)}</div>` : ""}
                   </td>
-                  <td style="color: ${isExpired || isExpiringSoon ? statusColor : 'inherit'}; font-weight: ${isExpired || isExpiringSoon ? '600' : 'normal'}">${escapeHtml(formatDate(license.expiry_date))}</td>
+                  <td style="color: ${isExpired || isExpiringSoon ? statusColor : 'inherit'}; font-weight: ${isExpired || isExpiringSoon ? '600' : 'normal'}">${license.expiry_date ? escapeHtml(formatDate(license.expiry_date)) : '<span style="color: var(--color-success);">Vĩnh Viễn</span>'}</td>
                   <td><span class="badge" style="color: ${statusColor}; border: 1px solid ${statusColor}; background: transparent;">${escapeHtml(statusLabel)}</span></td>
                   ${canEditAssets() ? `
                     <td class="table-actions">
@@ -1683,14 +1685,23 @@ const state = {
       const license = state.softwareLicenses.find(l => l.license_id === licenseId);
       if (license) {
         Object.keys(license).forEach(key => {
-          const input = els.softwareLicenseForm.querySelector(`[name="${key}"]`);
-          if (input) input.value = license[key];
+          if (key === "assigned_asset_id") {
+            const ids = (license[key] || "").split(",");
+            Array.from(assetSelect.options).forEach(opt => opt.selected = ids.includes(opt.value));
+          } else {
+            const input = els.softwareLicenseForm.querySelector(`[name="${key}"]`);
+            if (input) input.value = license[key];
+          }
         });
         els.softwareLicenseForm.querySelector('[name="license_id"]').value = licenseId;
       }
     } else {
       els.softwareLicenseForm.querySelector('[name="license_id"]').value = "";
-      if (assetIdForNew) assetSelect.value = assetIdForNew;
+      Array.from(assetSelect.options).forEach(opt => opt.selected = false);
+      if (assetIdForNew) {
+        const option = assetSelect.querySelector(`[value="${assetIdForNew}"]`);
+        if (option) option.selected = true;
+      }
     }
     els.softwareLicenseModal.hidden = false;
   }
@@ -1702,7 +1713,16 @@ const state = {
 
   async function handleSoftwareLicenseSubmit(event) {
     event.preventDefault();
-    const license = Object.fromEntries(new FormData(event.target).entries());
+    const formData = new FormData(event.target);
+    
+    // Thu thập tất cả id thiết bị được chọn (vì <select multiple>)
+    const selectedAssets = Array.from(event.target.querySelector('[name="assigned_asset_id"]').selectedOptions)
+      .map(opt => opt.value)
+      .filter(v => v);
+      
+    const license = Object.fromEntries(formData.entries());
+    license.assigned_asset_id = selectedAssets.join(","); // Nối thành chuỗi cách nhau bởi dấu phẩy
+    
     const submitBtn = event.target.querySelector("[type=submit]");
     if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
     try {

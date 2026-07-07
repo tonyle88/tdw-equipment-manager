@@ -347,9 +347,8 @@
             <label>Tên phần mềm<input name="software_name" required placeholder="VD: Windows 11, Office 365" /></label>
             <label>Phiên bản<input name="version" placeholder="VD: Pro, 2021" /></label>
             <label class="span-2">License Key / ID<input name="license_key" placeholder="VD: XXXX-XXXX-XXXX" /></label>
-            <label>Gán cho Thiết bị
-              <select name="assigned_asset_id">
-                <option value="">-- Không gán thiết bị --</option>
+            <label>Gán cho Thiết bị (Giữ Ctrl/Cmd để chọn nhiều)
+              <select name="assigned_asset_id" multiple size="5" style="height: 130px; padding: 4px;">
               </select>
             </label>
             <label>Gán cho Người dùng<input name="assigned_user" placeholder="VD: nguyen.van.a" /></label>
