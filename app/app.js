@@ -915,14 +915,15 @@ const state = {
             <td>${escapeHtml(departmentLabel(asset.department))}</td>
             <td class="pr-right">${escapeHtml(price)}</td>
             <td>${escapeHtml(asset.software_license)}</td>
-            <td>${escapeHtml(labelFor("status", asset.status))}</td>
+            <td style="color: ${colorForLabel(labelFor("status", asset.status), i)}; font-weight: bold;">${escapeHtml(labelFor("status", asset.status))}</td>
           </tr>`;
       });
     });
     tableRows += `<tr class="pr-total-row"><td colspan="3">TỔNG CỘNG</td><td class="pr-center">${data.reduce((s, a) => s + Number(a.quantity || 1), 0)}</td><td colspan="5">${data.length} thiết bị</td></tr>`;
 
     const html = `
-      <div class="pr-header">
+      <div class="pr-header" style="position: relative;">
+        <img src="assets/tdw-logo.webp" alt="TDW" style="position: absolute; left: 0; top: 0; width: 100px; height: auto;" />
         <div class="pr-company">CÔNG TY CỔ PHẦN NƯỚC THỦ ĐỨC &mdash; TDW</div>
         <div class="pr-title">TỔNG HỢP DANH SÁCH THIẾT BỊ &mdash; ${escapeHtml(groupTitle)}</div>
         <div class="pr-meta">Ngày xuất: ${dateStr} &nbsp;|&nbsp; Tổng: ${data.length} thiết bị</div>
@@ -1340,9 +1341,9 @@ const state = {
     `;
   }
 
-  function exportExcel(groupFilter = "") {
-    if (typeof XLSX === "undefined") {
-      showMessageModal("Lỗi xuất", "Thư viện XLSX chưa tải xong, vui lòng thử lại sau vài giây.");
+  async function exportExcel(groupFilter = "") {
+    if (typeof ExcelJS === "undefined") {
+      showMessageModal("Lỗi xuất", "Thư viện ExcelJS chưa tải xong, vui lòng thử lại sau vài giây.");
       return;
     }
 
@@ -1354,7 +1355,7 @@ const state = {
       return;
     }
 
-    // Nhóm theo asset_group, giữ thứ tự xuất hiện
+    // Nhóm theo asset_group
     const groupOrder = [];
     const groups = {};
     data.forEach((asset) => {
@@ -1365,54 +1366,139 @@ const state = {
     });
 
     const year = new Date().getFullYear();
-    const rows = [];
+    const groupTitle = groupFilter ? labelFor("asset_group", groupFilter).toUpperCase() : "TẤT CẢ NHÓM";
 
-    // Dòng 1: trống
-    rows.push([]);
-    // Dòng 2: tiêu đề lớn
-    rows.push(["", `TỔNG HỢP DANH SÁCH MÁY TÍNH - THIẾT BỊ CUNG CẤP CHO NHÂN VIÊN CÔNG TY TDW ĐẾN NĂM ${year}`]);
-    // Dòng 3: trống
-    rows.push([]);
-    // Dòng 4: header cột
-    rows.push(["", "STT", "TÊN MÁY / THIẾT BỊ", "NĂM MUA", "SỐ LƯỢNG", "NGƯỜI SỬ DỤNG", "ĐƠN GIÁ (VNĐ)", "PHẦN MỀM BẢN QUYỀN", "TÌNH TRẠNG THIẾT BỊ", "GHI CHÚ"]);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet(String(year));
 
+    // Cột độ rộng
+    ws.columns = [
+      { width: 3 },  // A (Trống)
+      { width: 6 },  // B (STT)
+      { width: 48 }, // C (Tên)
+      { width: 10 }, // D (Năm)
+      { width: 10 }, // E (SL)
+      { width: 28 }, // F (Người SD)
+      { width: 16 }, // G (Phòng ban)
+      { width: 18 }, // H (Đơn giá)
+      { width: 28 }, // I (Phần mềm)
+      { width: 22 }, // J (Tình trạng)
+      { width: 36 }  // K (Ghi chú)
+    ];
+
+    // Thêm logo
+    try {
+      const response = await fetch("assets/tdw-logo.jpg");
+      if (response.ok) {
+        const blob = await response.blob();
+        const reader = new FileReader();
+        const base64 = await new Promise((resolve) => {
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+        const logoId = wb.addImage({ base64, extension: "jpeg" });
+        ws.addImage(logoId, {
+          tl: { col: 1, row: 1 },
+          ext: { width: 120, height: 44 }
+        });
+      }
+    } catch(e) { console.error("Lỗi tải logo", e); }
+
+    // Hàng 1, 2, 3 trống cho logo
+    ws.addRow([]);
+    ws.addRow([]);
+    ws.addRow([]);
+
+    // Hàng 4: Tiêu đề lớn
+    const titleRow = ws.addRow(["", "", `TỔNG HỢP DANH SÁCH MÁY TÍNH - THIẾT BỊ CUNG CẤP CHO NHÂN VIÊN CÔNG TY TDW ĐẾN NĂM ${year} — ${groupTitle}`]);
+    ws.mergeCells('C4:K4');
+    titleRow.height = 30;
+    titleRow.getCell(3).font = { bold: true, size: 14, color: { argb: 'FF176DA5' } };
+    titleRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' };
+    
+    ws.addRow([]); // Hàng 5 trống
+
+    // Hàng 6: Header cột
+    const headerRow = ws.addRow(["", "STT", "TÊN MÁY / THIẾT BỊ", "NĂM MUA", "SỐ LƯỢNG", "NGƯỜI SỬ DỤNG", "PHÒNG BAN", "ĐƠN GIÁ (VNĐ)", "PHẦN MỀM BẢN QUYỀN", "TÌNH TRẠNG THIẾT BỊ", "GHI CHÚ"]);
+    headerRow.height = 25;
+    headerRow.eachCell((cell, colNumber) => {
+      if (colNumber > 1) {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF176DA5' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      }
+    });
+
+    // Dữ liệu
     groupOrder.forEach((key) => {
       const { label, items } = groups[key];
-      // Hàng tiêu đề nhóm
-      rows.push(["", label.toUpperCase()]);
-      // Hàng dữ liệu, STT bắt đầu lại từ 1 mỗi nhóm
+      // Hàng nhóm
+      const groupRow = ws.addRow(["", label.toUpperCase()]);
+      ws.mergeCells(`B${groupRow.number}:K${groupRow.number}`);
+      groupRow.getCell(2).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      groupRow.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E6FA8' } };
+      groupRow.getCell(2).alignment = { vertical: 'middle' };
+      groupRow.getCell(2).border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+
+      // Hàng item
       items.forEach((asset, index) => {
-        rows.push([
+        const statusLabel = labelFor("status", asset.status);
+        const colorHex = colorForLabel(statusLabel, 0).replace('#', 'FF').toUpperCase();
+
+        const itemRow = ws.addRow([
           "",
           index + 1,
           asset.asset_name,
           asset.purchase_year,
           asset.quantity || 1,
-          [asset.assigned_to, departmentLabel(asset.department)].filter(Boolean).join(" - "),
+          asset.assigned_to,
+          departmentLabel(asset.department),
           asset.unit_price ? Number(asset.unit_price) : "",
           asset.software_license,
-          labelFor("status", asset.status),
-          asset.note,
+          statusLabel,
+          asset.note
         ]);
+
+        itemRow.eachCell((cell, colNumber) => {
+          if (colNumber > 1) {
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            cell.alignment = { vertical: 'top', wrapText: true };
+          }
+        });
+        
+        // Căn giữa STT, Năm, SL
+        [2, 4, 5].forEach(c => itemRow.getCell(c).alignment = { vertical: 'top', horizontal: 'center' });
+        // Định dạng tiền
+        if (itemRow.getCell(8).value) itemRow.getCell(8).numFmt = '#,##0';
+        
+        // Màu status
+        const statusCell = itemRow.getCell(10);
+        statusCell.font = { bold: true, color: { argb: colorHex } };
       });
     });
 
-    // Hàng ngày xuất & tổng
-    const exportDate = new Date().toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
-    rows.push(["", `Ngày xuất: ${exportDate}`, "", "", "", "", "", `Tổng: ${data.length} thiết bị`]);
+    // Hàng tổng
+    const totalQty = data.reduce((s, a) => s + Number(a.quantity || 1), 0);
+    const dateStr = new Date().toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const summaryRow = ws.addRow(["", "TỔNG CỘNG", "", "", totalQty, `Ngày xuất: ${dateStr}`, "", "", "", `Tổng: ${data.length} thiết bị`, ""]);
+    ws.mergeCells(`B${summaryRow.number}:D${summaryRow.number}`);
+    ws.mergeCells(`F${summaryRow.number}:I${summaryRow.number}`);
+    
+    summaryRow.eachCell((cell, colNumber) => {
+      if (colNumber > 1) {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D4F7C' } };
+        cell.alignment = { vertical: 'middle' };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      }
+    });
+    summaryRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' };
 
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-
-    // Gộp ô tiêu đề (dòng 2, cột B→J tức index 1→9)
-    const titleRowIndex = 1; // 0-based
-    ws["!merges"] = [{ s: { r: titleRowIndex, c: 1 }, e: { r: titleRowIndex, c: 9 } }];
-
-    // Độ rộng cột
-    ws["!cols"] = [{wch:4},{wch:6},{wch:48},{wch:10},{wch:10},{wch:28},{wch:16},{wch:28},{wch:22},{wch:36}];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, String(year));
-    XLSX.writeFile(wb, `TDW-thiet-bi-${year}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    // Xuất file
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    saveAs(blob, `TDW-thiet-bi-${year}-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   function bindDynamicEvents() {
