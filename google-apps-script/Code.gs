@@ -63,7 +63,11 @@ function getAppData() {
     departments: readSheetAsObjects_(SHEET_NAMES.departments),
     maintenanceLogs: readSheetAsObjects_(SHEET_NAMES.maintenanceLogs),
     inventoryMovements: readSheetAsObjects_(SHEET_NAMES.inventoryMovements),
-    softwareLicenses: readSheetAsObjects_(SHEET_NAMES.softwareLicenses),
+    softwareLicenses: readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(lic => {
+      lic.license_key = decodeLicenseKey_(lic.license_key_or_note || "");
+      delete lic.license_key_or_note;
+      return lic;
+    }),
     currentUser: user ? publicUser_(user) : null,
     updated_at: new Date().toISOString(),
   };
@@ -95,7 +99,28 @@ function deleteAsset(assetId) {
   }
 }
 
-function saveSetting(setting) {
+// ==========================================
+// THIẾT LẬP HỆ THỐNG
+// ==========================================
+
+function encodeLicenseKey_(text) {
+  if (!text) return "";
+  try {
+    const b64 = Utilities.base64Encode(text, Utilities.Charset.UTF_8);
+    return "ENC:" + b64.split('').reverse().join('');
+  } catch(e) { return text; }
+}
+
+function decodeLicenseKey_(encoded) {
+  if (!encoded || typeof encoded !== "string" || !encoded.startsWith("ENC:")) return encoded;
+  try {
+    const b64 = encoded.substring(4).split('').reverse().join('');
+    const decoded = Utilities.base64Decode(b64);
+    return Utilities.newBlob(decoded).getDataAsString();
+  } catch(e) { return encoded; }
+}
+
+function saveSetting(setting, token) {
   try {
     if (arguments.length > 1) requireAdmin_(arguments[1]);
     const normalized = normalizeSetting_(setting || {});
@@ -385,7 +410,11 @@ function normalizeSoftwareLicense_(license) {
   normalized.software_name = String(normalized.software_name || "").trim();
   if (!normalized.software_name) throw new Error("Tên phần mềm là bắt buộc");
   normalized.version = normalized.version || "";
-  normalized.license_key = normalized.license_key || "";
+  
+  // Mã hoá license_key và lưu vào cột license_key_or_note của Sheet
+  normalized.license_key_or_note = encodeLicenseKey_(normalized.license_key || "");
+  delete normalized.license_key;
+
   normalized.assigned_asset_id = normalized.assigned_asset_id || "";
   normalized.assigned_user = normalized.assigned_user || "";
   normalized.expiry_date = normalized.expiry_date || "";
