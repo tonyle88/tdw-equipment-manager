@@ -852,11 +852,12 @@ const state = {
     }
     state.activeView = view;
     els.navLinks.forEach((link) => link.classList.toggle("active", link.dataset.view === view));
-    els.toolbar.style.display = view === "maintenance" || view === "reports" || view === "settings" || view === "users" ? "none" : "";
+    els.toolbar.style.display = view === "maintenance" || view === "software" || view === "reports" || view === "settings" || view === "users" ? "none" : "";
     const dashboardInsights = document.querySelector("#dashboardInsights");
     if (dashboardInsights) dashboardInsights.hidden = view !== "overview";
     if (view === "overview" || view === "devices") renderDeviceView(view);
     if (view === "maintenance") renderMaintenanceView();
+    if (view === "software") renderSoftwareView();
     if (view === "reports") renderReportsView();
     if (view === "settings") renderSettingsView();
     if (view === "users") renderUsersView();
