@@ -80,8 +80,7 @@ const state = {
     asset_group: "Nhóm thiết bị",
     status: "Tình trạng",
     asset_type: "Loại thiết bị",
-    department: "Phòng ban",
-    software_name: "Phần mềm",
+    maintenance_type: "Loại bảo trì",
   };
 
   const els = {};
