@@ -35,11 +35,6 @@ const state = {
     return String(value ?? "").replace(/[^A-Za-z0-9_-]/g, "");
   }
 
-  function csvCell(value) {
-    const text = String(value ?? "");
-    const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text;
-    return `"${safeText.replace(/"/g, '""')}"`;
-  }
 
   function formatDate(value) {
     const text = String(value || "").trim();
@@ -846,7 +841,7 @@ const state = {
         <div class="panel-head report-title-row">
           <h2>BÁO CÁO</h2>
           <div class="report-actions">
-            <button class="secondary-button" type="button" data-export-csv>Xuất Excel/CSV</button>
+            <button class="secondary-button" type="button" data-export-csv>Xuất Excel (.xlsx)</button>
             <button class="secondary-button" type="button" data-print-pdf>Xuất PDF</button>
           </div>
         </div>
@@ -864,7 +859,7 @@ const state = {
         </div>
       </div>
     `;
-    els.content.querySelector("[data-export-csv]").addEventListener("click", exportCsv);
+    els.content.querySelector("[data-export-csv]").addEventListener("click", exportExcel);
     els.content.querySelector("[data-print-pdf]").addEventListener("click", () => window.print());
   }
 
@@ -1251,17 +1246,68 @@ const state = {
     `;
   }
 
-  function exportCsv() {
-    const headers = ["Mã tài sản", "Tên thiết bị", "Nhóm", "Loại", "Serial", "Vị trí", "Năm", "Đơn giá", "Người dùng", "Phòng ban", "Hết bảo hành", "Bảo trì gần nhất", "Phần mềm", "Tình trạng", "Ghi chú"];
-    const rows = state.assets.map((asset) => [asset.asset_code, asset.asset_name, asset.asset_group_label, asset.asset_type, asset.serial_number, asset.location, asset.purchase_year, asset.unit_price, asset.assigned_to, departmentLabel(asset.department), asset.warranty_end_date, asset.last_maintenance_date, asset.software_license, labelFor("status", asset.status), asset.note]);
-    const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
-    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `tdw-thiet-bi-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  function exportExcel() {
+    if (typeof XLSX === "undefined") {
+      showMessageModal("Lỗi xuất", "Thư viện XLSX chưa tải xong, vui lòng thử lại sau vài giây.");
+      return;
+    }
+
+    // state.filtered đã lọc sẵn theo nhóm nếu có chọn bộ lọc
+    const data = state.filtered;
+    if (!data.length) {
+      showMessageModal("Không có dữ liệu", "Không có thiết bị phù hợp để xuất.");
+      return;
+    }
+
+    // Nhóm theo asset_group, giữ thứ tự xuất hiện
+    const groupOrder = [];
+    const groups = {};
+    data.forEach((asset) => {
+      const key = asset.asset_group;
+      const label = asset.asset_group_label || labelFor("asset_group", key) || key;
+      if (!groups[key]) { groups[key] = { label, items: [] }; groupOrder.push(key); }
+      groups[key].items.push(asset);
+    });
+
+    const year = new Date().getFullYear();
+    const rows = [];
+
+    // Dòng 1: trống
+    rows.push([]);
+    // Dòng 2: tiêu đề lớn
+    rows.push(["", `TỔNG HỢP DANH SÁCH MÁY TÍNH - THIẾT BỊ CUNG CẤP CHO NHÂN VIÊN CÔNG TY TDW ĐẾN NĂM ${year}`]);
+    // Dòng 3: trống
+    rows.push([]);
+    // Dòng 4: header cột
+    rows.push(["", "STT", "TÊN MÁY / THIẾT BỊ", "NĂM MUA", "SỐ LƯỢNG", "NGƯỜI SỬ DỤNG", "ĐƠN GIÁ (VNĐ)", "PHẦN MỀM BẢN QUYỀN", "TÌNH TRẠNG THIẾT BỊ", "GHI CHÚ"]);
+
+    groupOrder.forEach((key) => {
+      const { label, items } = groups[key];
+      // Hàng tiêu đề nhóm
+      rows.push(["", label.toUpperCase()]);
+      // Hàng dữ liệu, STT bắt đầu lại từ 1 mỗi nhóm
+      items.forEach((asset, index) => {
+        rows.push([
+          "",
+          index + 1,
+          asset.asset_name,
+          asset.purchase_year,
+          asset.quantity || 1,
+          [asset.assigned_to, departmentLabel(asset.department)].filter(Boolean).join(" - "),
+          asset.unit_price ? Number(asset.unit_price) : "",
+          asset.software_license,
+          labelFor("status", asset.status),
+          asset.note,
+        ]);
+      });
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    // Độ rộng cột gợi ý
+    ws["!cols"] = [{wch:4},{wch:6},{wch:48},{wch:10},{wch:10},{wch:28},{wch:16},{wch:28},{wch:22},{wch:36}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, String(year));
+    XLSX.writeFile(wb, `TDW-thiet-bi-${year}-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   function bindDynamicEvents() {
