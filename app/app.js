@@ -1689,7 +1689,7 @@ const state = {
     let selectedIds = new Set();
 
     // Lấy danh mục thiết bị từ settings
-    const assetTypes = settingsByType("ASSET_TYPE");
+    const assetTypes = settingsByType("asset_type");
     filterSel.innerHTML = `<option value="">-- Tất cả danh mục --</option>` +
       assetTypes.map(t => `<option value="${escapeHtml(t.setting_value)}">${escapeHtml(t.display_name)}</option>`).join("");
 
