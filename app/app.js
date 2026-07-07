@@ -955,8 +955,15 @@ const state = {
           </article>
           <article class="module-card maintenance-list-card" style="grid-column: 1 / -1;">
             <h3>DANH SÁCH CHI TIẾT THEO TÌNH TRẠNG</h3>
-            <table class="mini-table maintenance-table">
-              <thead><tr><th style="width: 50px; text-align: center;">STT</th><th>THIẾT BỊ</th><th>TÌNH TRẠNG</th><th>NGƯỜI DÙNG</th></tr></thead>
+            <table class="mini-table maintenance-table" style="table-layout: fixed; width: 100%; min-width: 600px;">
+              <thead>
+                <tr>
+                  <th style="width: 50px; text-align: center;">STT</th>
+                  <th style="width: 40%;">THIẾT BỊ</th>
+                  <th style="width: 150px; text-align: center;">TÌNH TRẠNG</th>
+                  <th style="width: 35%;">NGƯỜI DÙNG</th>
+                </tr>
+              </thead>
               <tbody>${tableHtml}</tbody>
             </table>
           </article>
@@ -1003,27 +1010,28 @@ const state = {
 
   function renderSoftwareView() {
     els.content.innerHTML = `
-      <div class="view-header">
-        <div>
-          <h2>Quản lý Bản quyền Phần mềm</h2>
-          <p class="view-subtitle">Theo dõi danh sách bản quyền, license key và thiết bị được cấp phép</p>
+      <div class="list-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Quản lý Bản quyền Phần mềm</h2>
+            <p class="view-subtitle" style="margin-top: 4px; color: rgba(255,255,255,.6);">Theo dõi danh sách bản quyền, license key và thiết bị được cấp phép</p>
+          </div>
+          ${canEditAssets() ? `<button class="primary-button" type="button" id="openAddSoftwareBtn">+ Thêm bản quyền</button>` : ""}
         </div>
-        ${canEditAssets() ? `<button class="primary-button" type="button" id="openAddSoftwareBtn">+ Thêm bản quyền</button>` : ""}
-      </div>
-      
-      <div class="table-wrap" style="margin-top: 16px;">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 25%">PHẦN MỀM</th>
-              <th style="width: 15%">PHIÊN BẢN</th>
-              <th style="width: 20%">LICENSE KEY</th>
-              <th style="width: 15%">GÁN CHO</th>
-              <th style="width: 15%">NGÀY HẾT HẠN</th>
-              <th style="width: 10%">TRẠNG THÁI</th>
-              ${canEditAssets() ? `<th style="width: 60px"></th>` : ""}
-            </tr>
-          </thead>
+        
+        <div class="table-wrap" style="margin-top: 16px;">
+          <table class="data-table" style="min-width: 1000px;">
+            <thead>
+              <tr>
+                <th style="width: 20%">PHẦN MỀM</th>
+                <th style="width: 10%">PHIÊN BẢN</th>
+                <th style="width: 15%">LICENSE KEY</th>
+                <th style="width: 25%">GÁN CHO</th>
+                <th style="width: 15%">NGÀY HẾT HẠN</th>
+                <th style="width: 15%">TRẠNG THÁI</th>
+                ${canEditAssets() ? `<th style="width: 60px; text-align: center;"></th>` : ""}
+              </tr>
+            </thead>
           <tbody>
             ${state.softwareLicenses.map(license => {
               const asset = state.assets.find(a => a.asset_id === license.assigned_asset_id);
@@ -1053,7 +1061,7 @@ const state = {
                   <td style="color: ${isExpired || isExpiringSoon ? statusColor : 'inherit'}; font-weight: ${isExpired || isExpiringSoon ? '600' : 'normal'}">${escapeHtml(formatDate(license.expiry_date))}</td>
                   <td><span class="badge" style="color: ${statusColor}; border: 1px solid ${statusColor}; background: transparent;">${escapeHtml(statusLabel)}</span></td>
                   ${canEditAssets() ? `
-                    <td class="table-actions">
+                    <td class="table-actions" style="text-align: center;">
                       <button class="icon-button edit-software-btn" data-id="${escapeHtml(license.license_id)}" type="button" aria-label="Sửa">✎</button>
                     </td>
                   ` : ""}
@@ -1062,6 +1070,7 @@ const state = {
             }).join('') || `<tr><td colspan="${canEditAssets() ? 7 : 6}" style="text-align: center; color: var(--text-secondary); padding: 32px;">Chưa có bản quyền phần mềm nào.</td></tr>`}
           </tbody>
         </table>
+      </div>
       </div>
     `;
 
@@ -1075,25 +1084,26 @@ const state = {
 
   function renderDepartmentsView() {
     els.content.innerHTML = `
-      <div class="view-header">
-        <div>
-          <h2>Quản lý Phòng ban</h2>
-          <p class="view-subtitle">Theo dõi danh sách các phòng ban, trưởng phòng và vị trí của công ty</p>
+      <div class="list-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Quản lý Phòng ban</h2>
+            <p class="view-subtitle" style="margin-top: 4px; color: rgba(255,255,255,.6);">Theo dõi danh sách các phòng ban, trưởng phòng và vị trí của công ty</p>
+          </div>
+          ${isAdmin() ? `<button class="primary-button" type="button" id="openAddDepartmentBtn">+ Thêm phòng ban</button>` : ""}
         </div>
-        ${isAdmin() ? `<button class="primary-button" type="button" id="openAddDepartmentBtn">+ Thêm phòng ban</button>` : ""}
-      </div>
-      
-      <div class="table-wrap" style="margin-top: 16px;">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 30%">PHÒNG BAN</th>
-              <th style="width: 25%">TRƯỞNG PHÒNG</th>
-              <th style="width: 25%">VỊ TRÍ / KHU VỰC</th>
-              <th style="width: 20%">GHI CHÚ</th>
-              ${isAdmin() ? `<th style="width: 80px;"></th>` : ""}
-            </tr>
-          </thead>
+        
+        <div class="table-wrap" style="margin-top: 16px;">
+          <table class="data-table" style="min-width: 800px;">
+            <thead>
+              <tr>
+                <th style="width: 25%">PHÒNG BAN</th>
+                <th style="width: 25%">TRƯỞNG PHÒNG</th>
+                <th style="width: 25%">VỊ TRÍ / KHU VỰC</th>
+                <th style="width: 25%">GHI CHÚ</th>
+                ${isAdmin() ? `<th style="width: 80px; text-align: center;"></th>` : ""}
+              </tr>
+            </thead>
           <tbody>
             ${state.departments.map(dept => `
                 <tr>
@@ -1102,7 +1112,7 @@ const state = {
                   <td>${escapeHtml(dept.location)}</td>
                   <td>${escapeHtml(dept.note)}</td>
                   ${isAdmin() ? `
-                    <td class="table-actions">
+                    <td class="table-actions" style="text-align: center;">
                       <button class="icon-button edit-dept-btn" data-id="${escapeHtml(dept.department_id)}" type="button" aria-label="Sửa">✎</button>
                       <button class="icon-button danger-icon-button delete-dept-btn" data-id="${escapeHtml(dept.department_id)}" data-name="${escapeHtml(dept.department_name)}" type="button" aria-label="Xóa">×</button>
                     </td>
@@ -1111,6 +1121,7 @@ const state = {
               `).join('') || `<tr><td colspan="${isAdmin() ? 5 : 4}" style="text-align: center; color: var(--text-secondary); padding: 32px;">Chưa có phòng ban nào.</td></tr>`}
           </tbody>
         </table>
+      </div>
       </div>
     `;
 
@@ -1536,6 +1547,13 @@ const state = {
     const groups = settingOptions("asset_group");
     els.maintenanceLogGroupFilter.innerHTML = `<option value="">-- Tất cả thiết bị --</option>` + groups.map(([val, label]) => `<option value="${escapeHtml(val)}">${escapeHtml(label)}</option>`).join('');
     els.maintenanceLogGroupFilter.value = "";
+
+    // Populate Maintenance Types
+    const actionSelect = els.maintenanceLogForm.querySelector('[name="action_type"]');
+    if (actionSelect) {
+      const actions = settingOptions("maintenance_type");
+      actionSelect.innerHTML = `<option value="">-- Chọn loại bảo trì --</option>` + actions.map(([val, label]) => `<option value="${escapeHtml(val)}">${escapeHtml(label)}</option>`).join('');
+    }
     
     const populateAssets = (groupFilter) => {
       const filteredAssets = groupFilter ? state.assets.filter(a => a.asset_group === groupFilter) : state.assets;
