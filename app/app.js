@@ -1689,9 +1689,9 @@ const state = {
     let selectedIds = new Set();
 
     // Lấy danh mục thiết bị từ settings
-    const assetTypes = settingsByType("asset_type");
+    const assetGroups = settingsByType("asset_group");
     filterSel.innerHTML = `<option value="">-- Tất cả danh mục --</option>` +
-      assetTypes.map(t => `<option value="${escapeHtml(t.setting_value)}">${escapeHtml(t.display_name)}</option>`).join("");
+      assetGroups.map(t => `<option value="${escapeHtml(t.setting_value)}">${escapeHtml(t.display_name)}</option>`).join("");
 
     function syncHidden() {
       hiddenInput.value = [...selectedIds].join(",");
@@ -1710,7 +1710,7 @@ const state = {
 
     function renderItems() {
       const filterVal = filterSel.value;
-      const visible = state.assets.filter(a => !filterVal || a.asset_type === filterVal);
+      const visible = state.assets.filter(a => !filterVal || a.asset_group === filterVal);
       if (!visible.length) { listDiv.innerHTML = `<div style="padding:10px;color:var(--muted);font-size:13px;text-align:center">Không có thiết bị nào</div>`; return; }
       listDiv.innerHTML = visible.map(a => `
         <label class="asset-picker-item ${selectedIds.has(a.asset_id) ? "selected" : ""}">
