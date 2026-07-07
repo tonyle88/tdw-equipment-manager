@@ -980,6 +980,7 @@ const state = {
                   <th style="width: 150px; text-align: center;">LOẠI</th>
                   <th>NỘI DUNG</th>
                   <th style="width: 120px; text-align: right;">CHI PHÍ</th>
+                  ${canEditAssets() ? `<th style="width: 90px; text-align: center;"></th>` : ""}
                 </tr>
               </thead>
               <tbody>
@@ -992,9 +993,15 @@ const state = {
                       <td style="text-align: center;"><span class="badge" style="background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color);">${escapeHtml(labelFor("maintenance_type", log.action_type) || log.action_type)}</span></td>
                       <td>${escapeHtml(log.description)}</td>
                       <td style="text-align: right; font-weight: 500; color: #e11d48;">${escapeHtml(formatMoney(log.cost))}</td>
+                      ${canEditAssets() ? `
+                        <td class="table-actions" style="text-align: center; white-space: nowrap;">
+                          <button class="icon-button edit-maintenance-btn" data-id="${escapeHtml(log.log_id)}" data-asset="${escapeHtml(log.asset_id)}" type="button" aria-label="Sửa">✎</button>
+                          ${isAdmin() ? `<button class="icon-button danger-icon-button delete-maintenance-btn" data-id="${escapeHtml(log.log_id)}" data-name="${escapeHtml(log.action_type)}" type="button" aria-label="Xóa">×</button>` : ""}
+                        </td>
+                      ` : ""}
                     </tr>
                   `;
-                }).join('') || `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 24px 0;">Chưa có lịch sử bảo trì.</td></tr>`}
+                }).join('') || `<tr><td colspan="${canEditAssets() ? 6 : 5}" style="text-align: center; color: var(--text-secondary); padding: 24px 0;">Chưa có lịch sử bảo trì.</td></tr>`}
               </tbody>
             </table>
           </article>
@@ -1006,6 +1013,26 @@ const state = {
     if (openBtn) {
       openBtn.addEventListener("click", () => openMaintenanceLogModal());
     }
+
+    els.content.querySelectorAll(".edit-maintenance-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => openMaintenanceLogModal(e.target.dataset.asset, e.target.dataset.id));
+    });
+
+    els.content.querySelectorAll(".delete-maintenance-btn").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        const id = e.target.dataset.id;
+        if (await confirmAction("Xóa lịch sử bảo trì", "Bạn có chắc chắn muốn xóa lịch sử bảo trì này? Dữ liệu không thể khôi phục.")) {
+          try {
+            await callServer("deleteMaintenanceLog", { logId: id });
+            showToast("Đã xóa", "Lịch sử bảo trì đã được xóa");
+            await loadAppData();
+            renderMaintenanceView();
+          } catch (err) {
+            showMessageModal("Lỗi", err.message);
+          }
+        }
+      });
+    });
   }
 
   function renderSoftwareView() {
@@ -1029,7 +1056,7 @@ const state = {
                 <th style="width: 20%">GÁN CHO</th>
                 <th style="width: 15%">NGÀY HẾT HẠN</th>
                 <th style="width: 10%">TRẠNG THÁI</th>
-                ${canEditAssets() ? `<th style="width: 80px; text-align: center;"></th>` : ""}
+                ${canEditAssets() ? `<th style="width: 90px; text-align: center;"></th>` : ""}
               </tr>
             </thead>
           <tbody>
@@ -1063,6 +1090,7 @@ const state = {
                   ${canEditAssets() ? `
                     <td class="table-actions" style="text-align: center; white-space: nowrap;">
                       <button class="icon-button edit-software-btn" data-id="${escapeHtml(license.license_id)}" type="button" aria-label="Sửa">✎</button>
+                      ${isAdmin() ? `<button class="icon-button danger-icon-button delete-software-btn" data-id="${escapeHtml(license.license_id)}" data-name="${escapeHtml(license.software_name)}" type="button" aria-label="Xóa">×</button>` : ""}
                     </td>
                   ` : ""}
                 </tr>
@@ -1079,6 +1107,23 @@ const state = {
 
     els.content.querySelectorAll(".edit-software-btn").forEach(btn => {
       btn.addEventListener("click", (e) => openSoftwareLicenseModal(e.target.dataset.id));
+    });
+
+    els.content.querySelectorAll(".delete-software-btn").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        const id = e.target.dataset.id;
+        const name = e.target.dataset.name;
+        if (await confirmAction("Xóa bản quyền", \`Bạn có chắc chắn muốn xóa bản quyền phần mềm "$\{name\}"?\`)) {
+          try {
+            await callServer("deleteSoftwareLicense", { licenseId: id });
+            showToast("Đã xóa", \`Bản quyền phần mềm "$\{name\}" đã được xóa\`);
+            await loadAppData();
+            renderSoftwareView();
+          } catch (err) {
+            showMessageModal("Lỗi", err.message);
+          }
+        }
+      });
     });
   }
 
@@ -1539,7 +1584,7 @@ const state = {
     }
   }
 
-  function openMaintenanceLogModal(assetId = null) {
+  function openMaintenanceLogModal(assetId = null, logId = null) {
     els.maintenanceLogForm.reset();
     const assetSelect = els.maintenanceLogForm.querySelector('[name="asset_id"]');
     
@@ -1563,20 +1608,43 @@ const state = {
     // Bind filter change
     els.maintenanceLogGroupFilter.onchange = (e) => populateAssets(e.target.value);
     
-    if (assetId) {
-      const asset = state.assets.find(a => a.asset_id === assetId);
-      if (asset) {
-        els.maintenanceLogGroupFilter.value = asset.asset_group;
-        populateAssets(asset.asset_group);
-        assetSelect.value = assetId;
+    let isEditing = false;
+    if (logId && typeof logId === "string") {
+      const log = state.maintenanceLogs.find(l => l.log_id === logId);
+      if (log) {
+        isEditing = true;
+        const logAsset = state.assets.find(a => a.asset_id === log.asset_id);
+        if (logAsset) {
+          els.maintenanceLogGroupFilter.value = logAsset.asset_group;
+          populateAssets(logAsset.asset_group);
+        } else {
+          populateAssets("");
+        }
+        Object.keys(log).forEach(key => {
+          const input = els.maintenanceLogForm.querySelector(`[name="${key}"]`);
+          if (input) input.value = log[key];
+        });
+        els.maintenanceLogForm.querySelector('[name="log_id"]').value = logId;
+      }
+    }
+    
+    if (!isEditing) {
+      els.maintenanceLogForm.querySelector('[name="log_id"]').value = "";
+      if (assetId) {
+        const asset = state.assets.find(a => a.asset_id === assetId);
+        if (asset) {
+          els.maintenanceLogGroupFilter.value = asset.asset_group;
+          populateAssets(asset.asset_group);
+          assetSelect.value = assetId;
+        } else {
+          populateAssets("");
+        }
       } else {
         populateAssets("");
       }
-    } else {
-      populateAssets("");
+      els.maintenanceLogForm.querySelector('[name="date"]').value = new Date().toISOString().split('T')[0];
     }
     
-    els.maintenanceLogForm.querySelector('[name="date"]').value = new Date().toISOString().split('T')[0];
     els.maintenanceLogModal.hidden = false;
   }
 

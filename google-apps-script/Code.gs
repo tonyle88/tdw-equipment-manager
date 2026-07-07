@@ -151,11 +151,17 @@ function doPost(event) {
     if (action === "saveMaintenanceLog") {
       return jsonResponse_(saveMaintenanceLog(args[0] || body.log || {}, args[1] || body.token || ""));
     }
+    if (action === "deleteMaintenanceLog") {
+      return jsonResponse_(deleteMaintenanceLog(args[0] || body.logId || "", args[1] || body.token || ""));
+    }
     if (action === "saveMovementLog") {
       return jsonResponse_(saveMovementLog(args[0] || body.log || {}, args[1] || body.token || ""));
     }
     if (action === "saveSoftwareLicense") {
       return jsonResponse_(saveSoftwareLicense(args[0] || body.license || {}, args[1] || body.token || ""));
+    }
+    if (action === "deleteSoftwareLicense") {
+      return jsonResponse_(deleteSoftwareLicense(args[0] || body.licenseId || "", args[1] || body.token || ""));
     }
     if (action === "saveSetting") {
       return jsonResponse_(saveSetting(args[0] || body.setting || {}, args[1] || body.token || ""));
@@ -298,6 +304,7 @@ function normalizeMaintenanceLog_(log) {
   normalized.log_id = normalized.log_id || Utilities.getUuid();
   normalized.asset_id = String(normalized.asset_id || "").trim();
   if (!normalized.asset_id) throw new Error("Thiếu asset_id cho log bảo trì");
+  if (!normalized.action_type) throw new Error("Thiếu action_type cho log bảo trì");
   
   normalized.date = normalized.date || now.split("T")[0];
   normalized.action_type = normalized.action_type || "";
@@ -309,6 +316,16 @@ function normalizeMaintenanceLog_(log) {
   normalized.note = normalized.note || "";
   normalized.created_at = normalized.created_at || now;
   return normalized;
+}
+
+function deleteMaintenanceLog(logId, token) {
+  try {
+    if (token) requireAdmin_(token);
+    const deleted = deleteObject_(SHEET_NAMES.maintenanceLogs, "log_id", logId);
+    return { ok: deleted, deleted_id: logId, updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
 }
 
 function saveMovementLog(log, token) {
@@ -372,9 +389,19 @@ function normalizeSoftwareLicense_(license) {
   normalized.assigned_asset_id = normalized.assigned_asset_id || "";
   normalized.assigned_user = normalized.assigned_user || "";
   normalized.expiry_date = normalized.expiry_date || "";
-  normalized.status = normalized.status || "ACTIVE";
+  if (!normalized.status) normalized.status = "ACTIVE";
   normalized.note = normalized.note || "";
   return normalized;
+}
+
+function deleteSoftwareLicense(licenseId, token) {
+  try {
+    if (token) requireAdmin_(token);
+    const deleted = deleteObject_(SHEET_NAMES.softwareLicenses, "license_id", licenseId);
+    return { ok: deleted, deleted_id: licenseId, updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
 }
 
 function saveDepartment(department, token) {
