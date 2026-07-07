@@ -994,9 +994,9 @@ const state = {
                       <td>${escapeHtml(log.description)}</td>
                       <td style="text-align: right; font-weight: 500; color: #e11d48;">${escapeHtml(formatMoney(log.cost))}</td>
                       ${canEditAssets() ? `
-                        <td class="table-actions" style="text-align: center; white-space: nowrap;">
-                          <button class="icon-button edit-maintenance-btn" data-id="${escapeHtml(log.log_id)}" data-asset="${escapeHtml(log.asset_id)}" type="button" aria-label="Sửa">✎</button>
-                          ${isAdmin() ? `<button class="icon-button danger-icon-button delete-maintenance-btn" data-id="${escapeHtml(log.log_id)}" data-name="${escapeHtml(log.action_type)}" type="button" aria-label="Xóa">×</button>` : ""}
+                        <td class="table-actions">
+                          <button class="table-action-btn edit-maintenance-btn" data-id="${escapeHtml(log.log_id)}" data-asset="${escapeHtml(log.asset_id)}" type="button" aria-label="Sửa">✎</button>
+                          ${isAdmin() ? `<button class="table-action-btn danger delete-maintenance-btn" data-id="${escapeHtml(log.log_id)}" data-name="${escapeHtml(log.action_type)}" type="button" aria-label="Xóa">×</button>` : ""}
                         </td>
                       ` : ""}
                     </tr>
@@ -1088,9 +1088,9 @@ const state = {
                   <td style="color: ${isExpired || isExpiringSoon ? statusColor : 'inherit'}; font-weight: ${isExpired || isExpiringSoon ? '600' : 'normal'}">${escapeHtml(formatDate(license.expiry_date))}</td>
                   <td><span class="badge" style="color: ${statusColor}; border: 1px solid ${statusColor}; background: transparent;">${escapeHtml(statusLabel)}</span></td>
                   ${canEditAssets() ? `
-                    <td class="table-actions" style="text-align: center; white-space: nowrap;">
-                      <button class="icon-button edit-software-btn" data-id="${escapeHtml(license.license_id)}" type="button" aria-label="Sửa">✎</button>
-                      ${isAdmin() ? `<button class="icon-button danger-icon-button delete-software-btn" data-id="${escapeHtml(license.license_id)}" data-name="${escapeHtml(license.software_name)}" type="button" aria-label="Xóa">×</button>` : ""}
+                    <td class="table-actions">
+                      <button class="table-action-btn edit-software-btn" data-id="${escapeHtml(license.license_id)}" type="button" aria-label="Sửa">✎</button>
+                      ${isAdmin() ? `<button class="table-action-btn danger delete-software-btn" data-id="${escapeHtml(license.license_id)}" data-name="${escapeHtml(license.software_name)}" type="button" aria-label="Xóa">×</button>` : ""}
                     </td>
                   ` : ""}
                 </tr>
@@ -1157,9 +1157,9 @@ const state = {
                   <td>${escapeHtml(dept.location)}</td>
                   <td>${escapeHtml(dept.note)}</td>
                   ${isAdmin() ? `
-                    <td class="table-actions" style="text-align: center; white-space: nowrap;">
-                      <button class="icon-button edit-dept-btn" data-id="${escapeHtml(dept.department_id)}" type="button" aria-label="Sửa">✎</button>
-                      <button class="icon-button danger-icon-button delete-dept-btn" data-id="${escapeHtml(dept.department_id)}" data-name="${escapeHtml(dept.department_name)}" type="button" aria-label="Xóa">×</button>
+                    <td class="table-actions">
+                      <button class="table-action-btn edit-dept-btn" data-id="${escapeHtml(dept.department_id)}" type="button" aria-label="Sửa">✎</button>
+                      <button class="table-action-btn danger delete-dept-btn" data-id="${escapeHtml(dept.department_id)}" data-name="${escapeHtml(dept.department_name)}" type="button" aria-label="Xóa">×</button>
                     </td>
                   ` : ""}
                 </tr>
