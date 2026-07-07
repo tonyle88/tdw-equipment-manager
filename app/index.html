@@ -85,6 +85,7 @@
           <a class="active" href="#" data-view="overview">Tổng quan</a>
           <a href="#" data-view="devices">Thiết bị</a>
           <a href="#" data-view="maintenance">Bảo trì</a>
+          <a href="#" data-view="software">Phần mềm</a>
           <a href="#" data-view="reports">Báo cáo</a>
           <a href="#" data-view="settings">Cấu hình</a>
           <a href="#" data-view="users" data-admin-only>Người dùng</a>
@@ -302,6 +303,74 @@
           <div class="modal-actions">
             <button class="secondary-button" type="button" id="cancelMaintenanceLogForm">Hủy</button>
             <button class="primary-button" type="submit">Lưu lịch sử</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-backdrop" id="movementLogModal" hidden>
+        <form class="modal compact-modal" id="movementLogForm">
+          <div class="modal-head">
+            <div>
+              <p class="eyebrow">LUÂN CHUYỂN</p>
+              <h2>GHI NHẬN LUÂN CHUYỂN</h2>
+            </div>
+            <button class="icon-button" type="button" id="closeMovementLogModal" aria-label="Đóng">×</button>
+          </div>
+          <input type="hidden" name="movement_id" />
+          <div class="form-grid">
+            <label class="span-2">Thiết bị
+              <select name="asset_id" required></select>
+            </label>
+            <label>Ngày luân chuyển<input name="movement_date" type="date" required /></label>
+            <label>Lý do luân chuyển<input name="reason" placeholder="VD: Cấp mới, điều chuyển..." /></label>
+            <label>Từ người dùng<input name="from_user" /></label>
+            <label>Đến người dùng<input name="to_user" /></label>
+            <label>Từ vị trí<input name="from_location" /></label>
+            <label>Đến vị trí<input name="to_location" /></label>
+            <label>Người duyệt<input name="approved_by" /></label>
+            <label class="span-2">Ghi chú thêm<textarea name="note" rows="2"></textarea></label>
+          </div>
+          <div class="modal-actions">
+            <button class="secondary-button" type="button" id="cancelMovementLogForm">Hủy</button>
+            <button class="primary-button" type="submit">Lưu phiếu</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-backdrop" id="softwareLicenseModal" hidden>
+        <form class="modal compact-modal" id="softwareLicenseForm">
+          <div class="modal-head">
+            <div>
+              <p class="eyebrow">PHẦN MỀM</p>
+              <h2>THÊM BẢN QUYỀN</h2>
+            </div>
+            <button class="icon-button" type="button" id="closeSoftwareLicenseModal" aria-label="Đóng">×</button>
+          </div>
+          <input type="hidden" name="license_id" />
+          <div class="form-grid">
+            <label>Tên phần mềm<input name="software_name" required placeholder="VD: Windows 11, Office 365" /></label>
+            <label>Phiên bản<input name="version" placeholder="VD: Pro, 2021" /></label>
+            <label class="span-2">License Key / ID<input name="license_key" placeholder="VD: XXXX-XXXX-XXXX" /></label>
+            <label>Gán cho Thiết bị
+              <select name="assigned_asset_id">
+                <option value="">-- Không gán thiết bị --</option>
+              </select>
+            </label>
+            <label>Gán cho Người dùng<input name="assigned_user" placeholder="VD: nguyen.van.a" /></label>
+            <label>Ngày hết hạn<input name="expiry_date" type="date" /></label>
+            <label>Trạng thái
+              <select name="status">
+                <option value="ACTIVE">Đang sử dụng</option>
+                <option value="AVAILABLE">Sẵn sàng (Kho)</option>
+                <option value="EXPIRED">Đã hết hạn</option>
+                <option value="REVOKED">Đã thu hồi</option>
+              </select>
+            </label>
+            <label class="span-2">Ghi chú<textarea name="note" rows="2"></textarea></label>
+          </div>
+          <div class="modal-actions">
+            <button class="secondary-button" type="button" id="cancelSoftwareLicenseForm">Hủy</button>
+            <button class="primary-button" type="submit">Lưu bản quyền</button>
           </div>
         </form>
       </div>

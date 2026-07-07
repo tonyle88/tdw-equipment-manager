@@ -61,6 +61,8 @@ function getAppData() {
     assets: readActiveAssets_(),
     settings: readSheetAsObjects_(SHEET_NAMES.settings),
     maintenanceLogs: readSheetAsObjects_(SHEET_NAMES.maintenanceLogs),
+    inventoryMovements: readSheetAsObjects_(SHEET_NAMES.inventoryMovements),
+    softwareLicenses: readSheetAsObjects_(SHEET_NAMES.softwareLicenses),
     currentUser: user ? publicUser_(user) : null,
     updated_at: new Date().toISOString(),
   };
@@ -147,6 +149,12 @@ function doPost(event) {
     }
     if (action === "saveMaintenanceLog") {
       return jsonResponse_(saveMaintenanceLog(args[0] || body.log || {}, args[1] || body.token || ""));
+    }
+    if (action === "saveMovementLog") {
+      return jsonResponse_(saveMovementLog(args[0] || body.log || {}, args[1] || body.token || ""));
+    }
+    if (action === "saveSoftwareLicense") {
+      return jsonResponse_(saveSoftwareLicense(args[0] || body.license || {}, args[1] || body.token || ""));
     }
     if (action === "saveSetting") {
       return jsonResponse_(saveSetting(args[0] || body.setting || {}, args[1] || body.token || ""));
@@ -293,6 +301,72 @@ function normalizeMaintenanceLog_(log) {
   normalized.performed_by = normalized.performed_by || "";
   normalized.note = normalized.note || "";
   normalized.created_at = normalized.created_at || now;
+  return normalized;
+}
+
+function saveMovementLog(log, token) {
+  try {
+    if (token) requireEdit_(token);
+    const normalized = normalizeMovementLog_(log || {});
+    const saved = upsertObject_(SHEET_NAMES.inventoryMovements, "movement_id", normalized);
+
+    // Tự động cập nhật tài sản
+    if (saved.asset_id && saved.to_user) {
+      const assets = readActiveAssets_();
+      const asset = assets.find(a => a.asset_id === saved.asset_id);
+      if (asset) {
+        asset.assigned_to = saved.to_user;
+        if (saved.to_location) asset.location = saved.to_location;
+        upsertObject_(SHEET_NAMES.assets, "asset_id", asset);
+      }
+    }
+    return { ok: true, data: saved, updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function normalizeMovementLog_(log) {
+  const now = new Date().toISOString();
+  const normalized = Object.assign({}, log);
+  normalized.movement_id = normalized.movement_id || Utilities.getUuid();
+  normalized.asset_id = String(normalized.asset_id || "").trim();
+  if (!normalized.asset_id) throw new Error("Thiếu asset_id");
+  normalized.movement_date = normalized.movement_date || now.split("T")[0];
+  normalized.from_user = normalized.from_user || "";
+  normalized.to_user = normalized.to_user || "";
+  normalized.from_location = normalized.from_location || "";
+  normalized.to_location = normalized.to_location || "";
+  normalized.reason = normalized.reason || "";
+  normalized.approved_by = normalized.approved_by || "";
+  normalized.note = normalized.note || "";
+  normalized.created_at = normalized.created_at || now;
+  return normalized;
+}
+
+function saveSoftwareLicense(license, token) {
+  try {
+    if (token) requireEdit_(token);
+    const normalized = normalizeSoftwareLicense_(license || {});
+    const saved = upsertObject_(SHEET_NAMES.softwareLicenses, "license_id", normalized);
+    return { ok: true, data: saved, updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function normalizeSoftwareLicense_(license) {
+  const normalized = Object.assign({}, license);
+  normalized.license_id = normalized.license_id || Utilities.getUuid();
+  normalized.software_name = String(normalized.software_name || "").trim();
+  if (!normalized.software_name) throw new Error("Tên phần mềm là bắt buộc");
+  normalized.version = normalized.version || "";
+  normalized.license_key = normalized.license_key || "";
+  normalized.assigned_asset_id = normalized.assigned_asset_id || "";
+  normalized.assigned_user = normalized.assigned_user || "";
+  normalized.expiry_date = normalized.expiry_date || "";
+  normalized.status = normalized.status || "ACTIVE";
+  normalized.note = normalized.note || "";
   return normalized;
 }
 

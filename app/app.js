@@ -2,6 +2,8 @@ const state = {
     assets: [],
     settings: [],
     maintenanceLogs: [],
+    inventoryMovements: [],
+    softwareLicenses: [],
     filtered: [],
     selectedId: null,
     page: 1,
@@ -144,6 +146,14 @@ const state = {
       maintenanceLogGroupFilter: document.querySelector("#maintenanceLogGroupFilter"),
       closeMaintenanceLogModal: document.querySelector("#closeMaintenanceLogModal"),
       cancelMaintenanceLogForm: document.querySelector("#cancelMaintenanceLogForm"),
+      softwareLicenseModal: document.querySelector("#softwareLicenseModal"),
+      softwareLicenseForm: document.querySelector("#softwareLicenseForm"),
+      closeSoftwareLicenseModal: document.querySelector("#closeSoftwareLicenseModal"),
+      cancelSoftwareLicenseForm: document.querySelector("#cancelSoftwareLicenseForm"),
+      movementLogModal: document.querySelector("#movementLogModal"),
+      movementLogForm: document.querySelector("#movementLogForm"),
+      closeMovementLogModal: document.querySelector("#closeMovementLogModal"),
+      cancelMovementLogForm: document.querySelector("#cancelMovementLogForm"),
       systemModal: document.querySelector("#systemModal"),
       systemModalForm: document.querySelector("#systemModalForm"),
       systemModalEyebrow: document.querySelector("#systemModalEyebrow"),
@@ -178,6 +188,8 @@ const state = {
     state.settings = normalizeSettings(payload.settings || []);
     state.assets = sortAssets(normalizeAssets(payload.assets || []));
     state.maintenanceLogs = (payload.maintenanceLogs || []).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    state.inventoryMovements = (payload.inventoryMovements || []).sort((a, b) => new Date(b.movement_date || 0) - new Date(a.movement_date || 0));
+    state.softwareLicenses = payload.softwareLicenses || [];
   }
 
   function isAdmin() {
@@ -655,10 +667,90 @@ const state = {
         <div><dt>Phần mềm</dt><dd>${escapeHtml(asset.software_license || "Không có dữ liệu")}</dd></div>
         <div><dt>Ghi chú</dt><dd>${escapeHtml(asset.note || "Không có ghi chú")}</dd></div>
       </dl>
+      
+      <div class="maintenance-logs-section" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="margin: 0; font-size: 14px; font-weight: bold;">LỊCH SỬ LUÂN CHUYỂN</h3>
+          ${canEditAssets() ? `<button class="secondary-button" type="button" data-add-movement="${escapeHtml(asset.asset_id)}" style="padding: 4px 8px; font-size: 12px;">+ Ghi nhận</button>` : ""}
+        </div>
+        ${renderMovementLogsTable(asset.asset_id)}
+      </div>
+
+      <div class="maintenance-logs-section" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="margin: 0; font-size: 14px; font-weight: bold;">PHẦN MỀM ĐÃ CÀI</h3>
+          ${canEditAssets() ? `<button class="secondary-button" type="button" data-add-software="${escapeHtml(asset.asset_id)}" style="padding: 4px 8px; font-size: 12px;">+ Gán phần mềm</button>` : ""}
+        </div>
+        ${renderAssetSoftwareTable(asset.asset_id)}
+      </div>
+
+      <div class="maintenance-logs-section" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="margin: 0; font-size: 14px; font-weight: bold;">LỊCH SỬ BẢO TRÌ</h3>
+          ${canEditAssets() ? `<button class="secondary-button" type="button" data-add-log="${escapeHtml(asset.asset_id)}" style="padding: 4px 8px; font-size: 12px;">+ Ghi nhận</button>` : ""}
+        </div>
+        ${renderMaintenanceLogsTable(asset.asset_id)}
+      </div>
+
       ${canEditAssets() ? `<div class="detail-actions">
         <button class="secondary-button detail-action-button" type="button" data-edit-asset="${escapeHtml(asset.asset_id)}">✎ Sửa</button>
         <button class="danger-button detail-action-button" type="button" data-delete-asset="${escapeHtml(asset.asset_id)}">× Xóa</button>
       </div>` : ""}
+    `;
+
+    els.detail.querySelectorAll("[data-add-log]").forEach(btn => {
+      btn.addEventListener("click", (e) => openMaintenanceLogModal(e.target.dataset.addLog));
+    });
+    els.detail.querySelectorAll("[data-add-movement]").forEach(btn => {
+      btn.addEventListener("click", (e) => openMovementLogModal(e.target.dataset.addMovement));
+    });
+    els.detail.querySelectorAll("[data-add-software]").forEach(btn => {
+      btn.addEventListener("click", (e) => openSoftwareLicenseModal(null, e.target.dataset.addSoftware));
+    });
+  }
+
+  function renderMovementLogsTable(assetId) {
+    const logs = (state.inventoryMovements || []).filter(log => log.asset_id === assetId);
+    if (!logs.length) return `<p class="muted" style="font-size: 13px;">Chưa có lịch sử luân chuyển.</p>`;
+    return `
+      <table class="mini-table" style="width: 100%; font-size: 13px;">
+        <thead>
+          <tr><th style="padding: 4px 0">Ngày</th><th style="padding: 4px 0">Đến ND</th><th style="padding: 4px 0">Đến VT</th><th style="padding: 4px 0">Lý do</th></tr>
+        </thead>
+        <tbody>
+          ${logs.map(log => `<tr><td style="padding: 8px 0">${escapeHtml(formatDate(log.movement_date))}</td><td style="padding: 8px 0">${escapeHtml(log.to_user)}</td><td style="padding: 8px 0">${escapeHtml(log.to_location)}</td><td style="padding: 8px 0">${escapeHtml(log.reason)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function renderAssetSoftwareTable(assetId) {
+    const logs = (state.softwareLicenses || []).filter(log => log.assigned_asset_id === assetId);
+    if (!logs.length) return `<p class="muted" style="font-size: 13px;">Chưa có phần mềm nào gán vào thiết bị này.</p>`;
+    return `
+      <table class="mini-table" style="width: 100%; font-size: 13px;">
+        <thead>
+          <tr><th style="padding: 4px 0">Phần mềm</th><th style="padding: 4px 0">Key</th><th style="padding: 4px 0">Ngày hết hạn</th></tr>
+        </thead>
+        <tbody>
+          ${logs.map(log => `<tr><td style="padding: 8px 0; font-weight:500;">${escapeHtml(log.software_name)} ${escapeHtml(log.version)}</td><td style="padding: 8px 0"><code style="background: var(--bg-hover); padding: 2px 4px; border-radius: 4px;">${escapeHtml(log.license_key)}</code></td><td style="padding: 8px 0">${escapeHtml(formatDate(log.expiry_date))}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function renderMaintenanceLogsTable(assetId) {
+    const logs = (state.maintenanceLogs || []).filter(log => log.asset_id === assetId);
+    if (!logs.length) return `<p class="muted" style="font-size: 13px;">Chưa có lịch sử bảo trì.</p>`;
+    return `
+      <table class="mini-table" style="width: 100%; font-size: 13px;">
+        <thead>
+          <tr><th style="padding: 4px 0">Ngày</th><th style="padding: 4px 0">Loại</th><th style="padding: 4px 0">Nội dung</th><th style="padding: 4px 0">Chi phí</th></tr>
+        </thead>
+        <tbody>
+          ${logs.map(log => `<tr><td style="padding: 8px 0">${escapeHtml(formatDate(log.date))}</td><td style="padding: 8px 0">${escapeHtml(log.action_type)}</td><td style="padding: 8px 0">${escapeHtml(log.description)}</td><td style="padding: 8px 0; font-weight: 500;">${escapeHtml(formatMoney(log.cost))}</td></tr>`).join('')}
+        </tbody>
+      </table>
     `;
   }
 
@@ -747,6 +839,7 @@ const state = {
       renderDetail(state.assets.find((asset) => asset.asset_id === state.selectedId));
     }
     if (state.activeView === "maintenance") renderMaintenanceView();
+    if (state.activeView === "software") renderSoftwareView();
     if (state.activeView === "reports") renderReportsView();
     if (state.activeView === "settings") renderSettingsView();
     if (state.activeView === "users") renderUsersView();
@@ -888,6 +981,78 @@ const state = {
     if (openBtn) {
       openBtn.addEventListener("click", () => openMaintenanceLogModal());
     }
+  }
+
+  function renderSoftwareView() {
+    els.content.innerHTML = `
+      <div class="view-header">
+        <div>
+          <h2>Quản lý Bản quyền Phần mềm</h2>
+          <p class="view-subtitle">Theo dõi danh sách bản quyền, license key và thiết bị được cấp phép</p>
+        </div>
+        ${canEditAssets() ? `<button class="primary-button" type="button" id="openAddSoftwareBtn">+ Thêm bản quyền</button>` : ""}
+      </div>
+      
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>PHẦN MỀM</th>
+              <th>PHIÊN BẢN</th>
+              <th>LICENSE KEY</th>
+              <th>GÁN CHO</th>
+              <th>NGÀY HẾT HẠN</th>
+              <th>TRẠNG THÁI</th>
+              ${canEditAssets() ? `<th></th>` : ""}
+            </tr>
+          </thead>
+          <tbody>
+            ${state.softwareLicenses.map(license => {
+              const asset = state.assets.find(a => a.asset_id === license.assigned_asset_id);
+              const isExpired = license.expiry_date && new Date(license.expiry_date) < new Date();
+              const isExpiringSoon = license.expiry_date && new Date(license.expiry_date) < new Date(new Date().setDate(new Date().getDate() + 30));
+              
+              let statusColor = "var(--text-secondary)";
+              if (license.status === "ACTIVE") statusColor = "var(--color-success)";
+              if (license.status === "EXPIRED" || isExpired) statusColor = "var(--color-error)";
+              else if (isExpiringSoon) statusColor = "var(--color-warning)";
+              
+              let statusLabel = license.status === "ACTIVE" ? "Đang sử dụng" : 
+                                license.status === "AVAILABLE" ? "Sẵn sàng" : 
+                                license.status === "EXPIRED" ? "Hết hạn" : "Đã thu hồi";
+              if (license.status === "ACTIVE" && isExpired) statusLabel = "Hết hạn";
+              else if (license.status === "ACTIVE" && isExpiringSoon) statusLabel = "Sắp hết hạn";
+
+              return `
+                <tr>
+                  <td style="font-weight: 500;">${escapeHtml(license.software_name)}</td>
+                  <td>${escapeHtml(license.version)}</td>
+                  <td><code style="background: var(--bg-hover); padding: 2px 6px; border-radius: 4px; font-size: 12px;">${escapeHtml(license.license_key)}</code></td>
+                  <td>
+                    ${asset ? `<span>🖥 ${escapeHtml(asset.asset_name)}</span>` : ""}
+                    ${license.assigned_user ? `<div>👤 ${escapeHtml(license.assigned_user)}</div>` : ""}
+                  </td>
+                  <td style="color: ${isExpired || isExpiringSoon ? statusColor : 'inherit'}; font-weight: ${isExpired || isExpiringSoon ? '600' : 'normal'}">${escapeHtml(formatDate(license.expiry_date))}</td>
+                  <td><span class="badge" style="color: ${statusColor}; border: 1px solid ${statusColor}; background: transparent;">${escapeHtml(statusLabel)}</span></td>
+                  ${canEditAssets() ? `
+                    <td class="table-actions">
+                      <button class="icon-button edit-software-btn" data-id="${escapeHtml(license.license_id)}" type="button" aria-label="Sửa">✎</button>
+                    </td>
+                  ` : ""}
+                </tr>
+              `;
+            }).join('') || `<tr><td colspan="${canEditAssets() ? 7 : 6}" style="text-align: center; color: var(--text-secondary); padding: 32px;">Chưa có bản quyền phần mềm nào.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    const addBtn = els.content.querySelector("#openAddSoftwareBtn");
+    if (addBtn) addBtn.addEventListener("click", () => openSoftwareLicenseModal());
+
+    els.content.querySelectorAll(".edit-software-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => openSoftwareLicenseModal(e.target.dataset.id));
+    });
   }
 
   function renderReportsView() {
@@ -1352,6 +1517,95 @@ const state = {
     }
   }
 
+  function openSoftwareLicenseModal(licenseId = null, assetIdForNew = null) {
+    els.softwareLicenseForm.reset();
+    const assetSelect = els.softwareLicenseForm.querySelector('[name="assigned_asset_id"]');
+    assetSelect.innerHTML = `<option value="">-- Không gán thiết bị --</option>` + state.assets.map(a => `<option value="${escapeHtml(a.asset_id)}">${escapeHtml(a.asset_name)} (${escapeHtml(a.asset_code)})</option>`).join('');
+    
+    if (licenseId && typeof licenseId === "string") {
+      const license = state.softwareLicenses.find(l => l.license_id === licenseId);
+      if (license) {
+        Object.keys(license).forEach(key => {
+          const input = els.softwareLicenseForm.querySelector(`[name="${key}"]`);
+          if (input) input.value = license[key];
+        });
+        els.softwareLicenseForm.querySelector('[name="license_id"]').value = licenseId;
+      }
+    } else {
+      els.softwareLicenseForm.querySelector('[name="license_id"]').value = "";
+      if (assetIdForNew) assetSelect.value = assetIdForNew;
+    }
+    els.softwareLicenseModal.hidden = false;
+  }
+
+  function closeSoftwareLicenseModal() {
+    els.softwareLicenseModal.hidden = true;
+    els.softwareLicenseForm.reset();
+  }
+
+  async function handleSoftwareLicenseSubmit(event) {
+    event.preventDefault();
+    const license = Object.fromEntries(new FormData(event.target).entries());
+    const submitBtn = event.target.querySelector("[type=submit]");
+    if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
+    try {
+      await callServer("saveSoftwareLicense", license);
+      showToast("Đã lưu bản quyền", license.software_name);
+      closeSoftwareLicenseModal();
+      await loadAppData();
+      if (state.activeView === "software") renderSoftwareView();
+      if (state.selectedId) renderDetail(state.assets.find((a) => a.asset_id === state.selectedId));
+    } catch (error) {
+      showMessageModal("Lỗi", error.message);
+    } finally {
+      if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
+    }
+  }
+
+  function openMovementLogModal(assetId = null) {
+    els.movementLogForm.reset();
+    const assetSelect = els.movementLogForm.querySelector('[name="asset_id"]');
+    assetSelect.innerHTML = `<option value="">-- Chọn thiết bị --</option>` + state.assets.map(a => `<option value="${escapeHtml(a.asset_id)}">${escapeHtml(a.asset_name)} (${escapeHtml(a.asset_code)})</option>`).join('');
+    if (assetId) assetSelect.value = assetId;
+    
+    els.movementLogForm.querySelector('[name="movement_date"]').value = new Date().toISOString().split('T')[0];
+    
+    // Auto populate "From" if asset is known
+    if (assetId) {
+      const asset = state.assets.find(a => a.asset_id === assetId);
+      if (asset) {
+        els.movementLogForm.querySelector('[name="from_user"]').value = asset.assigned_to || "";
+        els.movementLogForm.querySelector('[name="from_location"]').value = asset.location || "";
+      }
+    }
+    
+    els.movementLogModal.hidden = false;
+  }
+
+  function closeMovementLogModal() {
+    els.movementLogModal.hidden = true;
+    els.movementLogForm.reset();
+  }
+
+  async function handleMovementLogSubmit(event) {
+    event.preventDefault();
+    const log = Object.fromEntries(new FormData(event.target).entries());
+    const submitBtn = event.target.querySelector("[type=submit]");
+    if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
+    try {
+      await callServer("saveMovementLog", log);
+      showToast("Đã ghi nhận luân chuyển", log.reason || "Cập nhật thành công");
+      closeMovementLogModal();
+      await loadAppData();
+      if (state.selectedId) renderDetail(state.assets.find((a) => a.asset_id === state.selectedId));
+      if (state.activeView === "assets") renderAssetsView();
+    } catch (error) {
+      showMessageModal("Lỗi", error.message);
+    } finally {
+      if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
+    }
+  }
+
   async function handleDeleteUser(userId) {
     const user = state.users.find((item) => item.user_id === userId);
     const confirmed = await showConfirmModal("KHÓA USER", `Khóa user "${user?.full_name || user?.username || "này"}"?`, "Khóa");
@@ -1730,6 +1984,23 @@ const state = {
     els.maintenanceLogModal.addEventListener("click", (event) => {
       if (event.target === els.maintenanceLogModal) closeMaintenanceLogModal();
     });
+    
+    // Software License Listeners
+    els.softwareLicenseForm.addEventListener("submit", handleSoftwareLicenseSubmit);
+    els.closeSoftwareLicenseModal.addEventListener("click", closeSoftwareLicenseModal);
+    els.cancelSoftwareLicenseForm.addEventListener("click", closeSoftwareLicenseModal);
+    els.softwareLicenseModal.addEventListener("click", (event) => {
+      if (event.target === els.softwareLicenseModal) closeSoftwareLicenseModal();
+    });
+    
+    // Movement Log Listeners
+    els.movementLogForm.addEventListener("submit", handleMovementLogSubmit);
+    els.closeMovementLogModal.addEventListener("click", closeMovementLogModal);
+    els.cancelMovementLogForm.addEventListener("click", closeMovementLogModal);
+    els.movementLogModal.addEventListener("click", (event) => {
+      if (event.target === els.movementLogModal) closeMovementLogModal();
+    });
+
     els.systemModalForm?.addEventListener("submit", (event) => {
       event.preventDefault();
       closeSystemModal(els.systemModalInputWrap?.hidden ? true : els.systemModalInput?.value);

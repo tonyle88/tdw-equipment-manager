@@ -12,6 +12,8 @@ const ALLOWED_FUNCTIONS = new Set([
   "resetUserPassword",
   "changeOwnPassword",
   "saveMaintenanceLog",
+  "saveMovementLog",
+  "saveSoftwareLicense",
 ]);
 
 const SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL;
