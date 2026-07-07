@@ -1,6 +1,7 @@
 const state = {
     assets: [],
     settings: [],
+    maintenanceLogs: [],
     filtered: [],
     selectedId: null,
     page: 1,
@@ -138,6 +139,10 @@ const state = {
       userFormTitle: document.querySelector("#userFormTitle"),
       closeUserModal: document.querySelector("#closeUserModal"),
       cancelUserForm: document.querySelector("#cancelUserForm"),
+      maintenanceLogModal: document.querySelector("#maintenanceLogModal"),
+      maintenanceLogForm: document.querySelector("#maintenanceLogForm"),
+      closeMaintenanceLogModal: document.querySelector("#closeMaintenanceLogModal"),
+      cancelMaintenanceLogForm: document.querySelector("#cancelMaintenanceLogForm"),
       systemModal: document.querySelector("#systemModal"),
       systemModalForm: document.querySelector("#systemModalForm"),
       systemModalEyebrow: document.querySelector("#systemModalEyebrow"),
@@ -171,6 +176,7 @@ const state = {
     if (payload.currentUser) state.currentUser = payload.currentUser;
     state.settings = normalizeSettings(payload.settings || []);
     state.assets = sortAssets(normalizeAssets(payload.assets || []));
+    state.maintenanceLogs = (payload.maintenanceLogs || []).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
   }
 
   function isAdmin() {
@@ -842,9 +848,45 @@ const state = {
               <tbody>${tableHtml}</tbody>
             </table>
           </article>
+          <article class="module-card maintenance-list-card" style="grid-column: 1 / -1; margin-top: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 style="margin: 0;">LỊCH SỬ BẢO TRÌ GẦN ĐÂY</h3>
+              ${canEditAssets() ? `<button class="primary-button" type="button" id="openAddLogModal" style="padding: 6px 12px; font-size: 12px;">+ GHI NHẬN BẢO TRÌ</button>` : ""}
+            </div>
+            <table class="mini-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">NGÀY</th>
+                  <th>THIẾT BỊ</th>
+                  <th style="width: 120px;">LOẠI</th>
+                  <th>NỘI DUNG</th>
+                  <th style="width: 120px; text-align: right;">CHI PHÍ</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(state.maintenanceLogs || []).slice(0, 20).map(log => {
+                  const asset = state.assets.find(a => a.asset_id === log.asset_id);
+                  return `
+                    <tr>
+                      <td style="color: var(--text-secondary);">${escapeHtml(formatDate(log.date))}</td>
+                      <td style="font-weight: 500;">${escapeHtml(asset ? asset.asset_name : "Thiết bị đã xóa")}</td>
+                      <td><span class="badge" style="background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color);">${escapeHtml(log.action_type)}</span></td>
+                      <td>${escapeHtml(log.description)}</td>
+                      <td style="text-align: right; font-weight: 500; color: #e11d48;">${escapeHtml(formatMoney(log.cost))}</td>
+                    </tr>
+                  `;
+                }).join('') || `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 24px 0;">Chưa có lịch sử bảo trì.</td></tr>`}
+              </tbody>
+            </table>
+          </article>
         </div>
       </div>
     `;
+    
+    const openBtn = els.content.querySelector("#openAddLogModal");
+    if (openBtn) {
+      openBtn.addEventListener("click", () => openMaintenanceLogModal());
+    }
   }
 
   function renderReportsView() {
@@ -1249,6 +1291,41 @@ const state = {
     }
   }
 
+  function openMaintenanceLogModal(assetId = null) {
+    els.maintenanceLogForm.reset();
+    const assetSelect = els.maintenanceLogForm.querySelector('[name="asset_id"]');
+    assetSelect.innerHTML = `<option value="">-- Chọn thiết bị --</option>` + state.assets.map(a => `<option value="${escapeHtml(a.asset_id)}">${escapeHtml(a.asset_name)} (${escapeHtml(a.asset_code)})</option>`).join('');
+    if (assetId) assetSelect.value = assetId;
+    els.maintenanceLogForm.querySelector('[name="date"]').value = new Date().toISOString().split('T')[0];
+    els.maintenanceLogModal.hidden = false;
+  }
+
+  function closeMaintenanceLogModal() {
+    els.maintenanceLogModal.hidden = true;
+    els.maintenanceLogForm.reset();
+  }
+
+  async function handleMaintenanceLogSubmit(event) {
+    event.preventDefault();
+    const log = Object.fromEntries(new FormData(event.target).entries());
+    const submitBtn = event.target.querySelector("[type=submit]");
+    if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
+    try {
+      await callServer("saveMaintenanceLog", log);
+      showToast("Đã lưu lịch sử bảo trì", log.action_type);
+      closeMaintenanceLogModal();
+      await loadAppData();
+      if (state.activeView === "overview") renderOverviewView();
+      if (state.activeView === "assets") renderAssetsView();
+      if (state.activeView === "maintenance") renderMaintenanceView();
+      if (state.selectedId) renderDetail(state.assets.find((a) => a.asset_id === state.selectedId));
+    } catch (error) {
+      showMessageModal("Không thể lưu", error.message);
+    } finally {
+      if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
+    }
+  }
+
   async function handleDeleteUser(userId) {
     const user = state.users.find((item) => item.user_id === userId);
     const confirmed = await showConfirmModal("KHÓA USER", `Khóa user "${user?.full_name || user?.username || "này"}"?`, "Khóa");
@@ -1620,6 +1697,12 @@ const state = {
     els.cancelUserForm.addEventListener("click", closeUserModal);
     els.userModal.addEventListener("click", (event) => {
       if (event.target === els.userModal) closeUserModal();
+    });
+    els.maintenanceLogForm.addEventListener("submit", handleMaintenanceLogSubmit);
+    els.closeMaintenanceLogModal.addEventListener("click", closeMaintenanceLogModal);
+    els.cancelMaintenanceLogForm.addEventListener("click", closeMaintenanceLogModal);
+    els.maintenanceLogModal.addEventListener("click", (event) => {
+      if (event.target === els.maintenanceLogModal) closeMaintenanceLogModal();
     });
     els.systemModalForm?.addEventListener("submit", (event) => {
       event.preventDefault();

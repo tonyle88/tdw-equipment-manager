@@ -60,6 +60,7 @@ function getAppData() {
     ok: true,
     assets: readActiveAssets_(),
     settings: readSheetAsObjects_(SHEET_NAMES.settings),
+    maintenanceLogs: readSheetAsObjects_(SHEET_NAMES.maintenanceLogs),
     currentUser: user ? publicUser_(user) : null,
     updated_at: new Date().toISOString(),
   };
@@ -143,6 +144,9 @@ function doPost(event) {
     }
     if (action === "deleteAsset") {
       return jsonResponse_(deleteAsset(args[0] || body.asset_id || "", args[1] || body.token || ""));
+    }
+    if (action === "saveMaintenanceLog") {
+      return jsonResponse_(saveMaintenanceLog(args[0] || body.log || {}, args[1] || body.token || ""));
     }
     if (action === "saveSetting") {
       return jsonResponse_(saveSetting(args[0] || body.setting || {}, args[1] || body.token || ""));
@@ -259,6 +263,36 @@ function normalizeSetting_(setting) {
   normalized.display_name = String(normalized.display_name || value).trim();
   normalized.sort_order = normalized.sort_order || "999";
   normalized.active = normalized.active || "TRUE";
+  return normalized;
+}
+
+function saveMaintenanceLog(log, token) {
+  try {
+    if (token) requireEdit_(token);
+    const normalized = normalizeMaintenanceLog_(log || {});
+    const saved = upsertObject_(SHEET_NAMES.maintenanceLogs, "log_id", normalized);
+    return { ok: true, data: saved, updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function normalizeMaintenanceLog_(log) {
+  const now = new Date().toISOString();
+  const normalized = Object.assign({}, log);
+  normalized.log_id = normalized.log_id || Utilities.getUuid();
+  normalized.asset_id = String(normalized.asset_id || "").trim();
+  if (!normalized.asset_id) throw new Error("Thiếu asset_id cho log bảo trì");
+  
+  normalized.date = normalized.date || now.split("T")[0];
+  normalized.action_type = normalized.action_type || "";
+  normalized.description = normalized.description || "";
+  normalized.cost = normalized.cost || "";
+  normalized.vendor = normalized.vendor || "";
+  normalized.warranty_months = normalized.warranty_months || "";
+  normalized.performed_by = normalized.performed_by || "";
+  normalized.note = normalized.note || "";
+  normalized.created_at = normalized.created_at || now;
   return normalized;
 }
 
