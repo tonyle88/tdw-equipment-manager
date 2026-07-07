@@ -1113,10 +1113,10 @@ const state = {
       btn.addEventListener("click", async (e) => {
         const id = e.target.dataset.id;
         const name = e.target.dataset.name;
-        if (await confirmAction("Xóa bản quyền", \`Bạn có chắc chắn muốn xóa bản quyền phần mềm "$\{name\}"?\`)) {
+        if (await confirmAction("Xóa bản quyền", `Bạn có chắc chắn muốn xóa bản quyền phần mềm "${name}"?`)) {
           try {
             await callServer("deleteSoftwareLicense", { licenseId: id });
-            showToast("Đã xóa", \`Bản quyền phần mềm "$\{name\}" đã được xóa\`);
+            showToast("Đã xóa", `Bản quyền phần mềm "${name}" đã được xóa`);
             await loadAppData();
             renderSoftwareView();
           } catch (err) {
