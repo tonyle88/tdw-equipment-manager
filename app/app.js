@@ -809,6 +809,24 @@ const state = {
   function renderMaintenanceView() {
     const watchList = state.assets.filter((asset) => ["KEM_PHAM_CHAT", "CAN_KIEM_TRA", "KHONG_SU_DUNG", "LUU_KHO_THANH_LY"].includes(asset.status));
     const byStatus = countBy(watchList, "status", "status");
+    
+    // Nhóm watchList theo status
+    const statusGroups = {};
+    watchList.forEach(asset => {
+      if (!statusGroups[asset.status]) statusGroups[asset.status] = [];
+      statusGroups[asset.status].push(asset);
+    });
+    
+    let tableHtml = "";
+    Object.keys(statusGroups).forEach(statusKey => {
+      const items = statusGroups[statusKey];
+      tableHtml += `<tr class="maintenance-group-header"><td colspan="3" style="background: #f0f6fb; font-weight: bold; padding-top: 10px; color: ${colorForLabel(labelFor("status", statusKey), 0)}; text-transform: uppercase;">${escapeHtml(labelFor("status", statusKey))} (${items.length})</td></tr>`;
+      items.forEach(asset => {
+        tableHtml += `<tr><td>${escapeHtml(asset.asset_name)}</td><td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status))}</span></td><td>${escapeHtml([asset.assigned_to, departmentLabel(asset.department)].filter(Boolean).join(" / "))}</td></tr>`;
+      });
+    });
+    if (!tableHtml) tableHtml = `<tr><td colspan="3">CHƯA CÓ THIẾT BỊ CẦN XỬ LÝ.</td></tr>`;
+
     els.content.innerHTML = `
       <div class="view-only-panel">
         <div class="panel-head maintenance-title-row"><h2>BẢO TRÌ THIẾT BỊ</h2><span>${watchList.length} THIẾT BỊ CẦN THEO DÕI</span></div>
@@ -817,16 +835,12 @@ const state = {
             <h3>TÌNH TRẠNG CẦN XỬ LÝ</h3>
             ${renderBarChart(byStatus)}
           </article>
-          <article class="module-card maintenance-list-card">
-            <h3>DANH SÁCH ƯU TIÊN</h3>
+          <article class="module-card maintenance-list-card" style="grid-column: 1 / -1;">
+            <h3>DANH SÁCH CHI TIẾT THEO TÌNH TRẠNG</h3>
             <table class="mini-table maintenance-table">
               <thead><tr><th>THIẾT BỊ</th><th>TÌNH TRẠNG</th><th>NGƯỜI DÙNG</th></tr></thead>
-              <tbody>${watchList.slice(0, 12).map((asset) => `<tr><td>${escapeHtml(asset.asset_name)}</td><td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status))}</span></td><td>${escapeHtml([asset.assigned_to, departmentLabel(asset.department)].filter(Boolean).join(" / "))}</td></tr>`).join("") || `<tr><td colspan="3">CHƯA CÓ THIẾT BỊ CẦN XỬ LÝ.</td></tr>`}</tbody>
+              <tbody>${tableHtml}</tbody>
             </table>
-          </article>
-          <article class="module-card">
-            <h3>GỢI Ý VẬN HÀNH</h3>
-            <p>Chọn thiết bị ở tab Thiết bị để cập nhật tình trạng và ghi chú bảo trì. Giai đoạn kế tiếp có thể ghi timeline riêng vào tab MaintenanceLogs.</p>
           </article>
         </div>
       </div>
@@ -885,15 +899,34 @@ const state = {
       : state.assets;
     if (!data.length) { showMessageModal("Không có dữ liệu", "Không có thiết bị phù hợp để in."); return; }
 
-    // Nhóm theo asset_group
+    // Nhóm theo asset_group + Tách riêng nhóm lưu kho/kém phẩm chất
     const groupOrder = [];
     const groups = {};
+    const specialGroupKey = "_SPECIAL_";
+    const specialGroupLabel = "THIẾT BỊ LƯU KHO / KÉM PHẨM CHẤT / THANH LÝ";
+    const badStatuses = ["KEM_PHAM_CHAT", "LUU_KHO_THANH_LY", "KHONG_SU_DUNG"];
+
     data.forEach((asset) => {
-      const key = asset.asset_group;
-      const label = asset.asset_group_label || labelFor("asset_group", key) || key;
-      if (!groups[key]) { groups[key] = { label, items: [] }; groupOrder.push(key); }
+      let key, label;
+      
+      if (!groupFilter && badStatuses.includes(asset.status)) {
+        key = specialGroupKey;
+        label = specialGroupLabel;
+      } else {
+        key = asset.asset_group;
+        label = asset.asset_group_label || labelFor("asset_group", key) || key;
+      }
+
+      if (!groups[key]) { 
+        groups[key] = { label, items: [] }; 
+        if (key !== specialGroupKey) groupOrder.push(key); 
+      }
       groups[key].items.push(asset);
     });
+
+    if (groups[specialGroupKey]) {
+      groupOrder.push(specialGroupKey); // Đưa xuống cuối cùng
+    }
 
     const now = new Date();
     const dateStr = now.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -1355,15 +1388,34 @@ const state = {
       return;
     }
 
-    // Nhóm theo asset_group
+    // Nhóm theo asset_group + Tách riêng nhóm lưu kho/kém phẩm chất
     const groupOrder = [];
     const groups = {};
+    const specialGroupKey = "_SPECIAL_";
+    const specialGroupLabel = "THIẾT BỊ LƯU KHO / KÉM PHẨM CHẤT / THANH LÝ";
+    const badStatuses = ["KEM_PHAM_CHAT", "LUU_KHO_THANH_LY", "KHONG_SU_DUNG"];
+
     data.forEach((asset) => {
-      const key = asset.asset_group;
-      const label = asset.asset_group_label || labelFor("asset_group", key) || key;
-      if (!groups[key]) { groups[key] = { label, items: [] }; groupOrder.push(key); }
+      let key, label;
+      
+      if (!groupFilter && badStatuses.includes(asset.status)) {
+        key = specialGroupKey;
+        label = specialGroupLabel;
+      } else {
+        key = asset.asset_group;
+        label = asset.asset_group_label || labelFor("asset_group", key) || key;
+      }
+
+      if (!groups[key]) { 
+        groups[key] = { label, items: [] }; 
+        if (key !== specialGroupKey) groupOrder.push(key); 
+      }
       groups[key].items.push(asset);
     });
+
+    if (groups[specialGroupKey]) {
+      groupOrder.push(specialGroupKey); // Đưa xuống cuối cùng
+    }
 
     const year = new Date().getFullYear();
     const groupTitle = groupFilter ? labelFor("asset_group", groupFilter).toUpperCase() : "TẤT CẢ NHÓM";
