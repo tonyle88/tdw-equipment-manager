@@ -1053,9 +1053,9 @@ const state = {
                 <th style="width: 20%">PHẦN MỀM</th>
                 <th style="width: 15%">PHIÊN BẢN</th>
                 <th style="width: 20%">LICENSE KEY</th>
-                <th style="width: 20%">GÁN CHO</th>
-                <th style="width: 15%">NGÀY HẾT HẠN</th>
-                <th style="width: 10%">TRẠNG THÁI</th>
+                <th>GÁN CHO</th>
+                <th style="width: 130px">NGÀY HẾT HẠN</th>
+                <th style="width: 130px">TRẠNG THÁI</th>
                 ${canEditAssets() ? `<th style="width: 90px; text-align: center;"></th>` : ""}
               </tr>
             </thead>
@@ -1142,10 +1142,10 @@ const state = {
           <table class="data-table" style="min-width: 600px;">
             <thead>
               <tr>
-                <th style="width: 30%">PHÒNG BAN</th>
+                <th style="width: 25%">PHÒNG BAN</th>
                 <th style="width: 25%">TRƯỞNG PHÒNG</th>
                 <th style="width: 25%">VỊ TRÍ / KHU VỰC</th>
-                <th style="width: 20%">GHI CHÚ</th>
+                <th>GHI CHÚ</th>
                 ${isAdmin() ? `<th style="width: 90px; text-align: center;"></th>` : ""}
               </tr>
             </thead>
