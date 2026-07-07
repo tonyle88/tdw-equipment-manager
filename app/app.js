@@ -836,11 +836,21 @@ const state = {
   function renderReportsView() {
     const byGroup = countBy(state.assets, "asset_group_label");
     const byStatus = countBy(state.assets, "status", "status");
+    const groupOptions = settingOptions("asset_group")
+      .map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`)
+      .join("");
     els.content.innerHTML = `
       <div class="view-only-panel">
         <div class="panel-head report-title-row">
           <h2>BÁO CÁO</h2>
           <div class="report-actions">
+            <label class="report-group-filter">
+              <span>Nhóm xuất</span>
+              <select id="reportGroupSelect">
+                <option value="">Tất cả nhóm</option>
+                ${groupOptions}
+              </select>
+            </label>
             <button class="secondary-button" type="button" data-export-csv>Xuất Excel (.xlsx)</button>
             <button class="secondary-button" type="button" data-print-pdf>Xuất PDF</button>
           </div>
@@ -859,9 +869,13 @@ const state = {
         </div>
       </div>
     `;
-    els.content.querySelector("[data-export-csv]").addEventListener("click", exportExcel);
+    els.content.querySelector("[data-export-csv]").addEventListener("click", () => {
+      const selectedGroup = document.getElementById("reportGroupSelect")?.value || "";
+      exportExcel(selectedGroup);
+    });
     els.content.querySelector("[data-print-pdf]").addEventListener("click", () => window.print());
   }
+
 
   function renderSettingsView() {
     els.content.innerHTML = `
@@ -1246,14 +1260,15 @@ const state = {
     `;
   }
 
-  function exportExcel() {
+  function exportExcel(groupFilter = "") {
     if (typeof XLSX === "undefined") {
       showMessageModal("Lỗi xuất", "Thư viện XLSX chưa tải xong, vui lòng thử lại sau vài giây.");
       return;
     }
 
-    // state.filtered đã lọc sẵn theo nhóm nếu có chọn bộ lọc
-    const data = state.filtered;
+    const data = groupFilter
+      ? state.assets.filter((asset) => asset.asset_group === groupFilter)
+      : state.assets;
     if (!data.length) {
       showMessageModal("Không có dữ liệu", "Không có thiết bị phù hợp để xuất.");
       return;
