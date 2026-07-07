@@ -873,7 +873,87 @@ const state = {
       const selectedGroup = document.getElementById("reportGroupSelect")?.value || "";
       exportExcel(selectedGroup);
     });
-    els.content.querySelector("[data-print-pdf]").addEventListener("click", () => window.print());
+    els.content.querySelector("[data-print-pdf]").addEventListener("click", () => {
+      const selectedGroup = document.getElementById("reportGroupSelect")?.value || "";
+      printReport(selectedGroup);
+    });
+  }
+
+  function printReport(groupFilter = "") {
+    const data = groupFilter
+      ? state.assets.filter((a) => a.asset_group === groupFilter)
+      : state.assets;
+    if (!data.length) { showMessageModal("Không có dữ liệu", "Không có thiết bị phù hợp để in."); return; }
+
+    // Nhóm theo asset_group
+    const groupOrder = [];
+    const groups = {};
+    data.forEach((asset) => {
+      const key = asset.asset_group;
+      const label = asset.asset_group_label || labelFor("asset_group", key) || key;
+      if (!groups[key]) { groups[key] = { label, items: [] }; groupOrder.push(key); }
+      groups[key].items.push(asset);
+    });
+
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const groupTitle = groupFilter ? labelFor("asset_group", groupFilter) : "TấT CẢ NHÓM";
+
+    let tableRows = "";
+    groupOrder.forEach((key) => {
+      const { label, items } = groups[key];
+      tableRows += `<tr class="pr-group-row"><td colspan="9">${escapeHtml(label)}</td></tr>`;
+      items.forEach((asset, i) => {
+        const price = asset.unit_price ? Number(asset.unit_price).toLocaleString("vi-VN") + " đ" : "";
+        tableRows += `
+          <tr>
+            <td class="pr-center">${i + 1}</td>
+            <td>${escapeHtml(asset.asset_name)}</td>
+            <td class="pr-center">${escapeHtml(asset.purchase_year)}</td>
+            <td class="pr-center">${escapeHtml(asset.quantity || "1")}</td>
+            <td>${escapeHtml(asset.assigned_to)}</td>
+            <td>${escapeHtml(departmentLabel(asset.department))}</td>
+            <td class="pr-right">${escapeHtml(price)}</td>
+            <td>${escapeHtml(asset.software_license)}</td>
+            <td>${escapeHtml(labelFor("status", asset.status))}</td>
+          </tr>`;
+      });
+    });
+    tableRows += `<tr class="pr-total-row"><td colspan="3">TỔNG CỘNG</td><td class="pr-center">${data.reduce((s, a) => s + Number(a.quantity || 1), 0)}</td><td colspan="5">${data.length} thiết bị</td></tr>`;
+
+    const html = `
+      <div class="pr-header">
+        <div class="pr-company">CÔNG TY CỔ PHẦN NƯỚC THỦ ĐỨC &mdash; TDW</div>
+        <div class="pr-title">TỔNG HỢP DANH SÁCH THIẾT BỊ &mdash; ${escapeHtml(groupTitle)}</div>
+        <div class="pr-meta">Ngày xuất: ${dateStr} &nbsp;|&nbsp; Tổng: ${data.length} thiết bị</div>
+      </div>
+      <table class="pr-table">
+        <thead>
+          <tr>
+            <th style="width:4%">STT</th>
+            <th style="width:22%">TÊN THIẾT BỊ</th>
+            <th style="width:6%">NĂM</th>
+            <th style="width:5%">SỐ LƯỢNG</th>
+            <th style="width:12%">NGƯỜI SỬ DỤNG</th>
+            <th style="width:10%">PHÒNG BAN</th>
+            <th style="width:10%">ĐƠN GIÁ</th>
+            <th style="width:14%">PHẦN MỀM</th>
+            <th style="width:12%">TÌNH TRẠNG</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+      <div class="pr-footer">
+        <span class="pr-footer-left">Bước in: Ctrl+P (hoặc Chọm+P trên Mac) &rarr; Khổ giấy A4 Ngang</span>
+        Tài liệu nội bộ &mdash; TDW Equipment Manager &mdash; In lúc ${now.toLocaleTimeString("vi-VN")}
+      </div>`;
+
+    const el = document.getElementById("printReport");
+    el.innerHTML = html;
+    el.hidden = false;
+    window.print();
+    el.hidden = true;
+    el.innerHTML = "";
   }
 
 
@@ -1317,9 +1397,19 @@ const state = {
       });
     });
 
+    // Hàng ngày xuất & tổng
+    const exportDate = new Date().toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+    rows.push(["", `Ngày xuất: ${exportDate}`, "", "", "", "", "", `Tổng: ${data.length} thiết bị`]);
+
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    // Độ rộng cột gợi ý
+
+    // Gộp ô tiêu đề (dòng 2, cột B→J tức index 1→9)
+    const titleRowIndex = 1; // 0-based
+    ws["!merges"] = [{ s: { r: titleRowIndex, c: 1 }, e: { r: titleRowIndex, c: 9 } }];
+
+    // Độ rộng cột
     ws["!cols"] = [{wch:4},{wch:6},{wch:48},{wch:10},{wch:10},{wch:28},{wch:16},{wch:28},{wch:22},{wch:36}];
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, String(year));
     XLSX.writeFile(wb, `TDW-thiet-bi-${year}-${new Date().toISOString().slice(0, 10)}.xlsx`);

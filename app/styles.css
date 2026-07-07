@@ -905,10 +905,64 @@
     .form-grid .span-2 { grid-column: auto; }
   }
   @media print {
-    body { background: #fff; }
-    .topbar, .hero, .metrics, .toolbar, .report-actions { display: none !important; }
-    .shell { width: 100%; margin: 0; padding: 0; box-shadow: none; border: 0; background: #fff; }
-    .content, .view-only-panel, .module-card { background: #fff !important; color: #111827 !important; box-shadow: none; }
-    .module-card p, .panel-head span, .bar-label { color: #334155 !important; }
-    .mini-table th, .mini-table td { color: #111827 !important; border-bottom: 1px solid #dbe3ee; }
+    /* Ẩn toàn bộ app, chỉ hiện #printReport */
+    body > *:not(#printReport) { display: none !important; }
+    #printReport {
+      display: block !important;
+      font-family: "Times New Roman", serif;
+      color: #111;
+      background: #fff;
+      padding: 0;
+      margin: 0;
+    }
+
+    /* Header công ty */
+    .pr-header { text-align: center; border-bottom: 2.5px solid #176da5; padding-bottom: 10px; margin-bottom: 14px; }
+    .pr-company { font-size: 11pt; font-weight: bold; text-transform: uppercase; letter-spacing: .5px; }
+    .pr-title { font-size: 13pt; font-weight: bold; text-transform: uppercase; margin: 6px 0 4px; color: #176da5; }
+    .pr-meta { font-size: 9pt; color: #555; }
+
+    /* Bảng */
+    .pr-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 12px; }
+    .pr-table th {
+      background: #176da5;
+      color: #fff;
+      padding: 5px 7px;
+      text-align: center;
+      border: 1px solid #0e5080;
+      font-weight: bold;
+    }
+    .pr-table td { padding: 4px 7px; border: 1px solid #c8d8e8; vertical-align: top; }
+    .pr-table tr:nth-child(even) td { background: #f0f6fb; }
+    .pr-table tr:hover td { background: #dceeff; }
+
+    /* Hàng tiêu đề nhóm */
+    .pr-group-row td {
+      background: #e6f0f8 !important;
+      font-weight: bold;
+      font-size: 9.5pt;
+      color: #0d4f7c;
+      text-transform: uppercase;
+      border-top: 2px solid #176da5;
+      border-bottom: 1px solid #176da5;
+    }
+
+    /* Hàng tổng cuối */
+    .pr-total-row td {
+      background: #176da5 !important;
+      color: #fff !important;
+      font-weight: bold;
+      border-top: 2px solid #0e5080;
+    }
+
+    /* Footer */
+    .pr-footer { text-align: right; font-size: 8.5pt; color: #777; border-top: 1px solid #ccc; padding-top: 6px; margin-top: 6px; }
+    .pr-footer-left { float: left; }
+
+    /* Cột số thứ tự, năm, số lượng — căn giữa */
+    .pr-center { text-align: center; }
+    .pr-right { text-align: right; }
+
+    @page { size: A4 landscape; margin: 12mm 10mm; }
   }
+
