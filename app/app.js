@@ -944,8 +944,8 @@ const state = {
         <tbody>${tableRows}</tbody>
       </table>
       <div class="pr-footer">
-        <span class="pr-footer-left">Bước in: Ctrl+P (hoặc Chọm+P trên Mac) &rarr; Khổ giấy A4 Ngang</span>
-        Tài liệu nội bộ &mdash; TDW Equipment Manager &mdash; In lúc ${now.toLocaleTimeString("vi-VN")}
+        <span>Tài liệu nội bộ · TDW Equipment Manager</span>
+        <span>In lúc ${now.toLocaleTimeString("vi-VN")} ngày ${dateStr}</span>
       </div>`;
 
     const el = document.getElementById("printReport");
