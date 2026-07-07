@@ -545,9 +545,10 @@
   .panel-head h2 { margin: 0; font-size: 18px; }
   .panel-head span { color: rgba(255,255,255,.7); font-size: 13px; font-weight: 800; }
   .table-wrap { overflow: auto; max-height: none; border-radius: 16px; }
-  table { width: 100%; border-collapse: collapse; min-width: 1120px; table-layout: fixed; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th, td { padding: 11px 12px; border-bottom: 1px solid rgba(255,255,255,.08); text-align: left; vertical-align: top; font-size: 14px; }
   th { position: sticky; top: 0; z-index: 1; background: #161d34; color: rgba(255,255,255,.64); font-size: 12px; text-transform: uppercase; }
+  .assets-table { min-width: 1120px; }
   .assets-table th:nth-child(1), .assets-table td:nth-child(1) { width: 120px; }
   .assets-table th:nth-child(2), .assets-table td:nth-child(2) { width: 350px; }
   .assets-table th:nth-child(3), .assets-table td:nth-child(3) { width: 210px; }

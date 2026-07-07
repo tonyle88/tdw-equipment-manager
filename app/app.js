@@ -977,7 +977,7 @@ const state = {
                 <tr>
                   <th style="width: 100px;">NGÀY</th>
                   <th>THIẾT BỊ</th>
-                  <th style="width: 120px;">LOẠI</th>
+                  <th style="width: 150px; text-align: center;">LOẠI</th>
                   <th>NỘI DUNG</th>
                   <th style="width: 120px; text-align: right;">CHI PHÍ</th>
                 </tr>
@@ -989,7 +989,7 @@ const state = {
                     <tr>
                       <td style="color: var(--text-secondary);">${escapeHtml(formatDate(log.date))}</td>
                       <td style="font-weight: 500;">${escapeHtml(asset ? asset.asset_name : "Thiết bị đã xóa")}</td>
-                      <td><span class="badge" style="background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color);">${escapeHtml(log.action_type)}</span></td>
+                      <td style="text-align: center;"><span class="badge" style="background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color);">${escapeHtml(labelFor("maintenance_type", log.action_type) || log.action_type)}</span></td>
                       <td>${escapeHtml(log.description)}</td>
                       <td style="text-align: right; font-weight: 500; color: #e11d48;">${escapeHtml(formatMoney(log.cost))}</td>
                     </tr>
@@ -1020,16 +1020,16 @@ const state = {
         </div>
         
         <div class="table-wrap" style="margin-top: 16px;">
-          <table class="data-table" style="min-width: 1000px;">
+          <table class="data-table" style="min-width: 800px;">
             <thead>
               <tr>
                 <th style="width: 20%">PHẦN MỀM</th>
-                <th style="width: 10%">PHIÊN BẢN</th>
-                <th style="width: 15%">LICENSE KEY</th>
-                <th style="width: 25%">GÁN CHO</th>
+                <th style="width: 15%">PHIÊN BẢN</th>
+                <th style="width: 20%">LICENSE KEY</th>
+                <th style="width: 20%">GÁN CHO</th>
                 <th style="width: 15%">NGÀY HẾT HẠN</th>
-                <th style="width: 15%">TRẠNG THÁI</th>
-                ${canEditAssets() ? `<th style="width: 60px; text-align: center;"></th>` : ""}
+                <th style="width: 10%">TRẠNG THÁI</th>
+                ${canEditAssets() ? `<th style="width: 80px; text-align: center;"></th>` : ""}
               </tr>
             </thead>
           <tbody>
@@ -1061,7 +1061,7 @@ const state = {
                   <td style="color: ${isExpired || isExpiringSoon ? statusColor : 'inherit'}; font-weight: ${isExpired || isExpiringSoon ? '600' : 'normal'}">${escapeHtml(formatDate(license.expiry_date))}</td>
                   <td><span class="badge" style="color: ${statusColor}; border: 1px solid ${statusColor}; background: transparent;">${escapeHtml(statusLabel)}</span></td>
                   ${canEditAssets() ? `
-                    <td class="table-actions" style="text-align: center;">
+                    <td class="table-actions" style="text-align: center; white-space: nowrap;">
                       <button class="icon-button edit-software-btn" data-id="${escapeHtml(license.license_id)}" type="button" aria-label="Sửa">✎</button>
                     </td>
                   ` : ""}
@@ -1094,14 +1094,14 @@ const state = {
         </div>
         
         <div class="table-wrap" style="margin-top: 16px;">
-          <table class="data-table" style="min-width: 800px;">
+          <table class="data-table" style="min-width: 600px;">
             <thead>
               <tr>
-                <th style="width: 25%">PHÒNG BAN</th>
+                <th style="width: 30%">PHÒNG BAN</th>
                 <th style="width: 25%">TRƯỞNG PHÒNG</th>
                 <th style="width: 25%">VỊ TRÍ / KHU VỰC</th>
-                <th style="width: 25%">GHI CHÚ</th>
-                ${isAdmin() ? `<th style="width: 80px; text-align: center;"></th>` : ""}
+                <th style="width: 20%">GHI CHÚ</th>
+                ${isAdmin() ? `<th style="width: 90px; text-align: center;"></th>` : ""}
               </tr>
             </thead>
           <tbody>
@@ -1112,7 +1112,7 @@ const state = {
                   <td>${escapeHtml(dept.location)}</td>
                   <td>${escapeHtml(dept.note)}</td>
                   ${isAdmin() ? `
-                    <td class="table-actions" style="text-align: center;">
+                    <td class="table-actions" style="text-align: center; white-space: nowrap;">
                       <button class="icon-button edit-dept-btn" data-id="${escapeHtml(dept.department_id)}" type="button" aria-label="Sửa">✎</button>
                       <button class="icon-button danger-icon-button delete-dept-btn" data-id="${escapeHtml(dept.department_id)}" data-name="${escapeHtml(dept.department_name)}" type="button" aria-label="Xóa">×</button>
                     </td>
