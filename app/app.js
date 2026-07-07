@@ -141,6 +141,7 @@ const state = {
       cancelUserForm: document.querySelector("#cancelUserForm"),
       maintenanceLogModal: document.querySelector("#maintenanceLogModal"),
       maintenanceLogForm: document.querySelector("#maintenanceLogForm"),
+      maintenanceLogGroupFilter: document.querySelector("#maintenanceLogGroupFilter"),
       closeMaintenanceLogModal: document.querySelector("#closeMaintenanceLogModal"),
       cancelMaintenanceLogForm: document.querySelector("#cancelMaintenanceLogForm"),
       systemModal: document.querySelector("#systemModal"),
@@ -1294,8 +1295,33 @@ const state = {
   function openMaintenanceLogModal(assetId = null) {
     els.maintenanceLogForm.reset();
     const assetSelect = els.maintenanceLogForm.querySelector('[name="asset_id"]');
-    assetSelect.innerHTML = `<option value="">-- Chọn thiết bị --</option>` + state.assets.map(a => `<option value="${escapeHtml(a.asset_id)}">${escapeHtml(a.asset_name)} (${escapeHtml(a.asset_code)})</option>`).join('');
-    if (assetId) assetSelect.value = assetId;
+    
+    // Populate Group Filter
+    const groups = getUniqueValues(state.assets, "asset_group");
+    els.maintenanceLogGroupFilter.innerHTML = `<option value="">-- Tất cả thiết bị --</option>` + groups.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(labelFor("asset_group", g))}</option>`).join('');
+    els.maintenanceLogGroupFilter.value = "";
+    
+    const populateAssets = (groupFilter) => {
+      const filteredAssets = groupFilter ? state.assets.filter(a => a.asset_group === groupFilter) : state.assets;
+      assetSelect.innerHTML = `<option value="">-- Chọn thiết bị --</option>` + filteredAssets.map(a => `<option value="${escapeHtml(a.asset_id)}">${escapeHtml(a.asset_name)} (${escapeHtml(a.asset_code)})</option>`).join('');
+    };
+    
+    // Bind filter change
+    els.maintenanceLogGroupFilter.onchange = (e) => populateAssets(e.target.value);
+    
+    if (assetId) {
+      const asset = state.assets.find(a => a.asset_id === assetId);
+      if (asset) {
+        els.maintenanceLogGroupFilter.value = asset.asset_group;
+        populateAssets(asset.asset_group);
+        assetSelect.value = assetId;
+      } else {
+        populateAssets("");
+      }
+    } else {
+      populateAssets("");
+    }
+    
     els.maintenanceLogForm.querySelector('[name="date"]').value = new Date().toISOString().split('T')[0];
     els.maintenanceLogModal.hidden = false;
   }
