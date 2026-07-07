@@ -820,12 +820,12 @@ const state = {
     let tableHtml = "";
     Object.keys(statusGroups).forEach(statusKey => {
       const items = statusGroups[statusKey];
-      tableHtml += `<tr class="maintenance-group-header"><td colspan="3" style="background: #f0f6fb; font-weight: bold; padding-top: 10px; color: ${colorForLabel(labelFor("status", statusKey), 0)}; text-transform: uppercase;">${escapeHtml(labelFor("status", statusKey))} (${items.length})</td></tr>`;
-      items.forEach(asset => {
-        tableHtml += `<tr><td>${escapeHtml(asset.asset_name)}</td><td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status))}</span></td><td>${escapeHtml([asset.assigned_to, departmentLabel(asset.department)].filter(Boolean).join(" / "))}</td></tr>`;
+      tableHtml += `<tr class="maintenance-group-header"><td colspan="4" style="border-bottom: 2px solid var(--border-color); padding-top: 16px; padding-bottom: 8px;"><span style="font-weight: 700; font-size: 14px; color: ${colorForLabel(labelFor("status", statusKey), 0)}; text-transform: uppercase; letter-spacing: 0.5px;">${escapeHtml(labelFor("status", statusKey))} (${items.length})</span></td></tr>`;
+      items.forEach((asset, index) => {
+        tableHtml += `<tr><td style="width: 50px; text-align: center; color: var(--text-secondary);">${index + 1}</td><td>${escapeHtml(asset.asset_name)}</td><td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status))}</span></td><td>${escapeHtml([asset.assigned_to, departmentLabel(asset.department)].filter(Boolean).join(" / "))}</td></tr>`;
       });
     });
-    if (!tableHtml) tableHtml = `<tr><td colspan="3">CHƯA CÓ THIẾT BỊ CẦN XỬ LÝ.</td></tr>`;
+    if (!tableHtml) tableHtml = `<tr><td colspan="4">CHƯA CÓ THIẾT BỊ CẦN XỬ LÝ.</td></tr>`;
 
     els.content.innerHTML = `
       <div class="view-only-panel">
@@ -838,7 +838,7 @@ const state = {
           <article class="module-card maintenance-list-card" style="grid-column: 1 / -1;">
             <h3>DANH SÁCH CHI TIẾT THEO TÌNH TRẠNG</h3>
             <table class="mini-table maintenance-table">
-              <thead><tr><th>THIẾT BỊ</th><th>TÌNH TRẠNG</th><th>NGƯỜI DÙNG</th></tr></thead>
+              <thead><tr><th style="width: 50px; text-align: center;">STT</th><th>THIẾT BỊ</th><th>TÌNH TRẠNG</th><th>NGƯỜI DÙNG</th></tr></thead>
               <tbody>${tableHtml}</tbody>
             </table>
           </article>
