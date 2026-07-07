@@ -86,6 +86,7 @@
           <a href="#" data-view="devices">Thiết bị</a>
           <a href="#" data-view="maintenance">Bảo trì</a>
           <a href="#" data-view="software">Phần mềm</a>
+          <a href="#" data-view="departments" data-admin-only>Phòng ban</a>
           <a href="#" data-view="reports">Báo cáo</a>
           <a href="#" data-view="settings">Cấu hình</a>
           <a href="#" data-view="users" data-admin-only>Người dùng</a>
@@ -371,6 +372,29 @@
           <div class="modal-actions">
             <button class="secondary-button" type="button" id="cancelSoftwareLicenseForm">Hủy</button>
             <button class="primary-button" type="submit">Lưu bản quyền</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-backdrop" id="departmentModal" hidden>
+        <form class="modal compact-modal" id="departmentForm">
+          <div class="modal-head">
+            <div>
+              <p class="eyebrow">QUẢN LÝ PHÒNG BAN</p>
+              <h2 id="departmentFormTitle">THÊM PHÒNG BAN</h2>
+            </div>
+            <button class="icon-button" type="button" id="closeDepartmentModal" aria-label="Đóng">×</button>
+          </div>
+          <input type="hidden" name="department_id" />
+          <div class="form-grid">
+            <label class="span-2">Tên phòng ban<input name="department_name" required placeholder="VD: Phòng Hành chính Nhân sự" /></label>
+            <label>Trưởng phòng<input name="manager" placeholder="VD: Trần Thị B" /></label>
+            <label>Vị trí / Khu vực<input name="location" placeholder="VD: Tầng 2, Tòa nhà A" /></label>
+            <label class="span-2">Ghi chú<textarea name="note" rows="2"></textarea></label>
+          </div>
+          <div class="modal-actions">
+            <button class="secondary-button" type="button" id="cancelDepartmentForm">Hủy</button>
+            <button class="primary-button" type="submit">Lưu phòng ban</button>
           </div>
         </form>
       </div>

@@ -14,6 +14,8 @@ const ALLOWED_FUNCTIONS = new Set([
   "saveMaintenanceLog",
   "saveMovementLog",
   "saveSoftwareLicense",
+  "saveDepartment",
+  "deleteDepartment",
 ]);
 
 const SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL;

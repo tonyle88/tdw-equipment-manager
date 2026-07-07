@@ -60,6 +60,7 @@ function getAppData() {
     ok: true,
     assets: readActiveAssets_(),
     settings: readSheetAsObjects_(SHEET_NAMES.settings),
+    departments: readSheetAsObjects_(SHEET_NAMES.departments),
     maintenanceLogs: readSheetAsObjects_(SHEET_NAMES.maintenanceLogs),
     inventoryMovements: readSheetAsObjects_(SHEET_NAMES.inventoryMovements),
     softwareLicenses: readSheetAsObjects_(SHEET_NAMES.softwareLicenses),
@@ -161,6 +162,12 @@ function doPost(event) {
     }
     if (action === "deleteSetting") {
       return jsonResponse_(deleteSetting(args[0] || body.setting_id || "", args[1] || body.token || ""));
+    }
+    if (action === "saveDepartment") {
+      return jsonResponse_(saveDepartment(args[0] || body.department || {}, args[1] || body.token || ""));
+    }
+    if (action === "deleteDepartment") {
+      return jsonResponse_(deleteDepartment(args[0] || body.department_id || "", args[1] || body.token || ""));
     }
     if (action === "listUsers") {
       return jsonResponse_(listUsers(args[0] || body.token || ""));
@@ -368,6 +375,46 @@ function normalizeSoftwareLicense_(license) {
   normalized.status = normalized.status || "ACTIVE";
   normalized.note = normalized.note || "";
   return normalized;
+}
+
+function saveDepartment(department, token) {
+  try {
+    if (token) requireAdmin_(token);
+    const normalized = normalizeDepartment_(department || {});
+    const saved = upsertObject_(SHEET_NAMES.departments, "department_id", normalized);
+    return { ok: true, data: saved, updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function normalizeDepartment_(department) {
+  const normalized = Object.assign({}, department);
+  normalized.department_id = normalized.department_id || Utilities.getUuid();
+  normalized.department_name = String(normalized.department_name || "").trim();
+  if (!normalized.department_name) throw new Error("Tên phòng ban là bắt buộc");
+  normalized.manager = normalized.manager || "";
+  normalized.location = normalized.location || "";
+  normalized.note = normalized.note || "";
+  return normalized;
+}
+
+function deleteDepartment(departmentId, token) {
+  try {
+    if (token) requireAdmin_(token);
+    if (!departmentId) throw new Error("Missing department_id");
+    const sheet = getSheet_(SHEET_NAMES.departments);
+    const values = sheet.getDataRange().getValues();
+    const headers = values[0].map((header) => String(header).trim());
+    const keyIndex = headers.indexOf("department_id");
+    if (keyIndex === -1) throw new Error("Missing department_id column");
+    const rowIndex = values.findIndex((row, index) => index > 0 && row[keyIndex] === departmentId);
+    if (rowIndex < 1) throw new Error("Không tìm thấy phòng ban để xóa");
+    sheet.deleteRow(rowIndex + 1);
+    return { ok: true, department_id: departmentId, updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
 }
 
 function groupLabel_(groupCode) {

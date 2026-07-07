@@ -1,6 +1,7 @@
 const state = {
     assets: [],
     settings: [],
+    departments: [],
     maintenanceLogs: [],
     inventoryMovements: [],
     softwareLicenses: [],
@@ -154,6 +155,11 @@ const state = {
       movementLogForm: document.querySelector("#movementLogForm"),
       closeMovementLogModal: document.querySelector("#closeMovementLogModal"),
       cancelMovementLogForm: document.querySelector("#cancelMovementLogForm"),
+      departmentModal: document.querySelector("#departmentModal"),
+      departmentForm: document.querySelector("#departmentForm"),
+      closeDepartmentModal: document.querySelector("#closeDepartmentModal"),
+      cancelDepartmentForm: document.querySelector("#cancelDepartmentForm"),
+      departmentFormTitle: document.querySelector("#departmentFormTitle"),
       systemModal: document.querySelector("#systemModal"),
       systemModalForm: document.querySelector("#systemModalForm"),
       systemModalEyebrow: document.querySelector("#systemModalEyebrow"),
@@ -186,7 +192,13 @@ const state = {
     const payload = await callServer("getAppData");
     if (payload.currentUser) state.currentUser = payload.currentUser;
     state.settings = normalizeSettings(payload.settings || []);
-    state.assets = sortAssets(normalizeAssets(payload.assets || []));
+    state.departments = payload.departments || [];
+    state.assets = sortAssets(
+      (payload.assets || []).map((a) => {
+        a.costStr = formatMoney(a.unit_price);
+        return a;
+      }),
+    );
     state.maintenanceLogs = (payload.maintenanceLogs || []).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     state.inventoryMovements = (payload.inventoryMovements || []).sort((a, b) => new Date(b.movement_date || 0) - new Date(a.movement_date || 0));
     state.softwareLicenses = payload.softwareLicenses || [];
@@ -506,8 +518,9 @@ const state = {
     return setting?.display_name || fallbackLabels[type]?.[value] || value || "";
   }
 
-  function departmentLabel(value) {
-    return labelFor("department", value);
+  function departmentLabel(departmentValue) {
+    const dept = state.departments.find((d) => d.department_name === departmentValue || d.department_id === departmentValue);
+    return dept ? dept.department_name : departmentValue;
   }
 
   function settingOptions(type, extraValues = []) {
@@ -850,14 +863,19 @@ const state = {
       showMessageModal("Không đủ quyền", "Chỉ admin mới được vào trang người dùng");
       return;
     }
+    if (view === "departments" && !isAdmin()) {
+      showMessageModal("Không đủ quyền", "Chỉ admin mới được vào trang phòng ban");
+      return;
+    }
     state.activeView = view;
     els.navLinks.forEach((link) => link.classList.toggle("active", link.dataset.view === view));
-    els.toolbar.style.display = view === "maintenance" || view === "software" || view === "reports" || view === "settings" || view === "users" ? "none" : "";
+    els.toolbar.style.display = view === "maintenance" || view === "software" || view === "departments" || view === "reports" || view === "settings" || view === "users" ? "none" : "";
     const dashboardInsights = document.querySelector("#dashboardInsights");
     if (dashboardInsights) dashboardInsights.hidden = view !== "overview";
     if (view === "overview" || view === "devices") renderDeviceView(view);
     if (view === "maintenance") renderMaintenanceView();
     if (view === "software") renderSoftwareView();
+    if (view === "departments") renderDepartmentsView();
     if (view === "reports") renderReportsView();
     if (view === "settings") renderSettingsView();
     if (view === "users") renderUsersView();
@@ -1053,6 +1071,59 @@ const state = {
 
     els.content.querySelectorAll(".edit-software-btn").forEach(btn => {
       btn.addEventListener("click", (e) => openSoftwareLicenseModal(e.target.dataset.id));
+    });
+  }
+
+  function renderDepartmentsView() {
+    els.content.innerHTML = `
+      <div class="view-header">
+        <div>
+          <h2>Quản lý Phòng ban</h2>
+          <p class="view-subtitle">Theo dõi danh sách các phòng ban, trưởng phòng và vị trí của công ty</p>
+        </div>
+        ${isAdmin() ? `<button class="primary-button" type="button" id="openAddDepartmentBtn">+ Thêm phòng ban</button>` : ""}
+      </div>
+      
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>PHÒNG BAN</th>
+              <th>TRƯỞNG PHÒNG</th>
+              <th>VỊ TRÍ / KHU VỰC</th>
+              <th>GHI CHÚ</th>
+              ${isAdmin() ? `<th style="width: 100px;"></th>` : ""}
+            </tr>
+          </thead>
+          <tbody>
+            ${state.departments.map(dept => `
+                <tr>
+                  <td style="font-weight: 500;">${escapeHtml(dept.department_name)}</td>
+                  <td>${escapeHtml(dept.manager)}</td>
+                  <td>${escapeHtml(dept.location)}</td>
+                  <td>${escapeHtml(dept.note)}</td>
+                  ${isAdmin() ? `
+                    <td class="table-actions">
+                      <button class="icon-button edit-dept-btn" data-id="${escapeHtml(dept.department_id)}" type="button" aria-label="Sửa">✎</button>
+                      <button class="icon-button danger-icon-button delete-dept-btn" data-id="${escapeHtml(dept.department_id)}" data-name="${escapeHtml(dept.department_name)}" type="button" aria-label="Xóa">×</button>
+                    </td>
+                  ` : ""}
+                </tr>
+              `).join('') || `<tr><td colspan="${isAdmin() ? 5 : 4}" style="text-align: center; color: var(--text-secondary); padding: 32px;">Chưa có phòng ban nào.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    const addBtn = els.content.querySelector("#openAddDepartmentBtn");
+    if (addBtn) addBtn.addEventListener("click", () => openDepartmentModal());
+
+    els.content.querySelectorAll(".edit-dept-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => openDepartmentModal(e.target.dataset.id));
+    });
+    
+    els.content.querySelectorAll(".delete-dept-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => handleDeleteDepartment(e.target.dataset.id, e.target.dataset.name));
     });
   }
 
@@ -1607,6 +1678,59 @@ const state = {
     }
   }
 
+  function openDepartmentModal(departmentId = null) {
+    els.departmentForm.reset();
+    els.departmentFormTitle.textContent = departmentId ? "SỬA PHÒNG BAN" : "THÊM PHÒNG BAN";
+    if (departmentId) {
+      const dept = state.departments.find(d => d.department_id === departmentId);
+      if (dept) {
+        Object.keys(dept).forEach(key => {
+          const input = els.departmentForm.querySelector(`[name="${key}"]`);
+          if (input) input.value = dept[key];
+        });
+      }
+    } else {
+      els.departmentForm.querySelector('[name="department_id"]').value = "";
+    }
+    els.departmentModal.hidden = false;
+  }
+
+  function closeDepartmentModal() {
+    els.departmentModal.hidden = true;
+    els.departmentForm.reset();
+  }
+
+  async function handleDepartmentSubmit(event) {
+    event.preventDefault();
+    const dept = Object.fromEntries(new FormData(event.target).entries());
+    const submitBtn = event.target.querySelector("[type=submit]");
+    if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
+    try {
+      await callServer("saveDepartment", dept);
+      showToast("Đã lưu phòng ban", dept.department_name);
+      closeDepartmentModal();
+      await loadAppData();
+      if (state.activeView === "departments") renderDepartmentsView();
+    } catch (error) {
+      showMessageModal("Lỗi", error.message);
+    } finally {
+      if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
+    }
+  }
+
+  async function handleDeleteDepartment(deptId, deptName) {
+    const confirmed = await showConfirmModal("XÓA PHÒNG BAN", `Bạn có chắc muốn xóa phòng ban "${deptName}" không?`, "Xóa");
+    if (!confirmed) return;
+    try {
+      await callServer("deleteDepartment", deptId);
+      showToast("Đã xóa", `Phòng ban ${deptName}`);
+      await loadAppData();
+      if (state.activeView === "departments") renderDepartmentsView();
+    } catch (error) {
+      showMessageModal("Lỗi", error.message);
+    }
+  }
+
   async function handleDeleteUser(userId) {
     const user = state.users.find((item) => item.user_id === userId);
     const confirmed = await showConfirmModal("KHÓA USER", `Khóa user "${user?.full_name || user?.username || "này"}"?`, "Khóa");
@@ -2000,6 +2124,14 @@ const state = {
     els.cancelMovementLogForm.addEventListener("click", closeMovementLogModal);
     els.movementLogModal.addEventListener("click", (event) => {
       if (event.target === els.movementLogModal) closeMovementLogModal();
+    });
+
+    // Department Listeners
+    els.departmentForm.addEventListener("submit", handleDepartmentSubmit);
+    els.closeDepartmentModal.addEventListener("click", closeDepartmentModal);
+    els.cancelDepartmentForm.addEventListener("click", closeDepartmentModal);
+    els.departmentModal.addEventListener("click", (event) => {
+      if (event.target === els.departmentModal) closeDepartmentModal();
     });
 
     els.systemModalForm?.addEventListener("submit", (event) => {
