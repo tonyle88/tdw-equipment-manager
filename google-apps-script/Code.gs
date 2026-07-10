@@ -15,7 +15,8 @@ const AUDIT_LOG_HEADERS = ["audit_id", "created_at", "actor_user_id", "actor_use
 const LEGACY_PERMISSION_PRESETS = {
   view: ["overview.view", "assets.view", "maintenance.view", "software.view", "reports.view", "settings.view"],
   edit: ["overview.view", "assets.view", "assets.manage", "assets.delete", "maintenance.view", "maintenance.manage", "movement.manage", "software.view", "software.manage", "reports.view"],
-  report: ["overview.view", "assets.view", "reports.view", "reports.export"],
+  report: ["overview.view", "assets.view", "reports.view", "reports.assets.export"],
+  "reports.export": ["reports.assets.export"],
 };
 
 const MODULE_PERMISSION_CODES = [
@@ -23,7 +24,7 @@ const MODULE_PERMISSION_CODES = [
   "maintenance.view", "maintenance.manage", "maintenance.delete",
   "movement.manage",
   "software.view", "software.manage", "software.delete",
-  "reports.view", "reports.export",
+  "reports.view", "reports.assets.export", "reports.maintenance.export", "reports.software.export", "reports.movement.export",
 ];
 
 const HEALTH_CHECK_HEADERS = {

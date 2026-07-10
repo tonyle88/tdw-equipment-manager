@@ -105,8 +105,14 @@ assets.view, assets.manage, assets.delete
 maintenance.view, maintenance.manage, maintenance.delete
 movement.manage
 software.view, software.manage, software.delete
-reports.view, reports.export
+reports.view
+reports.assets.export
+reports.maintenance.export
+reports.software.export
+reports.movement.export
 ```
+
+`reports.export` cu van duoc hieu la `reports.assets.export` de khong lam mat quyen xuat danh sach thiet bi da cap truoc do.
 
 ## AssetResponsibles
 

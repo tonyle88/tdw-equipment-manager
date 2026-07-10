@@ -31,12 +31,13 @@ const state = {
     "maintenance.view", "maintenance.manage", "maintenance.delete",
     "movement.manage",
     "software.view", "software.manage", "software.delete",
-    "reports.view", "reports.export",
+    "reports.view", "reports.assets.export", "reports.maintenance.export", "reports.software.export", "reports.movement.export",
   ];
   const LEGACY_PERMISSION_PRESETS = {
     view: ["assets.view", "maintenance.view", "software.view", "reports.view"],
     edit: ["assets.view", "assets.manage", "assets.delete", "maintenance.view", "maintenance.manage", "movement.manage", "software.view", "software.manage", "reports.view"],
-    report: ["assets.view", "reports.view", "reports.export"],
+    report: ["assets.view", "reports.view", "reports.assets.export"],
+    "reports.export": ["reports.assets.export"],
   };
 
   function escapeHtml(value) {
@@ -297,7 +298,10 @@ const state = {
       "software.manage": ["assets.view", "software.view"],
       "software.delete": ["assets.view", "software.view", "software.manage"],
       "reports.view": ["assets.view"],
-      "reports.export": ["assets.view", "reports.view"],
+      "reports.assets.export": ["assets.view", "reports.view"],
+      "reports.maintenance.export": ["assets.view", "maintenance.view", "reports.view"],
+      "reports.software.export": ["assets.view", "software.view", "reports.view"],
+      "reports.movement.export": ["assets.view", "movement.manage", "reports.view"],
     };
     (dependencies[input.value] || []).forEach((code) => {
       const dependent = els.userForm.querySelector(`[name="permission_code"][value="${code}"]`);
@@ -1355,6 +1359,10 @@ const state = {
   function renderReportsView() {
     const byGroup = countBy(state.assets, "asset_group_label");
     const byStatus = countBy(state.assets, "status", "status");
+    const canExportAssets = hasPermission("reports.assets.export");
+    const canExportMaintenance = hasPermission("reports.maintenance.export");
+    const canExportSoftware = hasPermission("reports.software.export");
+    const canExportMovement = hasPermission("reports.movement.export");
     const groupOptions = settingOptions("asset_group")
       .map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`)
       .join("");
@@ -1363,14 +1371,10 @@ const state = {
         <div class="panel-head report-title-row">
           <h2>BÁO CÁO</h2>
           <div class="report-actions">
-            <label class="report-group-filter">
-              <span>Nhóm xuất</span>
-              <select id="reportGroupSelect">
-                <option value="">Tất cả nhóm</option>
-                ${groupOptions}
-              </select>
-            </label>
-            ${hasPermission("reports.export") ? `<button class="secondary-button" type="button" data-export-csv>Xuất Excel (.xlsx)</button><button class="secondary-button" type="button" data-print-pdf>Xuất PDF</button>` : ""}
+            ${canExportAssets ? `<label class="report-group-filter"><span>Nhóm xuất thiết bị</span><select id="reportGroupSelect"><option value="">Tất cả nhóm</option>${groupOptions}</select></label><button class="secondary-button" type="button" data-export-assets>Xuất Excel thiết bị</button><button class="secondary-button" type="button" data-print-assets>Xuất PDF thiết bị</button>` : ""}
+            ${canExportMaintenance ? `<button class="secondary-button" type="button" data-export-maintenance>Xuất CSV bảo trì</button>` : ""}
+            ${canExportSoftware ? `<button class="secondary-button" type="button" data-export-software>Xuất CSV phần mềm</button>` : ""}
+            ${canExportMovement ? `<button class="secondary-button" type="button" data-export-movement>Xuất CSV luân chuyển</button>` : ""}
           </div>
         </div>
         <div class="report-dashboard">
@@ -1387,14 +1391,17 @@ const state = {
         </div>
       </div>
     `;
-    els.content.querySelector("[data-export-csv]")?.addEventListener("click", () => {
+    els.content.querySelector("[data-export-assets]")?.addEventListener("click", () => {
       const selectedGroup = document.getElementById("reportGroupSelect")?.value || "";
       exportExcel(selectedGroup);
     });
-    els.content.querySelector("[data-print-pdf]")?.addEventListener("click", () => {
+    els.content.querySelector("[data-print-assets]")?.addEventListener("click", () => {
       const selectedGroup = document.getElementById("reportGroupSelect")?.value || "";
       printReport(selectedGroup);
     });
+    els.content.querySelector("[data-export-maintenance]")?.addEventListener("click", exportMaintenanceCsv);
+    els.content.querySelector("[data-export-software]")?.addEventListener("click", exportSoftwareCsv);
+    els.content.querySelector("[data-export-movement]")?.addEventListener("click", exportMovementCsv);
   }
 
   function printReport(groupFilter = "") {
@@ -2203,6 +2210,68 @@ const state = {
         </div>
       </article>
     `;
+  }
+
+  function exportCsv(filename, headers, rows) {
+    if (!rows.length) {
+      showMessageModal("Không có dữ liệu", "Không có dữ liệu phù hợp để xuất.");
+      return;
+    }
+    const cell = (value) => {
+      const text = String(value ?? "");
+      const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text;
+      return `"${safeText.replace(/"/g, '""')}"`;
+    };
+    const csv = `\uFEFF${[headers, ...rows].map((row) => row.map(cell).join(",")).join("\r\n")}`;
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  function exportMaintenanceCsv() {
+    const assets = new Map(state.assets.map((asset) => [asset.asset_id, asset]));
+    exportCsv(`tdw-bao-tri-${new Date().toISOString().slice(0, 10)}.csv`, ["Ngày", "Thiết bị", "Loại", "Nội dung", "Chi phí", "Nhà cung cấp", "Thực hiện bởi", "Ghi chú"], state.maintenanceLogs.map((log) => [
+      formatDate(log.date),
+      assets.get(log.asset_id)?.asset_name || "Thiết bị đã xóa",
+      labelFor("maintenance_type", log.action_type) || log.action_type,
+      log.description,
+      formatMoney(log.cost),
+      log.vendor,
+      log.performed_by,
+      log.note,
+    ]));
+  }
+
+  function exportSoftwareCsv() {
+    const assets = new Map(state.assets.map((asset) => [asset.asset_id, asset]));
+    exportCsv(`tdw-phan-mem-${new Date().toISOString().slice(0, 10)}.csv`, ["Phần mềm", "Phiên bản", "License key", "Thiết bị", "Người dùng", "Hết hạn", "Trạng thái", "Ghi chú"], state.softwareLicenses.map((license) => [
+      license.software_name,
+      license.version,
+      license.license_key_masked || "Chưa có",
+      String(license.assigned_asset_id || "").split(",").map((assetId) => assets.get(assetId.trim())?.asset_name).filter(Boolean).join(", "),
+      license.assigned_user,
+      formatDate(license.expiry_date),
+      license.status,
+      license.note,
+    ]));
+  }
+
+  function exportMovementCsv() {
+    const assets = new Map(state.assets.map((asset) => [asset.asset_id, asset]));
+    exportCsv(`tdw-luan-chuyen-${new Date().toISOString().slice(0, 10)}.csv`, ["Ngày", "Thiết bị", "Từ người dùng", "Đến người dùng", "Từ vị trí", "Đến vị trí", "Lý do", "Phê duyệt bởi", "Ghi chú"], state.inventoryMovements.map((movement) => [
+      formatDate(movement.movement_date),
+      assets.get(movement.asset_id)?.asset_name || "Thiết bị đã xóa",
+      movement.from_user,
+      movement.to_user,
+      movement.from_location,
+      movement.to_location,
+      movement.reason,
+      movement.approved_by,
+      movement.note,
+    ]));
   }
 
   async function exportExcel(groupFilter = "") {

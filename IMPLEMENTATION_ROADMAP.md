@@ -161,3 +161,11 @@ Trạng thái: Hoàn tất.
 - Them `AssetResponsibles` cho mot nguoi chinh va nhieu nguoi phu.
 - Chi user dang hoat dong co email hop le moi duoc gan phu trach.
 - Chan khoa hoac bo email cua user dang phu trach thiet bi cho den khi chuyen trach nhiem.
+
+## Phase 6 - Bao cao theo pham vi quyen
+
+Trạng thái: Hoàn tất.
+
+- Tach quyen xuat theo thiet bi, bao tri, phan mem va luan chuyen.
+- Bao cao thiet bi giu Excel/PDF; cac phan con lai xuat CSV tuong thich Excel.
+- License key trong CSV phan mem luon duoc che.
