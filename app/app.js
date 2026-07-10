@@ -24,6 +24,18 @@ const state = {
 
   const AUTH_STORAGE_KEY = "tdw_equipment_auth_token";
   const REMEMBER_USERNAME_KEY = "tdw_equipment_remember_username";
+  const USER_PERMISSION_CODES = [
+    "assets.view", "assets.manage", "assets.delete",
+    "maintenance.view", "maintenance.manage", "maintenance.delete",
+    "movement.manage",
+    "software.view", "software.manage", "software.delete",
+    "reports.view", "reports.export",
+  ];
+  const LEGACY_PERMISSION_PRESETS = {
+    view: ["assets.view", "maintenance.view", "software.view", "reports.view"],
+    edit: ["assets.view", "assets.manage", "assets.delete", "maintenance.view", "maintenance.manage", "movement.manage", "software.view", "software.manage", "reports.view"],
+    report: ["assets.view", "reports.view", "reports.export"],
+  };
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -216,6 +228,37 @@ const state = {
     if (role === "admin") return "all";
     if (role === "manager") return "edit,report";
     return "view";
+  }
+
+  function permissionCodesFor(rawPermissions, role) {
+    const raw = String(rawPermissions || "").trim().toLowerCase();
+    if (role === "admin" || raw === "all") return USER_PERMISSION_CODES;
+    return [...new Set(raw.split(",").flatMap((code) => LEGACY_PERMISSION_PRESETS[code.trim()] || [code.trim()]))]
+      .filter((code) => USER_PERMISSION_CODES.includes(code));
+  }
+
+  function selectedUserPermissionCodes() {
+    return [...els.userForm.querySelectorAll('[name="permission_code"]:checked')].map((input) => input.value);
+  }
+
+  function syncUserPermissionSummary() {
+    const summary = document.querySelector("#userPermissionSummary");
+    if (!summary) return;
+    if (els.userForm.elements.role.value === "admin") {
+      summary.textContent = "Admin có toàn quyền hệ thống; các quyền bên dưới được khóa để tránh nhầm lẫn.";
+      return;
+    }
+    summary.textContent = `${selectedUserPermissionCodes().length} quyền đã chọn cho tài khoản này.`;
+  }
+
+  function setUserPermissionCodes(rawPermissions, role) {
+    const codes = permissionCodesFor(rawPermissions, role);
+    const isAdminRole = role === "admin";
+    els.userForm.querySelectorAll('[name="permission_code"]').forEach((input) => {
+      input.checked = codes.includes(input.value);
+      input.disabled = isAdminRole;
+    });
+    syncUserPermissionSummary();
   }
 
   function setAuthToken(token) {
@@ -1608,7 +1651,7 @@ const state = {
     form.elements.user_id.value = "";
     form.elements.role.value = "user";
     form.elements.active.value = "TRUE";
-    form.elements.permissions.value = "view";
+    setUserPermissionCodes(defaultPermissionsForRole("user"), "user");
     els.userFormTitle.textContent = "THÊM USER";
   }
 
@@ -1621,11 +1664,7 @@ const state = {
       els.userForm.elements.full_name.value = user.full_name;
       els.userForm.elements.role.value = user.role;
       els.userForm.elements.active.value = user.active ? "TRUE" : "FALSE";
-      const permissions = user.permissions || "view";
-      if (![...els.userForm.elements.permissions.options].some((option) => option.value === permissions)) {
-        els.userForm.elements.permissions.add(new Option(`Quyền cũ: ${permissions}`, permissions));
-      }
-      els.userForm.elements.permissions.value = permissions;
+      setUserPermissionCodes(user.permissions || defaultPermissionsForRole(user.role), user.role);
       els.userFormTitle.textContent = "SỬA USER";
     }
     els.userModal.hidden = false;
@@ -1639,6 +1678,12 @@ const state = {
   async function handleUserSubmit(event) {
     event.preventDefault();
     const user = Object.fromEntries(new FormData(event.target).entries());
+    user.permissions = user.role === "admin" ? "all" : selectedUserPermissionCodes().join(",");
+    delete user.permission_code;
+    if (!user.permissions) {
+      showMessageModal("Thiếu quyền", "Vui lòng chọn ít nhất một quyền cho user.");
+      return;
+    }
     const submitBtn = event.target.querySelector("[type=submit]");
     if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
     try {
@@ -2314,8 +2359,9 @@ const state = {
     });
     els.userForm.addEventListener("submit", handleUserSubmit);
     els.userForm.elements.role.addEventListener("change", () => {
-      if (!state.editingUserId) els.userForm.elements.permissions.value = defaultPermissionsForRole(els.userForm.elements.role.value);
+      setUserPermissionCodes(defaultPermissionsForRole(els.userForm.elements.role.value), els.userForm.elements.role.value);
     });
+    els.userForm.querySelectorAll('[name="permission_code"]').forEach((input) => input.addEventListener("change", syncUserPermissionSummary));
     els.closeUserModal.addEventListener("click", closeUserModal);
     els.cancelUserForm.addEventListener("click", closeUserModal);
     els.userModal.addEventListener("click", (event) => {

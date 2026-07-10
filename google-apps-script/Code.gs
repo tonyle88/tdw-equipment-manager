@@ -17,6 +17,14 @@ const LEGACY_PERMISSION_PRESETS = {
   report: ["overview.view", "assets.view", "reports.view", "reports.export"],
 };
 
+const MODULE_PERMISSION_CODES = [
+  "assets.view", "assets.manage", "assets.delete",
+  "maintenance.view", "maintenance.manage", "maintenance.delete",
+  "movement.manage",
+  "software.view", "software.manage", "software.delete",
+  "reports.view", "reports.export",
+];
+
 const HEALTH_CHECK_HEADERS = {
   Assets: ["asset_id", "asset_name", "status"],
   Users: ["user_id", "username", "role", "active"],
@@ -862,6 +870,15 @@ function defaultPermissionsForRole_(role) {
   return "view";
 }
 
+function normalizePermissions_(permissions, role) {
+  const values = String(permissions || defaultPermissionsForRole_(role))
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const allowed = values.filter((value) => value === "all" || LEGACY_PERMISSION_PRESETS[value] || MODULE_PERMISSION_CODES.indexOf(value) !== -1);
+  return allowed.length ? [...new Set(allowed)].join(",") : defaultPermissionsForRole_(role);
+}
+
 function enforceLoginThrottle_(username) {
   const cache = CacheService.getScriptCache();
   const attempts = Number(cache.get(`login_fail_${username}`) || 0);
@@ -943,7 +960,7 @@ function normalizeUser_(user) {
   normalized.full_name = String(normalized.full_name || normalized.username).trim();
   normalized.role = String(normalized.role || "user").trim().toLowerCase();
   if (["admin", "manager", "user", "viewer"].indexOf(normalized.role) === -1) normalized.role = "user";
-  normalized.permissions = String(normalized.permissions || defaultPermissionsForRole_(normalized.role)).trim();
+  normalized.permissions = normalizePermissions_(normalized.permissions, normalized.role);
   normalized.active = String(normalized.active || "TRUE").toUpperCase() === "FALSE" ? "FALSE" : "TRUE";
   normalized.must_change_password = String(normalized.must_change_password || "FALSE").toUpperCase() === "TRUE" ? "TRUE" : "FALSE";
   normalized.created_at = normalized.created_at || now;

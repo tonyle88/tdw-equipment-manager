@@ -256,15 +256,40 @@
                 <option value="FALSE">Khóa tài khoản</option>
               </select>
             </label>
-            <label class="span-2">Mức quyền
-              <select name="permissions">
-                <option value="view">Chỉ xem</option>
-                <option value="edit">Sửa thiết bị, bảo trì và phần mềm</option>
-                <option value="report">Xem và xuất báo cáo</option>
-                <option value="edit,report">Sửa nghiệp vụ và báo cáo</option>
-                <option value="all">Toàn quyền</option>
-              </select>
-            </label>
+            <fieldset class="permission-matrix span-2" id="userPermissions">
+              <legend>PHÂN QUYỀN THEO MODULE</legend>
+              <p class="permission-summary" id="userPermissionSummary">Chọn quyền cho tài khoản này.</p>
+              <div class="permission-grid">
+                <section class="permission-module">
+                  <h3>THIẾT BỊ</h3>
+                  <label><input type="checkbox" name="permission_code" value="assets.view" /> Xem</label>
+                  <label><input type="checkbox" name="permission_code" value="assets.manage" /> Thêm/Sửa</label>
+                  <label><input type="checkbox" name="permission_code" value="assets.delete" /> Xóa</label>
+                </section>
+                <section class="permission-module">
+                  <h3>BẢO TRÌ</h3>
+                  <label><input type="checkbox" name="permission_code" value="maintenance.view" /> Xem</label>
+                  <label><input type="checkbox" name="permission_code" value="maintenance.manage" /> Thêm/Sửa</label>
+                  <label><input type="checkbox" name="permission_code" value="maintenance.delete" /> Xóa</label>
+                </section>
+                <section class="permission-module">
+                  <h3>LUÂN CHUYỂN</h3>
+                  <label><input type="checkbox" name="permission_code" value="movement.manage" /> Ghi nhận</label>
+                </section>
+                <section class="permission-module">
+                  <h3>PHẦN MỀM</h3>
+                  <label><input type="checkbox" name="permission_code" value="software.view" /> Xem</label>
+                  <label><input type="checkbox" name="permission_code" value="software.manage" /> Thêm/Sửa</label>
+                  <label><input type="checkbox" name="permission_code" value="software.delete" /> Xóa</label>
+                </section>
+                <section class="permission-module">
+                  <h3>BÁO CÁO</h3>
+                  <label><input type="checkbox" name="permission_code" value="reports.view" /> Xem</label>
+                  <label><input type="checkbox" name="permission_code" value="reports.export" /> Xuất file</label>
+                </section>
+              </div>
+              <p class="permission-admin-note">Cấu hình, Phòng ban, Người dùng và xem license key chỉ dành cho Admin.</p>
+            </fieldset>
             <label class="span-2">Mật khẩu mới<input name="password" type="password" autocomplete="new-password" placeholder="Nhập khi tạo mới hoặc muốn đổi mật khẩu" /></label>
           </div>
           <div class="modal-actions">

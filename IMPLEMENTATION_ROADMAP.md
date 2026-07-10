@@ -141,6 +141,8 @@ Trạng thái: Hoàn tất.
 
 ### Phase 3 - Ma trận checkbox cho Admin
 
+Trạng thái: Hoàn tất.
+
 - Thay ô nhập quyền tự do bằng checkbox `Xem`, `Thêm/Sửa`, `Xóa` theo từng module.
 - Có preset Admin, Manager, User, Viewer và phần tóm tắt quyền đã chọn.
 

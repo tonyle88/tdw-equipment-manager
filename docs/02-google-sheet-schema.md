@@ -85,7 +85,7 @@ user
 viewer
 ```
 
-`permissions` hien dung cac preset de tuong thich du lieu cu:
+`permissions` duoc luu la danh sach ma quyen theo module, cach nhau boi dau phay. Giao dien Quan ly nguoi dung da hien checkbox de Admin chon ro tung quyen. Cac preset cu van duoc ho tro de tuong thich du lieu da co:
 
 ```text
 view         Chi xem
@@ -96,6 +96,16 @@ all          Toan quyen (mac dinh Admin)
 ```
 
 Apps Script chuyen cac preset nay thanh ma quyen theo module khi kiem tra API. Cac thao tac Cau hinh, Phong ban, User va xem license key van yeu cau Admin.
+
+Ma quyen dang dung:
+
+```text
+assets.view, assets.manage, assets.delete
+maintenance.view, maintenance.manage, maintenance.delete
+movement.manage
+software.view, software.manage, software.delete
+reports.view, reports.export
+```
 
 ## Departments
 
