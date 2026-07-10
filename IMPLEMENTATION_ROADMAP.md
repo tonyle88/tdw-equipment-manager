@@ -133,6 +133,8 @@ Trạng thái: Hoàn tất.
 
 ### Phase 2 - Chuẩn hóa quyền backend
 
+Trạng thái: Hoàn tất.
+
 - Dùng mã quyền theo module, có kiểm tra tại từng API ghi/xóa/đọc dữ liệu nhạy cảm.
 - Hỗ trợ tương thích dữ liệu quyền cũ `all`, `view`, `edit`, `report`.
 - Admin luôn toàn quyền; Manager mặc định không quản lý Cấu hình, Phòng ban, User hoặc license key.

@@ -70,7 +70,16 @@ async function run() {
   const app = read("app/app.js");
   assert.ok(appsScript.includes("softwareLicenses: readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_)"));
   assert.ok(appsScript.includes("function getSoftwareLicenseKey(licenseId, token)"));
+  assert.ok(appsScript.includes("function requirePermission_(token, permission)"));
   assert.ok(!app.includes("license.license_key)"));
+
+  const permissions = vm.createContext();
+  vm.runInContext(appsScript, permissions, { filename: "google-apps-script/Code.gs" });
+  assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "edit,report" }, "assets.manage")', permissions), true);
+  assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "edit,report" }, "reports.export")', permissions), true);
+  assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "edit,report" }, "software.delete")', permissions), false);
+  assert.equal(vm.runInContext('hasPermission_({ role: "viewer", permissions: "view" }, "assets.manage")', permissions), false);
+  assert.equal(vm.runInContext('hasPermission_({ role: "admin", permissions: "all" }, "settings.manage")', permissions), true);
 
   const vercel = JSON.parse(read("vercel.json"));
   assert.equal(vercel.version, 2);

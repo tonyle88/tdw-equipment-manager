@@ -85,6 +85,18 @@ user
 viewer
 ```
 
+`permissions` hien dung cac preset de tuong thich du lieu cu:
+
+```text
+view         Chi xem
+edit         Sua thiet bi, bao tri, luan chuyen va ban quyen
+report       Xem va xuat bao cao
+edit,report  Sua nghiep vu va bao cao (mac dinh Manager)
+all          Toan quyen (mac dinh Admin)
+```
+
+Apps Script chuyen cac preset nay thanh ma quyen theo module khi kiem tra API. Cac thao tac Cau hinh, Phong ban, User va xem license key van yeu cau Admin.
+
 ## Departments
 
 ```text

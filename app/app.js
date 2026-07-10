@@ -212,6 +212,12 @@ const state = {
     return isAdmin() || permissions === "all" || permissions.split(",").map((item) => item.trim()).includes("edit");
   }
 
+  function defaultPermissionsForRole(role) {
+    if (role === "admin") return "all";
+    if (role === "manager") return "edit,report";
+    return "view";
+  }
+
   function setAuthToken(token) {
     state.authToken = token || "";
     if (state.authToken) localStorage.setItem(AUTH_STORAGE_KEY, state.authToken);
@@ -1082,9 +1088,11 @@ const state = {
                 <tr>
                   <td style="font-weight: 500;">${escapeHtml(license.software_name)}</td>
                   <td>${escapeHtml(license.version)}</td>
-                  <td class="license-key-cell">
-                    <code class="license-key-value">${escapeHtml(license.license_key_masked || "Chưa có")}</code>
-                    ${isAdmin() && license.license_key_masked !== "Chưa có" ? `<button class="license-key-toggle" type="button" data-license-id="${escapeHtml(license.license_id)}" data-masked="${escapeHtml(license.license_key_masked)}" aria-label="Xem license key">👁</button>` : ""}
+                  <td>
+                    <div class="license-key-cell">
+                      <code class="license-key-value">${escapeHtml(license.license_key_masked || "Chưa có")}</code>
+                      ${isAdmin() && license.license_key_masked !== "Chưa có" ? `<button class="license-key-toggle" type="button" data-license-id="${escapeHtml(license.license_id)}" data-masked="${escapeHtml(license.license_key_masked)}" aria-label="Xem license key">👁</button>` : ""}
+                    </div>
                   </td>
                   <td>
                     ${assignedAssets.map(asset => `<div style="margin-bottom: 2px;"><span>🖥 ${escapeHtml(asset.asset_name)}</span></div>`).join('')}
@@ -1613,7 +1621,11 @@ const state = {
       els.userForm.elements.full_name.value = user.full_name;
       els.userForm.elements.role.value = user.role;
       els.userForm.elements.active.value = user.active ? "TRUE" : "FALSE";
-      els.userForm.elements.permissions.value = user.permissions || "";
+      const permissions = user.permissions || "view";
+      if (![...els.userForm.elements.permissions.options].some((option) => option.value === permissions)) {
+        els.userForm.elements.permissions.add(new Option(`Quyền cũ: ${permissions}`, permissions));
+      }
+      els.userForm.elements.permissions.value = permissions;
       els.userFormTitle.textContent = "SỬA USER";
     }
     els.userModal.hidden = false;
@@ -2301,6 +2313,9 @@ const state = {
       if (event.target === els.settingModal) closeSettingModal();
     });
     els.userForm.addEventListener("submit", handleUserSubmit);
+    els.userForm.elements.role.addEventListener("change", () => {
+      if (!state.editingUserId) els.userForm.elements.permissions.value = defaultPermissionsForRole(els.userForm.elements.role.value);
+    });
     els.closeUserModal.addEventListener("click", closeUserModal);
     els.cancelUserForm.addEventListener("click", closeUserModal);
     els.userModal.addEventListener("click", (event) => {

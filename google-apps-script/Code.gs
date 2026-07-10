@@ -11,6 +11,12 @@ const SHEET_NAMES = {
 
 const AUDIT_LOG_HEADERS = ["audit_id", "created_at", "actor_user_id", "actor_username", "action", "entity_type", "entity_id", "entity_name"];
 
+const LEGACY_PERMISSION_PRESETS = {
+  view: ["overview.view", "assets.view", "maintenance.view", "software.view", "reports.view", "settings.view"],
+  edit: ["overview.view", "assets.view", "assets.manage", "assets.delete", "maintenance.view", "maintenance.manage", "movement.manage", "software.view", "software.manage", "reports.view"],
+  report: ["overview.view", "assets.view", "reports.view", "reports.export"],
+};
+
 const HEALTH_CHECK_HEADERS = {
   Assets: ["asset_id", "asset_name", "status"],
   Users: ["user_id", "username", "role", "active"],
@@ -67,8 +73,8 @@ function getSettings() {
   };
 }
 
-function getAppData() {
-  const user = arguments.length ? requireAuth_(arguments[0]) : null;
+function getAppData(token) {
+  const user = requireAuth_(token);
   return {
     ok: true,
     assets: readActiveAssets_(),
@@ -77,7 +83,7 @@ function getAppData() {
     maintenanceLogs: readSheetAsObjects_(SHEET_NAMES.maintenanceLogs),
     inventoryMovements: readSheetAsObjects_(SHEET_NAMES.inventoryMovements),
     softwareLicenses: readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_),
-    currentUser: user ? publicUser_(user) : null,
+    currentUser: publicUser_(user),
     updated_at: new Date().toISOString(),
   };
 }
@@ -148,7 +154,7 @@ function healthCheck(token) {
 
 function saveAsset(asset) {
   try {
-    const actor = arguments.length > 1 ? requireEdit_(arguments[1]) : null;
+    const actor = requirePermission_(arguments[1] || "", "assets.manage");
     const action = asset && asset.asset_id ? "ASSET_UPDATED" : "ASSET_CREATED";
     const normalized = normalizeAsset_(asset || {});
     const saved = upsertObject_(SHEET_NAMES.assets, "asset_id", normalized);
@@ -161,7 +167,7 @@ function saveAsset(asset) {
 
 function deleteAsset(assetId) {
   try {
-    const user = arguments.length > 1 ? requireEdit_(arguments[1]) : null;
+    const user = requirePermission_(arguments[1] || "", "assets.delete");
     if (!assetId) throw new Error("Missing asset_id");
     const asset = readSheetAsObjects_(SHEET_NAMES.assets).find((item) => item.asset_id === assetId);
     if (!asset) throw new Error("Không tìm thấy thiết bị để xóa");
@@ -198,7 +204,7 @@ function decodeLicenseKey_(encoded) {
 
 function saveSetting(setting, token) {
   try {
-    const actor = arguments.length > 1 ? requireAdmin_(arguments[1]) : null;
+    const actor = requireAdmin_(token || "");
     const action = setting && setting.setting_id ? "SETTING_UPDATED" : "SETTING_CREATED";
     const normalized = normalizeSetting_(setting || {});
     const saved = upsertObject_(SHEET_NAMES.settings, "setting_id", normalized);
@@ -211,7 +217,7 @@ function saveSetting(setting, token) {
 
 function deleteSetting(settingId) {
   try {
-    const actor = arguments.length > 1 ? requireAdmin_(arguments[1]) : null;
+    const actor = requireAdmin_(arguments[1] || "");
     if (!settingId) throw new Error("Missing setting_id");
     const sheet = getSheet_(SHEET_NAMES.settings);
     const values = sheet.getDataRange().getValues();
@@ -403,7 +409,7 @@ function normalizeSetting_(setting) {
 
 function saveMaintenanceLog(log, token) {
   try {
-    const actor = token ? requireEdit_(token) : null;
+    const actor = requirePermission_(token || "", "maintenance.manage");
     const action = log && log.log_id ? "MAINTENANCE_UPDATED" : "MAINTENANCE_CREATED";
     const normalized = normalizeMaintenanceLog_(log || {});
     const saved = upsertObject_(SHEET_NAMES.maintenanceLogs, "log_id", normalized);
@@ -436,7 +442,7 @@ function normalizeMaintenanceLog_(log) {
 
 function deleteMaintenanceLog(logId, token) {
   try {
-    const actor = token ? requireAdmin_(token) : null;
+    const actor = requirePermission_(token || "", "maintenance.delete");
     const deleted = deleteObject_(SHEET_NAMES.maintenanceLogs, "log_id", logId);
     if (deleted) logAudit_(actor, "MAINTENANCE_DELETED", "maintenance_log", logId, logId);
     return { ok: deleted, deleted_id: logId, updated_at: new Date().toISOString() };
@@ -447,7 +453,7 @@ function deleteMaintenanceLog(logId, token) {
 
 function saveMovementLog(log, token) {
   try {
-    const actor = token ? requireEdit_(token) : null;
+    const actor = requirePermission_(token || "", "movement.manage");
     const action = log && log.movement_id ? "MOVEMENT_UPDATED" : "MOVEMENT_CREATED";
     const normalized = normalizeMovementLog_(log || {});
     const saved = upsertObject_(SHEET_NAMES.inventoryMovements, "movement_id", normalized);
@@ -489,7 +495,7 @@ function normalizeMovementLog_(log) {
 
 function saveSoftwareLicense(license, token) {
   try {
-    const actor = token ? requireEdit_(token) : null;
+    const actor = requirePermission_(token || "", "software.manage");
     const action = license && license.license_id ? "LICENSE_UPDATED" : "LICENSE_CREATED";
     const normalized = normalizeSoftwareLicense_(license || {});
     const saved = upsertObject_(SHEET_NAMES.softwareLicenses, "license_id", normalized);
@@ -526,7 +532,7 @@ function normalizeSoftwareLicense_(license) {
 
 function deleteSoftwareLicense(licenseId, token) {
   try {
-    const actor = token ? requireAdmin_(token) : null;
+    const actor = requirePermission_(token || "", "software.delete");
     const deleted = deleteObject_(SHEET_NAMES.softwareLicenses, "license_id", licenseId);
     if (deleted) logAudit_(actor, "LICENSE_DELETED", "software_license", licenseId, licenseId);
     return { ok: deleted, deleted_id: licenseId, updated_at: new Date().toISOString() };
@@ -537,7 +543,7 @@ function deleteSoftwareLicense(licenseId, token) {
 
 function saveDepartment(department, token) {
   try {
-    const actor = token ? requireAdmin_(token) : null;
+    const actor = requireAdmin_(token || "");
     const action = department && department.department_id ? "DEPARTMENT_UPDATED" : "DEPARTMENT_CREATED";
     const normalized = normalizeDepartment_(department || {});
     const saved = upsertObject_(SHEET_NAMES.departments, "department_id", normalized);
@@ -561,7 +567,7 @@ function normalizeDepartment_(department) {
 
 function deleteDepartment(departmentId, token) {
   try {
-    const actor = token ? requireAdmin_(token) : null;
+    const actor = requireAdmin_(token || "");
     if (!departmentId) throw new Error("Missing department_id");
     const sheet = getSheet_(SHEET_NAMES.departments);
     const values = sheet.getDataRange().getValues();
@@ -821,12 +827,39 @@ function requireAdmin_(token) {
   return user;
 }
 
-function requireEdit_(token) {
+function permissionCodes_(user) {
+  const raw = String(user.permissions || "").trim().toLowerCase();
+  if (String(user.role || "").toLowerCase() === "admin" || raw === "all") return ["*"];
+
+  const values = raw.split(",").map((item) => item.trim()).filter(Boolean);
+  const codes = new Set();
+  values.forEach((value) => {
+    (LEGACY_PERMISSION_PRESETS[value] || [value]).forEach((code) => codes.add(code));
+  });
+  return [...codes];
+}
+
+function hasPermission_(user, permission) {
+  const codes = permissionCodes_(user);
+  if (codes.indexOf("*") !== -1 || codes.indexOf(permission) !== -1) return true;
+
+  const [module, action] = String(permission).split(".");
+  if (!module || !action) return false;
+  if (action === "view") return codes.indexOf(`${module}.manage`) !== -1 || codes.indexOf(`${module}.delete`) !== -1;
+  if (action === "manage") return codes.indexOf(`${module}.delete`) !== -1;
+  return false;
+}
+
+function requirePermission_(token, permission) {
   const user = requireAuth_(token);
-  const permissions = String(user.permissions || "").toLowerCase();
-  const role = String(user.role || "").toLowerCase();
-  if (role === "admin" || permissions === "all" || permissions.split(",").map((item) => item.trim()).indexOf("edit") !== -1) return user;
-  throw new Error("Tài khoản này chỉ có quyền xem, không được chỉnh sửa thiết bị");
+  if (!hasPermission_(user, permission)) throw new Error("Tài khoản không có quyền thực hiện thao tác này");
+  return user;
+}
+
+function defaultPermissionsForRole_(role) {
+  if (role === "admin") return "all";
+  if (role === "manager") return "edit,report";
+  return "view";
 }
 
 function enforceLoginThrottle_(username) {
@@ -910,7 +943,7 @@ function normalizeUser_(user) {
   normalized.full_name = String(normalized.full_name || normalized.username).trim();
   normalized.role = String(normalized.role || "user").trim().toLowerCase();
   if (["admin", "manager", "user", "viewer"].indexOf(normalized.role) === -1) normalized.role = "user";
-  normalized.permissions = String(normalized.permissions || (normalized.role === "admin" ? "all" : "view")).trim();
+  normalized.permissions = String(normalized.permissions || defaultPermissionsForRole_(normalized.role)).trim();
   normalized.active = String(normalized.active || "TRUE").toUpperCase() === "FALSE" ? "FALSE" : "TRUE";
   normalized.must_change_password = String(normalized.must_change_password || "FALSE").toUpperCase() === "TRUE" ? "TRUE" : "FALSE";
   normalized.created_at = normalized.created_at || now;

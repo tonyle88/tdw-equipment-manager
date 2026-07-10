@@ -256,7 +256,15 @@
                 <option value="FALSE">Khóa tài khoản</option>
               </select>
             </label>
-            <label class="span-2">Phân quyền<input name="permissions" placeholder="VD: all, view, edit, report" /></label>
+            <label class="span-2">Mức quyền
+              <select name="permissions">
+                <option value="view">Chỉ xem</option>
+                <option value="edit">Sửa thiết bị, bảo trì và phần mềm</option>
+                <option value="report">Xem và xuất báo cáo</option>
+                <option value="edit,report">Sửa nghiệp vụ và báo cáo</option>
+                <option value="all">Toàn quyền</option>
+              </select>
+            </label>
             <label class="span-2">Mật khẩu mới<input name="password" type="password" autocomplete="new-password" placeholder="Nhập khi tạo mới hoặc muốn đổi mật khẩu" /></label>
           </div>
           <div class="modal-actions">
