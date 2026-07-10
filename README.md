@@ -27,6 +27,12 @@ Xem hướng dẫn chi tiết tại:
 docs/06-github-vercel-deploy.md
 ```
 
+Checklist truoc va sau deploy:
+
+```text
+docs/07-release-checklist.md
+```
+
 ## Cấu trúc
 
 ```text

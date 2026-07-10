@@ -103,6 +103,8 @@ Xác minh:
 
 ## Sprint 5 - Cleanup repo và quy trình release
 
+Trạng thái: Hoàn tất phần quy trình; cleanup `.DS_Store` chờ duyệt riêng.
+
 Mục tiêu:
 
 - Repo sạch hơn, tránh upload file hệ thống hoặc file build thừa.
