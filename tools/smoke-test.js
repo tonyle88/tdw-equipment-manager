@@ -69,7 +69,8 @@ async function run() {
   const appsScript = read("google-apps-script/Code.gs");
   const app = read("app/app.js");
   const index = read("app/index.html");
-  assert.ok(appsScript.includes("softwareLicenses: readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_)"));
+  assert.ok(appsScript.includes('softwareLicenses: hasPermission_(user, "software.view") ? readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_) : []'));
+  assert.ok(appsScript.includes('maintenanceLogs: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenanceLogs) : []'));
   assert.ok(appsScript.includes("function getSoftwareLicenseKey(licenseId, token)"));
   assert.ok(appsScript.includes("function requirePermission_(token, permission)"));
   assert.ok(appsScript.includes("Object.assign({}, existing, user || {})"));
@@ -83,10 +84,14 @@ async function run() {
   assert.equal(vm.runInContext('hasPermission_({ role: "viewer", permissions: "view" }, "assets.manage")', permissions), false);
   assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "assets.manage,reports.export" }, "assets.manage")', permissions), true);
   assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "assets.manage,reports.export" }, "maintenance.manage")', permissions), false);
+  assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "maintenance.manage" }, "maintenance.view")', permissions), true);
+  assert.equal(vm.runInContext('hasPermission_({ role: "user", permissions: "view" }, "assets.view")', permissions), true);
+  assert.equal(vm.runInContext('hasPermission_({ role: "user", permissions: "view" }, "reports.export")', permissions), false);
   assert.equal(vm.runInContext('hasPermission_({ role: "admin", permissions: "all" }, "settings.manage")', permissions), true);
   assert.equal(vm.runInContext('normalizeUser_({ user_id: "user-id", username: "user", role: "user", password_salt: "salt", password_hash: "hash" }).password_hash', permissions), "hash");
   assert.ok(index.includes('name="permission_code" value="assets.manage"'));
   assert.ok(app.includes('function setUserPermissionCodes(rawPermissions, role)'));
+  assert.ok(app.includes("function canAccessView(view)"));
 
   const vercel = JSON.parse(read("vercel.json"));
   assert.equal(vercel.version, 2);

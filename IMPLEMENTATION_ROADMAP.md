@@ -148,5 +148,7 @@ Trạng thái: Hoàn tất.
 
 ### Phase 4 - Đồng bộ giao diện và xác minh
 
+Trạng thái: Hoàn tất.
+
 - Menu, nút thao tác và dữ liệu trả về chỉ hiển thị khi có quyền tương ứng.
 - Bổ sung test cho Admin, Manager, User và Viewer trước khi deploy.

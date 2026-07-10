@@ -220,8 +220,7 @@ const state = {
   }
 
   function canEditAssets() {
-    const permissions = String(state.currentUser?.permissions || "").toLowerCase();
-    return isAdmin() || permissions === "all" || permissions.split(",").map((item) => item.trim()).includes("edit");
+    return hasPermission("assets.manage");
   }
 
   function defaultPermissionsForRole(role) {
@@ -235,6 +234,27 @@ const state = {
     if (role === "admin" || raw === "all") return USER_PERMISSION_CODES;
     return [...new Set(raw.split(",").flatMap((code) => LEGACY_PERMISSION_PRESETS[code.trim()] || [code.trim()]))]
       .filter((code) => USER_PERMISSION_CODES.includes(code));
+  }
+
+  function hasPermission(permission) {
+    if (isAdmin()) return true;
+    const codes = permissionCodesFor(state.currentUser?.permissions, state.currentUser?.role);
+    if (codes.includes(permission)) return true;
+    const [module, action] = permission.split(".");
+    if (action === "view") return codes.includes(`${module}.manage`) || codes.includes(`${module}.delete`);
+    if (action === "manage") return codes.includes(`${module}.delete`);
+    return false;
+  }
+
+  function canAccessView(view) {
+    const permissions = {
+      overview: "assets.view",
+      devices: "assets.view",
+      maintenance: "maintenance.view",
+      software: "software.view",
+      reports: "reports.view",
+    };
+    return !permissions[view] ? isAdmin() : hasPermission(permissions[view]);
   }
 
   function selectedUserPermissionCodes() {
@@ -259,6 +279,26 @@ const state = {
       input.disabled = isAdminRole;
     });
     syncUserPermissionSummary();
+  }
+
+  function applyPermissionDependencies(input) {
+    if (!input.checked) return;
+    const dependencies = {
+      "assets.delete": ["assets.view", "assets.manage"],
+      "maintenance.view": ["assets.view"],
+      "maintenance.manage": ["assets.view", "maintenance.view"],
+      "maintenance.delete": ["assets.view", "maintenance.view", "maintenance.manage"],
+      "movement.manage": ["assets.view"],
+      "software.view": ["assets.view"],
+      "software.manage": ["assets.view", "software.view"],
+      "software.delete": ["assets.view", "software.view", "software.manage"],
+      "reports.view": ["assets.view"],
+      "reports.export": ["assets.view", "reports.view"],
+    };
+    (dependencies[input.value] || []).forEach((code) => {
+      const dependent = els.userForm.querySelector(`[name="permission_code"][value="${code}"]`);
+      if (dependent) dependent.checked = true;
+    });
   }
 
   function setAuthToken(token) {
@@ -381,8 +421,8 @@ const state = {
 
   function updateUserChrome() {
     if (els.currentUserChip) els.currentUserChip.textContent = state.currentUser ? `${state.currentUser.full_name} · ${state.currentUser.role}` : "";
-    document.querySelectorAll("[data-admin-only]").forEach((node) => {
-      node.hidden = !isAdmin();
+    els.navLinks.forEach((link) => {
+      link.hidden = !canAccessView(link.dataset.view);
     });
     if (els.addButton) els.addButton.hidden = !canEditAssets();
   }
@@ -732,30 +772,30 @@ const state = {
       <div class="maintenance-logs-section" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <h3 style="margin: 0; font-size: 14px; font-weight: bold;">LỊCH SỬ LUÂN CHUYỂN</h3>
-          ${canEditAssets() ? `<button class="secondary-button" type="button" data-add-movement="${escapeHtml(asset.asset_id)}" style="padding: 4px 8px; font-size: 12px;">+ Ghi nhận</button>` : ""}
+          ${hasPermission("movement.manage") ? `<button class="secondary-button" type="button" data-add-movement="${escapeHtml(asset.asset_id)}" style="padding: 4px 8px; font-size: 12px;">+ Ghi nhận</button>` : ""}
         </div>
-        ${renderMovementLogsTable(asset.asset_id)}
+        ${hasPermission("movement.manage") ? renderMovementLogsTable(asset.asset_id) : ""}
       </div>
 
       <div class="maintenance-logs-section" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <h3 style="margin: 0; font-size: 14px; font-weight: bold;">PHẦN MỀM ĐÃ CÀI</h3>
-          ${canEditAssets() ? `<button class="secondary-button" type="button" data-add-software="${escapeHtml(asset.asset_id)}" style="padding: 4px 8px; font-size: 12px;">+ Gán phần mềm</button>` : ""}
+          ${hasPermission("software.manage") ? `<button class="secondary-button" type="button" data-add-software="${escapeHtml(asset.asset_id)}" style="padding: 4px 8px; font-size: 12px;">+ Gán phần mềm</button>` : ""}
         </div>
-        ${renderAssetSoftwareTable(asset.asset_id)}
+        ${hasPermission("software.view") ? renderAssetSoftwareTable(asset.asset_id) : ""}
       </div>
 
       <div class="maintenance-logs-section" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <h3 style="margin: 0; font-size: 14px; font-weight: bold;">LỊCH SỬ BẢO TRÌ</h3>
-          ${canEditAssets() ? `<button class="secondary-button" type="button" data-add-log="${escapeHtml(asset.asset_id)}" style="padding: 4px 8px; font-size: 12px;">+ Ghi nhận</button>` : ""}
+          ${hasPermission("maintenance.manage") ? `<button class="secondary-button" type="button" data-add-log="${escapeHtml(asset.asset_id)}" style="padding: 4px 8px; font-size: 12px;">+ Ghi nhận</button>` : ""}
         </div>
-        ${renderMaintenanceLogsTable(asset.asset_id)}
+        ${hasPermission("maintenance.view") ? renderMaintenanceLogsTable(asset.asset_id) : ""}
       </div>
 
-      ${canEditAssets() ? `<div class="detail-actions">
-        <button class="secondary-button detail-action-button" type="button" data-edit-asset="${escapeHtml(asset.asset_id)}">✎ Sửa</button>
-        <button class="danger-button detail-action-button" type="button" data-delete-asset="${escapeHtml(asset.asset_id)}">× Xóa</button>
+      ${(hasPermission("assets.manage") || hasPermission("assets.delete")) ? `<div class="detail-actions">
+        ${hasPermission("assets.manage") ? `<button class="secondary-button detail-action-button" type="button" data-edit-asset="${escapeHtml(asset.asset_id)}">✎ Sửa</button>` : ""}
+        ${hasPermission("assets.delete") ? `<button class="danger-button detail-action-button" type="button" data-delete-asset="${escapeHtml(asset.asset_id)}">× Xóa</button>` : ""}
       </div>` : ""}
     `;
 
@@ -907,12 +947,8 @@ const state = {
   }
 
   function setView(view) {
-    if (view === "users" && !isAdmin()) {
-      showMessageModal("Không đủ quyền", "Chỉ admin mới được vào trang người dùng");
-      return;
-    }
-    if (view === "departments" && !isAdmin()) {
-      showMessageModal("Không đủ quyền", "Chỉ admin mới được vào trang phòng ban");
+    if (!canAccessView(view)) {
+      showMessageModal("Không đủ quyền", "Tài khoản không có quyền truy cập module này.");
       return;
     }
     state.activeView = view;
@@ -974,6 +1010,8 @@ const state = {
   }
 
   function renderMaintenanceView() {
+    const canManageMaintenance = hasPermission("maintenance.manage");
+    const canDeleteMaintenance = hasPermission("maintenance.delete");
     const watchList = state.assets.filter((asset) => ["KEM_PHAM_CHAT", "CAN_KIEM_TRA", "KHONG_SU_DUNG", "LUU_KHO_THANH_LY"].includes(asset.status));
     const byStatus = countBy(watchList, "status", "status");
     
@@ -1019,7 +1057,7 @@ const state = {
           <article class="module-card maintenance-list-card" style="grid-column: 1 / -1; margin-top: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
               <h3 style="margin: 0;">LỊCH SỬ BẢO TRÌ GẦN ĐÂY</h3>
-              ${canEditAssets() ? `<button class="primary-button" type="button" id="openAddLogModal" style="padding: 6px 12px; font-size: 12px;">+ GHI NHẬN BẢO TRÌ</button>` : ""}
+              ${canManageMaintenance ? `<button class="primary-button" type="button" id="openAddLogModal" style="padding: 6px 12px; font-size: 12px;">+ GHI NHẬN BẢO TRÌ</button>` : ""}
             </div>
             <table class="mini-table">
               <thead>
@@ -1029,7 +1067,7 @@ const state = {
                   <th style="width: 150px; text-align: center;">LOẠI</th>
                   <th>NỘI DUNG</th>
                   <th style="width: 120px; text-align: right;">CHI PHÍ</th>
-                  ${canEditAssets() ? `<th style="width: 90px; text-align: center;"></th>` : ""}
+                  ${(canManageMaintenance || canDeleteMaintenance) ? `<th style="width: 90px; text-align: center;"></th>` : ""}
                 </tr>
               </thead>
               <tbody>
@@ -1042,15 +1080,15 @@ const state = {
                       <td style="text-align: center;"><span class="badge" style="background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color);">${escapeHtml(labelFor("maintenance_type", log.action_type) || log.action_type)}</span></td>
                       <td>${escapeHtml(log.description)}</td>
                       <td style="text-align: right; font-weight: 500; color: #e11d48;">${escapeHtml(formatMoney(log.cost))}</td>
-                      ${canEditAssets() ? `
+                      ${(canManageMaintenance || canDeleteMaintenance) ? `
                         <td class="table-actions">
-                          <button class="table-action-btn edit-maintenance-btn" data-id="${escapeHtml(log.log_id)}" data-asset="${escapeHtml(log.asset_id)}" type="button" aria-label="Sửa">✎</button>
-                          ${isAdmin() ? `<button class="table-action-btn danger delete-maintenance-btn" data-id="${escapeHtml(log.log_id)}" data-name="${escapeHtml(log.action_type)}" type="button" aria-label="Xóa">×</button>` : ""}
+                          ${canManageMaintenance ? `<button class="table-action-btn edit-maintenance-btn" data-id="${escapeHtml(log.log_id)}" data-asset="${escapeHtml(log.asset_id)}" type="button" aria-label="Sửa">✎</button>` : ""}
+                          ${canDeleteMaintenance ? `<button class="table-action-btn danger delete-maintenance-btn" data-id="${escapeHtml(log.log_id)}" data-name="${escapeHtml(log.action_type)}" type="button" aria-label="Xóa">×</button>` : ""}
                         </td>
                       ` : ""}
                     </tr>
                   `;
-                }).join('') || `<tr><td colspan="${canEditAssets() ? 6 : 5}" style="text-align: center; color: var(--text-secondary); padding: 24px 0;">Chưa có lịch sử bảo trì.</td></tr>`}
+                }).join('') || `<tr><td colspan="${canManageMaintenance || canDeleteMaintenance ? 6 : 5}" style="text-align: center; color: var(--text-secondary); padding: 24px 0;">Chưa có lịch sử bảo trì.</td></tr>`}
               </tbody>
             </table>
           </article>
@@ -1085,6 +1123,8 @@ const state = {
   }
 
   function renderSoftwareView() {
+    const canManageSoftware = hasPermission("software.manage");
+    const canDeleteSoftware = hasPermission("software.delete");
     els.content.innerHTML = `
       <div class="list-panel">
         <div class="panel-head">
@@ -1092,7 +1132,7 @@ const state = {
             <h2>Quản lý Bản quyền Phần mềm</h2>
             <p class="view-subtitle" style="margin-top: 4px; color: rgba(255,255,255,.6);">Theo dõi danh sách bản quyền, license key và thiết bị được cấp phép</p>
           </div>
-          ${canEditAssets() ? `<button class="primary-button" type="button" id="openAddSoftwareBtn">+ Thêm bản quyền</button>` : ""}
+          ${canManageSoftware ? `<button class="primary-button" type="button" id="openAddSoftwareBtn">+ Thêm bản quyền</button>` : ""}
         </div>
         
         <div class="table-wrap" style="margin-top: 16px;">
@@ -1105,7 +1145,7 @@ const state = {
                 <th>GÁN CHO</th>
                 <th style="width: 130px">NGÀY HẾT HẠN</th>
                 <th style="width: 130px">TRẠNG THÁI</th>
-                ${canEditAssets() ? `<th style="width: 90px; text-align: center;"></th>` : ""}
+                ${(canManageSoftware || canDeleteSoftware) ? `<th style="width: 90px; text-align: center;"></th>` : ""}
               </tr>
             </thead>
           <tbody>
@@ -1143,15 +1183,15 @@ const state = {
                   </td>
                   <td style="color: ${isExpired || isExpiringSoon ? statusColor : 'inherit'}; font-weight: ${isExpired || isExpiringSoon ? '600' : 'normal'}">${license.expiry_date ? escapeHtml(formatDate(license.expiry_date)) : '<span style="color: var(--color-success);">Vĩnh Viễn</span>'}</td>
                   <td><span class="badge" style="color: ${statusColor}; border: 1px solid ${statusColor}; background: transparent;">${escapeHtml(statusLabel)}</span></td>
-                  ${canEditAssets() ? `
+                  ${(canManageSoftware || canDeleteSoftware) ? `
                     <td class="table-actions">
-                      <button class="table-action-btn edit-software-btn" data-id="${escapeHtml(license.license_id)}" type="button" aria-label="Sửa">✎</button>
-                      ${isAdmin() ? `<button class="table-action-btn danger delete-software-btn" data-id="${escapeHtml(license.license_id)}" data-name="${escapeHtml(license.software_name)}" type="button" aria-label="Xóa">×</button>` : ""}
+                      ${canManageSoftware ? `<button class="table-action-btn edit-software-btn" data-id="${escapeHtml(license.license_id)}" type="button" aria-label="Sửa">✎</button>` : ""}
+                      ${canDeleteSoftware ? `<button class="table-action-btn danger delete-software-btn" data-id="${escapeHtml(license.license_id)}" data-name="${escapeHtml(license.software_name)}" type="button" aria-label="Xóa">×</button>` : ""}
                     </td>
                   ` : ""}
                 </tr>
               `;
-            }).join('') || `<tr><td colspan="${canEditAssets() ? 7 : 6}" style="text-align: center; color: var(--text-secondary); padding: 32px;">Chưa có bản quyền phần mềm nào.</td></tr>`}
+            }).join('') || `<tr><td colspan="${canManageSoftware || canDeleteSoftware ? 7 : 6}" style="text-align: center; color: var(--text-secondary); padding: 32px;">Chưa có bản quyền phần mềm nào.</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -1283,8 +1323,7 @@ const state = {
                 ${groupOptions}
               </select>
             </label>
-            <button class="secondary-button" type="button" data-export-csv>Xuất Excel (.xlsx)</button>
-            <button class="secondary-button" type="button" data-print-pdf>Xuất PDF</button>
+            ${hasPermission("reports.export") ? `<button class="secondary-button" type="button" data-export-csv>Xuất Excel (.xlsx)</button><button class="secondary-button" type="button" data-print-pdf>Xuất PDF</button>` : ""}
           </div>
         </div>
         <div class="report-dashboard">
@@ -1301,11 +1340,11 @@ const state = {
         </div>
       </div>
     `;
-    els.content.querySelector("[data-export-csv]").addEventListener("click", () => {
+    els.content.querySelector("[data-export-csv]")?.addEventListener("click", () => {
       const selectedGroup = document.getElementById("reportGroupSelect")?.value || "";
       exportExcel(selectedGroup);
     });
-    els.content.querySelector("[data-print-pdf]").addEventListener("click", () => {
+    els.content.querySelector("[data-print-pdf]")?.addEventListener("click", () => {
       const selectedGroup = document.getElementById("reportGroupSelect")?.value || "";
       printReport(selectedGroup);
     });
@@ -2361,7 +2400,10 @@ const state = {
     els.userForm.elements.role.addEventListener("change", () => {
       setUserPermissionCodes(defaultPermissionsForRole(els.userForm.elements.role.value), els.userForm.elements.role.value);
     });
-    els.userForm.querySelectorAll('[name="permission_code"]').forEach((input) => input.addEventListener("change", syncUserPermissionSummary));
+    els.userForm.querySelectorAll('[name="permission_code"]').forEach((input) => input.addEventListener("change", () => {
+      applyPermissionDependencies(input);
+      syncUserPermissionSummary();
+    }));
     els.closeUserModal.addEventListener("click", closeUserModal);
     els.cancelUserForm.addEventListener("click", closeUserModal);
     els.userModal.addEventListener("click", (event) => {

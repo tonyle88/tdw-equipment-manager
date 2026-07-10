@@ -85,12 +85,12 @@ function getAppData(token) {
   const user = requireAuth_(token);
   return {
     ok: true,
-    assets: readActiveAssets_(),
+    assets: hasPermission_(user, "assets.view") ? readActiveAssets_() : [],
     settings: readSheetAsObjects_(SHEET_NAMES.settings),
     departments: readSheetAsObjects_(SHEET_NAMES.departments),
-    maintenanceLogs: readSheetAsObjects_(SHEET_NAMES.maintenanceLogs),
-    inventoryMovements: readSheetAsObjects_(SHEET_NAMES.inventoryMovements),
-    softwareLicenses: readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_),
+    maintenanceLogs: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenanceLogs) : [],
+    inventoryMovements: hasPermission_(user, "movement.manage") ? readSheetAsObjects_(SHEET_NAMES.inventoryMovements) : [],
+    softwareLicenses: hasPermission_(user, "software.view") ? readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_) : [],
     currentUser: publicUser_(user),
     updated_at: new Date().toISOString(),
   };
