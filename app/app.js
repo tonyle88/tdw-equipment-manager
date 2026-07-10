@@ -1370,12 +1370,12 @@ const state = {
       <div class="view-only-panel">
         <div class="panel-head report-title-row">
           <h2>BÁO CÁO</h2>
-          <div class="report-actions">
-            ${canExportAssets ? `<label class="report-group-filter"><span>Nhóm xuất thiết bị</span><select id="reportGroupSelect"><option value="">Tất cả nhóm</option>${groupOptions}</select></label><button class="secondary-button" type="button" data-export-assets>Xuất Excel thiết bị</button><button class="secondary-button" type="button" data-print-assets>Xuất PDF thiết bị</button>` : ""}
-            ${canExportMaintenance ? `<button class="secondary-button" type="button" data-export-maintenance>Xuất Excel bảo trì</button><button class="secondary-button" type="button" data-print-maintenance>Xuất PDF bảo trì</button>` : ""}
-            ${canExportSoftware ? `<button class="secondary-button" type="button" data-export-software>Xuất Excel phần mềm</button><button class="secondary-button" type="button" data-print-software>Xuất PDF phần mềm</button>` : ""}
-            ${canExportMovement ? `<button class="secondary-button" type="button" data-export-movement>Xuất Excel luân chuyển</button><button class="secondary-button" type="button" data-print-movement>Xuất PDF luân chuyển</button>` : ""}
-          </div>
+        </div>
+        <div class="report-actions report-actions--toolbar">
+          ${canExportAssets ? `<label class="report-group-filter"><span>Nhóm xuất thiết bị</span><select id="reportGroupSelect"><option value="">Tất cả nhóm</option>${groupOptions}</select></label><button class="secondary-button" type="button" data-export-assets>Excel thiết bị</button><button class="secondary-button" type="button" data-print-assets>PDF thiết bị</button>` : ""}
+          ${canExportMaintenance ? `<button class="secondary-button" type="button" data-export-maintenance>Excel bảo trì</button><button class="secondary-button" type="button" data-print-maintenance>PDF bảo trì</button>` : ""}
+          ${canExportSoftware ? `<button class="secondary-button" type="button" data-export-software>Excel phần mềm</button><button class="secondary-button" type="button" data-print-software>PDF phần mềm</button>` : ""}
+          ${canExportMovement ? `<button class="secondary-button" type="button" data-export-movement>Excel luân chuyển</button><button class="secondary-button" type="button" data-print-movement>PDF luân chuyển</button>` : ""}
         </div>
         <div class="report-dashboard">
           <article class="module-card report-main-card">
