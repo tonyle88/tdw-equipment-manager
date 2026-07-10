@@ -149,6 +149,23 @@ updated_at
 
 `license_key_or_note` duoc Apps Script ma hoa khi luu. Frontend nhan lai truong `license_key` da giai ma qua API.
 
+## AuditLogs
+
+Tab nay duoc Apps Script tu tao khi phat sinh thao tac ghi du lieu dau tien.
+
+```text
+audit_id
+created_at
+actor_user_id
+actor_username
+action
+entity_type
+entity_id
+entity_name
+```
+
+Nhat ky khong luu token, mat khau hay license key.
+
 ## Gia tri dropdown goi y
 
 ### asset_group

@@ -44,6 +44,8 @@ Xác minh:
 
 ## Sprint 2 - Audit log cho thao tác quan trọng
 
+Trạng thái: Hoàn tất.
+
 Mục tiêu:
 
 - Ghi lại ai đã thêm/sửa/xóa thiết bị, cấu hình, user, phòng ban, license và log bảo trì.

@@ -6,7 +6,10 @@ const SHEET_NAMES = {
   softwareLicenses: "SoftwareLicenses",
   inventoryMovements: "InventoryMovements",
   settings: "Settings",
+  auditLogs: "AuditLogs",
 };
+
+const AUDIT_LOG_HEADERS = ["audit_id", "created_at", "actor_user_id", "actor_username", "action", "entity_type", "entity_id", "entity_name"];
 
 const HEALTH_CHECK_HEADERS = {
   Assets: ["asset_id", "asset_name", "status"],
@@ -117,9 +120,11 @@ function healthCheck(token) {
 
 function saveAsset(asset) {
   try {
-    if (arguments.length > 1) requireEdit_(arguments[1]);
+    const actor = arguments.length > 1 ? requireEdit_(arguments[1]) : null;
+    const action = asset && asset.asset_id ? "ASSET_UPDATED" : "ASSET_CREATED";
     const normalized = normalizeAsset_(asset || {});
     const saved = upsertObject_(SHEET_NAMES.assets, "asset_id", normalized);
+    logAudit_(actor, action, "asset", saved.asset_id, saved.asset_name);
     return { ok: true, data: saved, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -135,6 +140,7 @@ function deleteAsset(assetId) {
     asset.deleted_at = new Date().toISOString();
     asset.deleted_by = user ? user.username : "";
     upsertObject_(SHEET_NAMES.assets, "asset_id", asset);
+    logAudit_(user, "ASSET_DELETED", "asset", assetId, asset.asset_name);
     return { ok: true, asset_id: assetId, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -164,9 +170,11 @@ function decodeLicenseKey_(encoded) {
 
 function saveSetting(setting, token) {
   try {
-    if (arguments.length > 1) requireAdmin_(arguments[1]);
+    const actor = arguments.length > 1 ? requireAdmin_(arguments[1]) : null;
+    const action = setting && setting.setting_id ? "SETTING_UPDATED" : "SETTING_CREATED";
     const normalized = normalizeSetting_(setting || {});
     const saved = upsertObject_(SHEET_NAMES.settings, "setting_id", normalized);
+    logAudit_(actor, action, "setting", saved.setting_id, saved.display_name);
     return { ok: true, data: saved, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -175,7 +183,7 @@ function saveSetting(setting, token) {
 
 function deleteSetting(settingId) {
   try {
-    if (arguments.length > 1) requireAdmin_(arguments[1]);
+    const actor = arguments.length > 1 ? requireAdmin_(arguments[1]) : null;
     if (!settingId) throw new Error("Missing setting_id");
     const sheet = getSheet_(SHEET_NAMES.settings);
     const values = sheet.getDataRange().getValues();
@@ -184,7 +192,10 @@ function deleteSetting(settingId) {
     if (keyIndex === -1) throw new Error("Missing setting_id column");
     const rowIndex = values.findIndex((row, index) => index > 0 && row[keyIndex] === settingId);
     if (rowIndex < 1) throw new Error("Không tìm thấy cấu hình để xóa");
+    const nameIndex = headers.indexOf("display_name");
+    const settingName = nameIndex >= 0 ? String(values[rowIndex][nameIndex] || "") : "";
     sheet.deleteRow(rowIndex + 1);
+    logAudit_(actor, "SETTING_DELETED", "setting", settingId, settingName);
     return { ok: true, setting_id: settingId, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -359,9 +370,11 @@ function normalizeSetting_(setting) {
 
 function saveMaintenanceLog(log, token) {
   try {
-    if (token) requireEdit_(token);
+    const actor = token ? requireEdit_(token) : null;
+    const action = log && log.log_id ? "MAINTENANCE_UPDATED" : "MAINTENANCE_CREATED";
     const normalized = normalizeMaintenanceLog_(log || {});
     const saved = upsertObject_(SHEET_NAMES.maintenanceLogs, "log_id", normalized);
+    logAudit_(actor, action, "maintenance_log", saved.log_id, saved.action_type || saved.asset_id);
     return { ok: true, data: saved, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -390,8 +403,9 @@ function normalizeMaintenanceLog_(log) {
 
 function deleteMaintenanceLog(logId, token) {
   try {
-    if (token) requireAdmin_(token);
+    const actor = token ? requireAdmin_(token) : null;
     const deleted = deleteObject_(SHEET_NAMES.maintenanceLogs, "log_id", logId);
+    if (deleted) logAudit_(actor, "MAINTENANCE_DELETED", "maintenance_log", logId, logId);
     return { ok: deleted, deleted_id: logId, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -400,7 +414,8 @@ function deleteMaintenanceLog(logId, token) {
 
 function saveMovementLog(log, token) {
   try {
-    if (token) requireEdit_(token);
+    const actor = token ? requireEdit_(token) : null;
+    const action = log && log.movement_id ? "MOVEMENT_UPDATED" : "MOVEMENT_CREATED";
     const normalized = normalizeMovementLog_(log || {});
     const saved = upsertObject_(SHEET_NAMES.inventoryMovements, "movement_id", normalized);
 
@@ -414,6 +429,7 @@ function saveMovementLog(log, token) {
         upsertObject_(SHEET_NAMES.assets, "asset_id", asset);
       }
     }
+    logAudit_(actor, action, "inventory_movement", saved.movement_id, saved.asset_id);
     return { ok: true, data: saved, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -440,9 +456,11 @@ function normalizeMovementLog_(log) {
 
 function saveSoftwareLicense(license, token) {
   try {
-    if (token) requireEdit_(token);
+    const actor = token ? requireEdit_(token) : null;
+    const action = license && license.license_id ? "LICENSE_UPDATED" : "LICENSE_CREATED";
     const normalized = normalizeSoftwareLicense_(license || {});
     const saved = upsertObject_(SHEET_NAMES.softwareLicenses, "license_id", normalized);
+    logAudit_(actor, action, "software_license", saved.license_id, saved.software_name);
     return { ok: true, data: saved, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -470,8 +488,9 @@ function normalizeSoftwareLicense_(license) {
 
 function deleteSoftwareLicense(licenseId, token) {
   try {
-    if (token) requireAdmin_(token);
+    const actor = token ? requireAdmin_(token) : null;
     const deleted = deleteObject_(SHEET_NAMES.softwareLicenses, "license_id", licenseId);
+    if (deleted) logAudit_(actor, "LICENSE_DELETED", "software_license", licenseId, licenseId);
     return { ok: deleted, deleted_id: licenseId, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -480,9 +499,11 @@ function deleteSoftwareLicense(licenseId, token) {
 
 function saveDepartment(department, token) {
   try {
-    if (token) requireAdmin_(token);
+    const actor = token ? requireAdmin_(token) : null;
+    const action = department && department.department_id ? "DEPARTMENT_UPDATED" : "DEPARTMENT_CREATED";
     const normalized = normalizeDepartment_(department || {});
     const saved = upsertObject_(SHEET_NAMES.departments, "department_id", normalized);
+    logAudit_(actor, action, "department", saved.department_id, saved.department_name);
     return { ok: true, data: saved, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -502,7 +523,7 @@ function normalizeDepartment_(department) {
 
 function deleteDepartment(departmentId, token) {
   try {
-    if (token) requireAdmin_(token);
+    const actor = token ? requireAdmin_(token) : null;
     if (!departmentId) throw new Error("Missing department_id");
     const sheet = getSheet_(SHEET_NAMES.departments);
     const values = sheet.getDataRange().getValues();
@@ -511,7 +532,10 @@ function deleteDepartment(departmentId, token) {
     if (keyIndex === -1) throw new Error("Missing department_id column");
     const rowIndex = values.findIndex((row, index) => index > 0 && row[keyIndex] === departmentId);
     if (rowIndex < 1) throw new Error("Không tìm thấy phòng ban để xóa");
+    const nameIndex = headers.indexOf("department_name");
+    const departmentName = nameIndex >= 0 ? String(values[rowIndex][nameIndex] || "") : "";
     sheet.deleteRow(rowIndex + 1);
+    logAudit_(actor, "DEPARTMENT_DELETED", "department", departmentId, departmentName);
     return { ok: true, department_id: departmentId, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -557,6 +581,36 @@ function getSheet_(sheetName) {
   }
   if (!sheet) throw new Error(`Sheet not found: ${sheetName}`);
   return sheet;
+}
+
+function logAudit_(actor, action, entityType, entityId, entityName) {
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = spreadsheet.getSheetByName(SHEET_NAMES.auditLogs);
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(SHEET_NAMES.auditLogs);
+      sheet.getRange(1, 1, 1, AUDIT_LOG_HEADERS.length).setValues([AUDIT_LOG_HEADERS]);
+    }
+    const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+      .getDisplayValues()[0]
+      .map((header) => String(header).trim());
+    if (AUDIT_LOG_HEADERS.some((header) => !headers.includes(header))) {
+      throw new Error("AuditLogs thiếu cột bắt buộc");
+    }
+    const entry = {
+      audit_id: Utilities.getUuid(),
+      created_at: new Date().toISOString(),
+      actor_user_id: actor ? actor.user_id : "",
+      actor_username: actor ? actor.username : "system",
+      action,
+      entity_type: entityType,
+      entity_id: entityId,
+      entity_name: entityName,
+    };
+    sheet.appendRow(headers.map((header) => entry[header] || ""));
+  } catch (error) {
+    console.error(`Không thể ghi AuditLogs: ${error.message}`);
+  }
 }
 
 function ensureSheetHeaders_(sheetName, sheet) {
@@ -655,12 +709,14 @@ function listUsers(token) {
 
 function saveUser(user, token) {
   try {
-    requireAdmin_(token);
+    const actor = requireAdmin_(token);
+    const action = user && user.user_id ? "USER_UPDATED" : "USER_CREATED";
     ensureUsersReady_();
     const normalized = normalizeUser_(user || {});
     const duplicate = readUsers_().find((item) => item.username === normalized.username && item.user_id !== normalized.user_id);
     if (duplicate) throw new Error("Tên đăng nhập đã tồn tại");
     const saved = upsertObject_(SHEET_NAMES.users, "user_id", normalized);
+    logAudit_(actor, action, "user", saved.user_id, saved.username);
     return { ok: true, data: publicUser_(saved), updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -676,6 +732,7 @@ function deleteUser(userId, token) {
     if (!user) throw new Error("Không tìm thấy user");
     user.active = "FALSE";
     upsertObject_(SHEET_NAMES.users, "user_id", user);
+    logAudit_(admin, "USER_DISABLED", "user", userId, user.username);
     return { ok: true, user_id: userId, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -684,7 +741,7 @@ function deleteUser(userId, token) {
 
 function resetUserPassword(userId, newPassword, token) {
   try {
-    requireAdmin_(token);
+    const admin = requireAdmin_(token);
     if (!userId) throw new Error("Missing user_id");
     if (String(newPassword || "").length < 6) throw new Error("Mật khẩu mới cần ít nhất 6 ký tự");
     const user = findUserById_(userId);
@@ -692,6 +749,7 @@ function resetUserPassword(userId, newPassword, token) {
     setPassword_(user, newPassword);
     user.must_change_password = "TRUE";
     upsertObject_(SHEET_NAMES.users, "user_id", user);
+    logAudit_(admin, "PASSWORD_RESET", "user", userId, user.username);
     return { ok: true, user_id: userId, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -705,6 +763,7 @@ function changeOwnPassword(newPassword, token) {
     setPassword_(user, newPassword);
     user.must_change_password = "FALSE";
     const saved = upsertObject_(SHEET_NAMES.users, "user_id", user);
+    logAudit_(user, "PASSWORD_CHANGED", "user", saved.user_id, saved.username);
     return { ok: true, user: publicUser_(saved), updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
