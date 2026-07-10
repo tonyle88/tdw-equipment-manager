@@ -761,8 +761,10 @@ function listUsers(token) {
 function saveUser(user, token) {
   try {
     const actor = requireAdmin_(token);
-    const action = user && user.user_id ? "USER_UPDATED" : "USER_CREATED";
-    const normalized = normalizeUser_(user || {});
+    const existing = user && user.user_id ? findUserById_(user.user_id) : null;
+    if (user && user.user_id && !existing) throw new Error("Không tìm thấy user để cập nhật");
+    const action = existing ? "USER_UPDATED" : "USER_CREATED";
+    const normalized = normalizeUser_(existing ? Object.assign({}, existing, user || {}) : user || {});
     const duplicate = readUsers_().find((item) => item.username === normalized.username && item.user_id !== normalized.user_id);
     if (duplicate) throw new Error("Tên đăng nhập đã tồn tại");
     const saved = upsertObject_(SHEET_NAMES.users, "user_id", normalized);

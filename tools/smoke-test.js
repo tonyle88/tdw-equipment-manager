@@ -72,6 +72,7 @@ async function run() {
   assert.ok(appsScript.includes("softwareLicenses: readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_)"));
   assert.ok(appsScript.includes("function getSoftwareLicenseKey(licenseId, token)"));
   assert.ok(appsScript.includes("function requirePermission_(token, permission)"));
+  assert.ok(appsScript.includes("Object.assign({}, existing, user || {})"));
   assert.ok(!app.includes("license.license_key)"));
 
   const permissions = vm.createContext();
@@ -83,6 +84,7 @@ async function run() {
   assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "assets.manage,reports.export" }, "assets.manage")', permissions), true);
   assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "assets.manage,reports.export" }, "maintenance.manage")', permissions), false);
   assert.equal(vm.runInContext('hasPermission_({ role: "admin", permissions: "all" }, "settings.manage")', permissions), true);
+  assert.equal(vm.runInContext('normalizeUser_({ user_id: "user-id", username: "user", role: "user", password_salt: "salt", password_hash: "hash" }).password_hash', permissions), "hash");
   assert.ok(index.includes('name="permission_code" value="assets.manage"'));
   assert.ok(app.includes('function setUserPermissionCodes(rawPermissions, role)'));
 
