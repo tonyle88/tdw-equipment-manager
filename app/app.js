@@ -100,6 +100,7 @@ const state = {
   };
 
   const els = {};
+  const formSnapshots = new WeakMap();
 
   function collectElements() {
     Object.assign(els, {
@@ -350,6 +351,7 @@ const state = {
     if (els.appShell) els.appShell.hidden = true;
     if (els.passwordChangeError) els.passwordChangeError.hidden = true;
     if (els.passwordChangeForm) els.passwordChangeForm.reset();
+    markFormClean(els.passwordChangeForm);
     if (els.passwordChangeModal) els.passwordChangeModal.hidden = false;
   }
 
@@ -427,6 +429,37 @@ const state = {
 
   function showConfirmModal(title, message, confirmText = "Đồng ý") {
     return showSystemModal({ title, message, confirmText, cancelText: "Hủy" });
+  }
+
+  function formSnapshot(form) {
+    return JSON.stringify([...new FormData(form).entries()]);
+  }
+
+  function markFormClean(form) {
+    if (form) formSnapshots.set(form, formSnapshot(form));
+  }
+
+  async function requestFormClose(form, closeModal) {
+    const initial = formSnapshots.get(form);
+    if (initial && initial !== formSnapshot(form)) {
+      const shouldDiscard = await showConfirmModal(
+        "BỎ NỘI DUNG ĐANG SOẠN?",
+        "Các thay đổi chưa lưu sẽ bị mất. Bạn có muốn tiếp tục đóng popup không?",
+        "Bỏ thay đổi",
+      );
+      if (!shouldDiscard) return false;
+    }
+    closeModal();
+    return true;
+  }
+
+  function bindModalCloseGuard(modal, form, closeModal, buttons) {
+    buttons.filter(Boolean).forEach((button) => {
+      button.addEventListener("click", () => requestFormClose(form, closeModal));
+    });
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) requestFormClose(form, closeModal);
+    });
   }
 
   function showInputModal(title, message, inputLabel, inputType = "text") {
@@ -910,6 +943,7 @@ const state = {
     [...els.form.elements.secondary_responsible_ids.options].forEach((option) => {
       option.selected = secondaryIds.has(option.value);
     });
+    markFormClean(els.form);
     els.modal.hidden = false;
   }
 
@@ -1663,6 +1697,7 @@ const state = {
       els.settingForm.elements.sort_order.value = setting.sort_order;
       els.settingFormTitle.textContent = "SỬA CẤU HÌNH";
     }
+    markFormClean(els.settingForm);
     els.settingModal.hidden = false;
   }
 
@@ -1818,6 +1853,7 @@ const state = {
       setUserPermissionCodes(user.permissions || defaultPermissionsForRole(user.role), user.role);
       els.userFormTitle.textContent = "SỬA USER";
     }
+    markFormClean(els.userForm);
     els.userModal.hidden = false;
   }
 
@@ -1912,6 +1948,7 @@ const state = {
       els.maintenanceLogForm.querySelector('[name="date"]').value = new Date().toISOString().split('T')[0];
     }
     
+    markFormClean(els.maintenanceLogForm);
     els.maintenanceLogModal.hidden = false;
   }
 
@@ -1956,6 +1993,7 @@ const state = {
       els.maintenancePlanForm.elements.next_due_date.value = new Date().toISOString().slice(0, 10);
       els.maintenancePlanForm.elements.active.value = "TRUE";
     }
+    markFormClean(els.maintenancePlanForm);
     els.maintenancePlanModal.hidden = false;
   }
 
@@ -2058,6 +2096,7 @@ const state = {
     renderTags();
     syncHidden();
 
+    markFormClean(els.softwareLicenseForm);
     els.softwareLicenseModal.hidden = false;
   }
 
@@ -2103,6 +2142,7 @@ const state = {
       }
     }
     
+    markFormClean(els.movementLogForm);
     els.movementLogModal.hidden = false;
   }
 
@@ -2144,6 +2184,7 @@ const state = {
     } else {
       els.departmentForm.querySelector('[name="department_id"]').value = "";
     }
+    markFormClean(els.departmentForm);
     els.departmentModal.hidden = false;
   }
 
@@ -2666,27 +2707,21 @@ const state = {
       els.loginForm?.requestSubmit();
     });
     els.passwordChangeForm?.addEventListener("submit", handlePasswordChange);
-    els.passwordChangeLogout?.addEventListener("click", handleLogout);
+    els.passwordChangeLogout?.addEventListener("click", async () => {
+      if (await requestFormClose(els.passwordChangeForm, () => {})) handleLogout();
+    });
     els.logoutButton?.addEventListener("click", handleLogout);
     [els.search, els.group, els.year, els.department, els.status]
       .filter(Boolean)
       .forEach((el) => el.addEventListener("input", () => applyFilters({ resetPage: true })));
     els.addButton.addEventListener("click", () => openAssetModal());
-    els.closeModal.addEventListener("click", closeAssetModal);
-    els.cancelForm.addEventListener("click", closeAssetModal);
-    els.modal.addEventListener("click", (event) => {
-      if (event.target === els.modal) closeAssetModal();
-    });
+    bindModalCloseGuard(els.modal, els.form, closeAssetModal, [els.closeModal, els.cancelForm]);
     els.form.addEventListener("submit", handleAssetSubmit);
     els.settingForm.addEventListener("submit", handleSettingSubmit);
     els.settingForm.elements.setting_type.addEventListener("change", () => {
       if (!state.editingSettingId) els.settingForm.elements.sort_order.value = nextSettingOrder(els.settingForm.elements.setting_type.value);
     });
-    els.closeSettingModal.addEventListener("click", closeSettingModal);
-    els.cancelSettingForm.addEventListener("click", closeSettingModal);
-    els.settingModal.addEventListener("click", (event) => {
-      if (event.target === els.settingModal) closeSettingModal();
-    });
+    bindModalCloseGuard(els.settingModal, els.settingForm, closeSettingModal, [els.closeSettingModal, els.cancelSettingForm]);
     els.userForm.addEventListener("submit", handleUserSubmit);
     els.userForm.elements.role.addEventListener("change", () => {
       setUserPermissionCodes(defaultPermissionsForRole(els.userForm.elements.role.value), els.userForm.elements.role.value);
@@ -2695,47 +2730,23 @@ const state = {
       applyPermissionDependencies(input);
       syncUserPermissionSummary();
     }));
-    els.closeUserModal.addEventListener("click", closeUserModal);
-    els.cancelUserForm.addEventListener("click", closeUserModal);
-    els.userModal.addEventListener("click", (event) => {
-      if (event.target === els.userModal) closeUserModal();
-    });
+    bindModalCloseGuard(els.userModal, els.userForm, closeUserModal, [els.closeUserModal, els.cancelUserForm]);
     els.maintenanceLogForm.addEventListener("submit", handleMaintenanceLogSubmit);
-    els.closeMaintenanceLogModal.addEventListener("click", closeMaintenanceLogModal);
-    els.cancelMaintenanceLogForm.addEventListener("click", closeMaintenanceLogModal);
-    els.maintenanceLogModal.addEventListener("click", (event) => {
-      if (event.target === els.maintenanceLogModal) closeMaintenanceLogModal();
-    });
+    bindModalCloseGuard(els.maintenanceLogModal, els.maintenanceLogForm, closeMaintenanceLogModal, [els.closeMaintenanceLogModal, els.cancelMaintenanceLogForm]);
     els.maintenancePlanForm.addEventListener("submit", handleMaintenancePlanSubmit);
-    els.closeMaintenancePlanModal.addEventListener("click", closeMaintenancePlanModal);
-    els.cancelMaintenancePlanForm.addEventListener("click", closeMaintenancePlanModal);
-    els.maintenancePlanModal.addEventListener("click", (event) => {
-      if (event.target === els.maintenancePlanModal) closeMaintenancePlanModal();
-    });
+    bindModalCloseGuard(els.maintenancePlanModal, els.maintenancePlanForm, closeMaintenancePlanModal, [els.closeMaintenancePlanModal, els.cancelMaintenancePlanForm]);
     
     // Software License Listeners
     els.softwareLicenseForm.addEventListener("submit", handleSoftwareLicenseSubmit);
-    els.closeSoftwareLicenseModal.addEventListener("click", closeSoftwareLicenseModal);
-    els.cancelSoftwareLicenseForm.addEventListener("click", closeSoftwareLicenseModal);
-    els.softwareLicenseModal.addEventListener("click", (event) => {
-      if (event.target === els.softwareLicenseModal) closeSoftwareLicenseModal();
-    });
+    bindModalCloseGuard(els.softwareLicenseModal, els.softwareLicenseForm, closeSoftwareLicenseModal, [els.closeSoftwareLicenseModal, els.cancelSoftwareLicenseForm]);
     
     // Movement Log Listeners
     els.movementLogForm.addEventListener("submit", handleMovementLogSubmit);
-    els.closeMovementLogModal.addEventListener("click", closeMovementLogModal);
-    els.cancelMovementLogForm.addEventListener("click", closeMovementLogModal);
-    els.movementLogModal.addEventListener("click", (event) => {
-      if (event.target === els.movementLogModal) closeMovementLogModal();
-    });
+    bindModalCloseGuard(els.movementLogModal, els.movementLogForm, closeMovementLogModal, [els.closeMovementLogModal, els.cancelMovementLogForm]);
 
     // Department Listeners
     els.departmentForm.addEventListener("submit", handleDepartmentSubmit);
-    els.closeDepartmentModal.addEventListener("click", closeDepartmentModal);
-    els.cancelDepartmentForm.addEventListener("click", closeDepartmentModal);
-    els.departmentModal.addEventListener("click", (event) => {
-      if (event.target === els.departmentModal) closeDepartmentModal();
-    });
+    bindModalCloseGuard(els.departmentModal, els.departmentForm, closeDepartmentModal, [els.closeDepartmentModal, els.cancelDepartmentForm]);
 
     els.systemModalForm?.addEventListener("submit", (event) => {
       event.preventDefault();

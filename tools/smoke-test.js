@@ -113,6 +113,9 @@ async function run() {
   assert.ok(app.includes("async function exportTabularExcel(kind)"));
   assert.ok(app.includes("function printTabularReport(kind)"));
   assert.ok(app.includes("function openMaintenancePlanModal(planId = null)"));
+  assert.ok(app.includes("function bindModalCloseGuard(modal, form, closeModal, buttons)"));
+  assert.ok(app.includes('"BỎ NỘI DUNG ĐANG SOẠN?"'));
+  assert.ok((app.match(/bindModalCloseGuard\(/g) || []).length >= 9);
   assert.ok(index.includes('id="maintenancePlanModal"'));
   assert.ok(!app.includes("function exportMaintenanceCsv()"));
 
