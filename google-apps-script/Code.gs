@@ -700,7 +700,6 @@ function currentUser(token) {
 function listUsers(token) {
   try {
     requireAdmin_(token);
-    ensureUsersReady_();
     return { ok: true, users: readUsers_().map(publicUser_) };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -711,7 +710,6 @@ function saveUser(user, token) {
   try {
     const actor = requireAdmin_(token);
     const action = user && user.user_id ? "USER_UPDATED" : "USER_CREATED";
-    ensureUsersReady_();
     const normalized = normalizeUser_(user || {});
     const duplicate = readUsers_().find((item) => item.username === normalized.username && item.user_id !== normalized.user_id);
     if (duplicate) throw new Error("Tên đăng nhập đã tồn tại");

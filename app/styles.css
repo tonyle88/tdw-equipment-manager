@@ -826,6 +826,8 @@
   .setting-actions button:disabled { opacity: .42; cursor: not-allowed; }
   .users-panel { display: grid; gap: 14px; padding: 20px; color: #fff; grid-column: 1 / -1; }
   .users-list { display: grid; gap: 10px; }
+  .users-loading { display: flex; align-items: center; gap: 10px; margin: 8px 0; color: rgba(255,255,255,.75); font-weight: 800; }
+  .users-loading span { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.24); border-top-color: #5ddcf6; border-radius: 999px; animation: spin .8s linear infinite; }
   .user-row {
     display: grid;
     grid-template-columns: minmax(220px, 1fr) 140px 150px 260px;

@@ -1513,8 +1513,8 @@ const state = {
           <h2>QUẢN LÝ NGƯỜI DÙNG</h2>
           <button class="primary-button" type="button" id="openUserModal">+ Thêm user</button>
         </div>
-        <div class="users-list" id="usersList">
-          <p class="muted">Đang tải danh sách user...</p>
+        <div class="users-list" id="usersList" aria-busy="true">
+          <p class="users-loading" aria-live="polite"><span aria-hidden="true"></span>Đang tải danh sách user...</p>
         </div>
       </div>
     `;
@@ -1527,13 +1527,16 @@ const state = {
       await preloadUsers({ force: true });
       renderUsersList();
     } catch (error) {
-      els.content.querySelector("#usersList").innerHTML = `<p class="muted">Không tải được user: ${escapeHtml(error.message)}</p>`;
+      const list = els.content.querySelector("#usersList");
+      list.setAttribute("aria-busy", "false");
+      list.innerHTML = `<p class="muted">Không tải được user: ${escapeHtml(error.message)}</p>`;
     }
   }
 
   function renderUsersList() {
     const list = els.content.querySelector("#usersList");
     if (!list) return;
+    list.setAttribute("aria-busy", "false");
     list.innerHTML = state.users.map((user) => `
       <div class="user-row">
         <div>

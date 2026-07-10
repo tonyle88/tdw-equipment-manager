@@ -83,6 +83,8 @@ Xác minh:
 
 ## Sprint 4 - Tối ưu tốc độ và trải nghiệm tải
 
+Trạng thái: Hoàn tất.
+
 Mục tiêu:
 
 - Giảm cảm giác chậm ở Dashboard và Quản lý người dùng.
