@@ -1,5 +1,6 @@
 const ALLOWED_FUNCTIONS = new Set([
   "getAppData",
+  "getSoftwareLicenseKey",
   "healthCheck",
   "loginUser",
   "logoutUser",

@@ -120,3 +120,29 @@ Xác minh:
 
 - `git status --short` sạch sau commit.
 - Vercel deploy đúng commit mới nhất.
+
+## Phân quyền theo module
+
+### Phase 1 - Bảo vệ license và hợp đồng API
+
+Trạng thái: Hoàn tất.
+
+- License key chỉ tải khi Admin bấm xem; dữ liệu tải chung chỉ có bản che.
+- Lượt xem key được ghi vào `AuditLogs`.
+- Chuẩn hóa request xóa maintenance/license giữa frontend và Apps Script.
+
+### Phase 2 - Chuẩn hóa quyền backend
+
+- Dùng mã quyền theo module, có kiểm tra tại từng API ghi/xóa/đọc dữ liệu nhạy cảm.
+- Hỗ trợ tương thích dữ liệu quyền cũ `all`, `view`, `edit`, `report`.
+- Admin luôn toàn quyền; Manager mặc định không quản lý Cấu hình, Phòng ban, User hoặc license key.
+
+### Phase 3 - Ma trận checkbox cho Admin
+
+- Thay ô nhập quyền tự do bằng checkbox `Xem`, `Thêm/Sửa`, `Xóa` theo từng module.
+- Có preset Admin, Manager, User, Viewer và phần tóm tắt quyền đã chọn.
+
+### Phase 4 - Đồng bộ giao diện và xác minh
+
+- Menu, nút thao tác và dữ liệu trả về chỉ hiển thị khi có quyền tương ứng.
+- Bổ sung test cho Admin, Manager, User và Viewer trước khi deploy.

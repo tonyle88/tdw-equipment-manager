@@ -76,14 +76,42 @@ function getAppData() {
     departments: readSheetAsObjects_(SHEET_NAMES.departments),
     maintenanceLogs: readSheetAsObjects_(SHEET_NAMES.maintenanceLogs),
     inventoryMovements: readSheetAsObjects_(SHEET_NAMES.inventoryMovements),
-    softwareLicenses: readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(lic => {
-      lic.license_key = decodeLicenseKey_(lic.license_key_or_note || "");
-      delete lic.license_key_or_note;
-      return lic;
-    }),
+    softwareLicenses: readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_),
     currentUser: user ? publicUser_(user) : null,
     updated_at: new Date().toISOString(),
   };
+}
+
+function publicSoftwareLicense_(license) {
+  const result = Object.assign({}, license);
+  const key = decodeLicenseKey_(result.license_key_or_note || "");
+  delete result.license_key_or_note;
+  result.license_key_masked = maskLicenseKey_(key);
+  return result;
+}
+
+function maskLicenseKey_(key) {
+  if (!key) return "Chưa có";
+  return String(key).length > 4 ? `••••-••••-${String(key).slice(-4)}` : "••••";
+}
+
+function getSoftwareLicenseKey(licenseId, token) {
+  try {
+    const admin = requireAdmin_(token);
+    if (!licenseId) throw new Error("Missing license_id");
+    const license = readSheetAsObjects_(SHEET_NAMES.softwareLicenses)
+      .find((item) => item.license_id === licenseId);
+    if (!license) throw new Error("Không tìm thấy bản quyền phần mềm");
+    logAudit_(admin, "LICENSE_KEY_VIEWED", "software_license", licenseId, license.software_name);
+    return {
+      ok: true,
+      license_id: licenseId,
+      license_key: decodeLicenseKey_(license.license_key_or_note || ""),
+      updated_at: new Date().toISOString(),
+    };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
 }
 
 function healthCheck(token) {
@@ -220,6 +248,9 @@ function doPost(event) {
     if (action === "getAppData") {
       return jsonResponse_(getAppData(args[0] || body.token || ""));
     }
+    if (action === "getSoftwareLicenseKey") {
+      return jsonResponse_(getSoftwareLicenseKey(args[0] || body.license_id || "", args[1] || body.token || ""));
+    }
     if (action === "healthCheck") {
       return jsonResponse_(healthCheck(args[0] || body.token || ""));
     }
@@ -233,7 +264,8 @@ function doPost(event) {
       return jsonResponse_(saveMaintenanceLog(args[0] || body.log || {}, args[1] || body.token || ""));
     }
     if (action === "deleteMaintenanceLog") {
-      return jsonResponse_(deleteMaintenanceLog(args[0] || body.logId || "", args[1] || body.token || ""));
+      const logId = args[0] && typeof args[0] === "object" ? args[0].logId : args[0] || body.logId || "";
+      return jsonResponse_(deleteMaintenanceLog(logId, args[1] || body.token || ""));
     }
     if (action === "saveMovementLog") {
       return jsonResponse_(saveMovementLog(args[0] || body.log || {}, args[1] || body.token || ""));
@@ -242,7 +274,8 @@ function doPost(event) {
       return jsonResponse_(saveSoftwareLicense(args[0] || body.license || {}, args[1] || body.token || ""));
     }
     if (action === "deleteSoftwareLicense") {
-      return jsonResponse_(deleteSoftwareLicense(args[0] || body.licenseId || "", args[1] || body.token || ""));
+      const licenseId = args[0] && typeof args[0] === "object" ? args[0].licenseId : args[0] || body.licenseId || "";
+      return jsonResponse_(deleteSoftwareLicense(licenseId, args[1] || body.token || ""));
     }
     if (action === "saveSetting") {
       return jsonResponse_(saveSetting(args[0] || body.setting || {}, args[1] || body.token || ""));
@@ -474,8 +507,13 @@ function normalizeSoftwareLicense_(license) {
   if (!normalized.software_name) throw new Error("Tên phần mềm là bắt buộc");
   normalized.version = normalized.version || "";
   
-  // Mã hoá license_key và lưu vào cột license_key_or_note của Sheet
-  normalized.license_key_or_note = encodeLicenseKey_(normalized.license_key || "");
+  const existing = normalized.license_id
+    ? readSheetAsObjects_(SHEET_NAMES.softwareLicenses).find((item) => item.license_id === normalized.license_id)
+    : null;
+  const licenseKey = String(normalized.license_key || "");
+  normalized.license_key_or_note = licenseKey
+    ? encodeLicenseKey_(licenseKey)
+    : existing ? existing.license_key_or_note || "" : "";
   delete normalized.license_key;
 
   normalized.assigned_asset_id = normalized.assigned_asset_id || "";

@@ -147,7 +147,7 @@ created_at
 updated_at
 ```
 
-`license_key_or_note` duoc Apps Script ma hoa khi luu. Frontend nhan lai truong `license_key` da giai ma qua API.
+`license_key_or_note` duoc Apps Script ma hoa khi luu. Du lieu tai ban dau chi co `license_key_masked`; key day du chi duoc tra ve theo yeu cau rieng cho Admin.
 
 ## AuditLogs
 

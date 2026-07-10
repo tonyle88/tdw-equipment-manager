@@ -57,6 +57,7 @@ Schema chi tiết nằm ở `docs/02-google-sheet-schema.md`.
 
 ```text
 getAppData
+getSoftwareLicenseKey
 loginUser
 logoutUser
 saveAsset

@@ -745,7 +745,7 @@ const state = {
           <tr><th style="padding: 4px 0">Phần mềm</th><th style="padding: 4px 0">Key</th><th style="padding: 4px 0">Ngày hết hạn</th></tr>
         </thead>
         <tbody>
-          ${logs.map(log => `<tr><td style="padding: 8px 0; font-weight:500;">${escapeHtml(log.software_name)} ${escapeHtml(log.version)}</td><td style="padding: 8px 0"><code style="background: var(--bg-hover); padding: 2px 4px; border-radius: 4px;">${escapeHtml(log.license_key)}</code></td><td style="padding: 8px 0">${escapeHtml(formatDate(log.expiry_date))}</td></tr>`).join('')}
+          ${logs.map(log => `<tr><td style="padding: 8px 0; font-weight:500;">${escapeHtml(log.software_name)} ${escapeHtml(log.version)}</td><td style="padding: 8px 0"><code style="background: var(--bg-hover); padding: 2px 4px; border-radius: 4px;">${escapeHtml(log.license_key_masked || "Chưa có")}</code></td><td style="padding: 8px 0">${escapeHtml(formatDate(log.expiry_date))}</td></tr>`).join('')}
         </tbody>
       </table>
     `;
@@ -1023,7 +1023,7 @@ const state = {
         const id = e.target.dataset.id;
         if (await confirmAction("Xóa lịch sử bảo trì", "Bạn có chắc chắn muốn xóa lịch sử bảo trì này? Dữ liệu không thể khôi phục.")) {
           try {
-            await callServer("deleteMaintenanceLog", { logId: id });
+            await callServer("deleteMaintenanceLog", id);
             showToast("Đã xóa", "Lịch sử bảo trì đã được xóa");
             await loadAppData();
             renderMaintenanceView();
@@ -1082,7 +1082,10 @@ const state = {
                 <tr>
                   <td style="font-weight: 500;">${escapeHtml(license.software_name)}</td>
                   <td>${escapeHtml(license.version)}</td>
-                  <td><code style="background: var(--bg-hover); padding: 2px 6px; border-radius: 4px; font-size: 12px;">${escapeHtml(license.license_key)}</code></td>
+                  <td class="license-key-cell">
+                    <code class="license-key-value">${escapeHtml(license.license_key_masked || "Chưa có")}</code>
+                    ${isAdmin() && license.license_key_masked !== "Chưa có" ? `<button class="license-key-toggle" type="button" data-license-id="${escapeHtml(license.license_id)}" data-masked="${escapeHtml(license.license_key_masked)}" aria-label="Xem license key">👁</button>` : ""}
+                  </td>
                   <td>
                     ${assignedAssets.map(asset => `<div style="margin-bottom: 2px;"><span>🖥 ${escapeHtml(asset.asset_name)}</span></div>`).join('')}
                     ${license.assigned_user ? `<div style="margin-top: 2px;">👤 ${escapeHtml(license.assigned_user)}</div>` : ""}
@@ -1117,7 +1120,7 @@ const state = {
         const name = e.target.dataset.name;
         if (await confirmAction("Xóa bản quyền", `Bạn có chắc chắn muốn xóa bản quyền phần mềm "${name}"?`)) {
           try {
-            await callServer("deleteSoftwareLicense", { licenseId: id });
+            await callServer("deleteSoftwareLicense", id);
             showToast("Đã xóa", `Bản quyền phần mềm "${name}" đã được xóa`);
             await loadAppData();
             renderSoftwareView();
@@ -1127,6 +1130,33 @@ const state = {
         }
       });
     });
+    els.content.querySelectorAll(".license-key-toggle").forEach((button) => {
+      button.addEventListener("click", () => toggleLicenseKey(button));
+    });
+  }
+
+  async function toggleLicenseKey(button) {
+    const value = button.closest(".license-key-cell")?.querySelector(".license-key-value");
+    if (!value) return;
+    if (button.dataset.revealed === "true") {
+      value.textContent = button.dataset.masked || "Chưa có";
+      button.dataset.revealed = "false";
+      button.textContent = "👁";
+      button.setAttribute("aria-label", "Xem license key");
+      return;
+    }
+    button.disabled = true;
+    try {
+      const payload = await callServer("getSoftwareLicenseKey", button.dataset.licenseId);
+      value.textContent = payload.license_key || "Chưa có";
+      button.dataset.revealed = "true";
+      button.textContent = "🙈";
+      button.setAttribute("aria-label", "Ẩn license key");
+    } catch (error) {
+      showMessageModal("Không thể xem license key", error.message);
+    } finally {
+      button.disabled = false;
+    }
   }
 
   function renderDepartmentsView() {
@@ -1334,8 +1364,7 @@ const state = {
         <div class="settings-title-row">
           <h2>CẤU HÌNH</h2>
           <div class="settings-header-actions">
-            ${isAdmin() ? '<button class="secondary-button" type="button" id="healthCheckButton">Kiểm tra kết nối</button>' : ""}
-            <button class="primary-button" type="button" id="openSettingModal">+ Thêm cấu hình</button>
+            ${isAdmin() ? '<button class="secondary-button" type="button" id="healthCheckButton">Kiểm tra kết nối</button><button class="primary-button" type="button" id="openSettingModal">+ Thêm cấu hình</button>' : ""}
           </div>
         </div>
         <div class="settings-layout full-settings-layout">
@@ -1351,14 +1380,14 @@ const state = {
                         <strong>${escapeHtml(item.display_name)}</strong>
                         <small>${escapeHtml(item.setting_value)} · thứ tự ${escapeHtml(item.sort_order)}</small>
                       </div>
-                      <div class="setting-actions">
+                      ${isAdmin() ? `<div class="setting-actions">
                         <div class="setting-order-buttons" aria-label="Đổi thứ tự">
                           <button class="secondary-button" type="button" data-move-setting="${escapeHtml(item.setting_id)}" data-direction="up" ${index === 0 ? "disabled" : ""}>↑</button>
                           <button class="secondary-button" type="button" data-move-setting="${escapeHtml(item.setting_id)}" data-direction="down" ${index === list.length - 1 ? "disabled" : ""}>↓</button>
                         </div>
                         <button class="secondary-button" type="button" data-edit-setting="${escapeHtml(item.setting_id)}">Sửa</button>
                         <button class="danger-button" type="button" data-delete-setting="${escapeHtml(item.setting_id)}">Xóa</button>
-                      </div>
+                      </div>` : ""}
                     </div>
                   `).join("") || `<p>Chưa có cấu hình.</p>`}
                 </section>
@@ -1368,7 +1397,7 @@ const state = {
         </div>
       </div>
     `;
-    els.content.querySelector("#openSettingModal").addEventListener("click", () => openSettingModal());
+    els.content.querySelector("#openSettingModal")?.addEventListener("click", () => openSettingModal());
     els.content.querySelector("#healthCheckButton")?.addEventListener("click", handleHealthCheck);
     els.content.querySelectorAll("[data-edit-setting]").forEach((button) => {
       button.addEventListener("click", () => openSettingModal(state.settings.find((item) => item.setting_id === button.dataset.editSetting)));

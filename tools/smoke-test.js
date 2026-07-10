@@ -66,6 +66,12 @@ async function run() {
   assertSyntax("google-apps-script/Code.gs");
   assertSyntax("api/google-script.js");
 
+  const appsScript = read("google-apps-script/Code.gs");
+  const app = read("app/app.js");
+  assert.ok(appsScript.includes("softwareLicenses: readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_)"));
+  assert.ok(appsScript.includes("function getSoftwareLicenseKey(licenseId, token)"));
+  assert.ok(!app.includes("license.license_key)"));
+
   const vercel = JSON.parse(read("vercel.json"));
   assert.equal(vercel.version, 2);
   assert.ok(vercel.rewrites.some((rule) => rule.source === "/" && rule.destination === "/app/index.html"));
@@ -77,6 +83,13 @@ async function run() {
   assert.deepEqual(JSON.parse(allowed.requestToAppsScript.options.body), {
     action: "healthCheck",
     args: ["session-token"],
+  });
+
+  const licenseKey = await invokeProxy({ fn: "getSoftwareLicenseKey", args: ["license-id", "session-token"] });
+  assert.equal(licenseKey.res.statusCode, 200);
+  assert.deepEqual(JSON.parse(licenseKey.requestToAppsScript.options.body), {
+    action: "getSoftwareLicenseKey",
+    args: ["license-id", "session-token"],
   });
 
   const denied = await invokeProxy({ fn: "notAllowed", args: [] });
