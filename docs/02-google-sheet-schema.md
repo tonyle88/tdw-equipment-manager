@@ -159,6 +159,22 @@ created_at
 updated_at
 ```
 
+## MaintenancePlans
+
+Tab nay duoc Apps Script tu tao khi luu ke hoach dau tien. Chu ky chi nhan `MONTHLY`, `QUARTERLY` hoac `YEARLY`; `next_due_date` dung dinh dang `YYYY-MM-DD`.
+
+```text
+plan_id
+asset_id
+title
+frequency
+next_due_date
+note
+active
+created_at
+updated_at
+```
+
 ## InventoryMovements
 
 ```text

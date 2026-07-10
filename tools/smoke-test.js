@@ -71,6 +71,9 @@ async function run() {
   const index = read("app/index.html");
   assert.ok(appsScript.includes('softwareLicenses: hasPermission_(user, "software.view") ? readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_) : []'));
   assert.ok(appsScript.includes('maintenanceLogs: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenanceLogs) : []'));
+  assert.ok(appsScript.includes('maintenancePlans: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenancePlans) : []'));
+  assert.ok(appsScript.includes("function normalizeMaintenancePlan_(plan)"));
+  assert.ok(appsScript.includes("function ensureMaintenancePlansSheet_(sheet)"));
   assert.ok(appsScript.includes("function getSoftwareLicenseKey(licenseId, token)"));
   assert.ok(appsScript.includes("function requirePermission_(token, permission)"));
   assert.ok(appsScript.includes("Object.assign({}, existing, user || {})"));
@@ -98,6 +101,9 @@ async function run() {
   assert.throws(() => vm.runInContext('normalizeEmail_("not-an-email")', permissions), /Email không đúng định dạng/);
   assert.equal(vm.runInContext('isNotificationReadyUser_({ active: "TRUE", email: "notice@example.com" })', permissions), true);
   assert.equal(vm.runInContext('isNotificationReadyUser_({ active: "FALSE", email: "notice@example.com" })', permissions), false);
+  vm.runInContext('readActiveAssets_ = () => [{ asset_id: "asset-id" }];', permissions);
+  assert.equal(vm.runInContext('normalizeMaintenancePlan_({ plan_id: "plan-id", asset_id: "asset-id", title: "Kiểm tra định kỳ", frequency: "monthly", next_due_date: "2026-08-01" }).frequency', permissions), "MONTHLY");
+  assert.throws(() => vm.runInContext('normalizeMaintenancePlan_({ plan_id: "plan-id", asset_id: "asset-id", title: "Kiểm tra", frequency: "weekly", next_due_date: "2026-08-01" })', permissions), /Chu kỳ bảo trì không hợp lệ/);
   assert.ok(index.includes('name="permission_code" value="assets.manage"'));
   assert.ok(index.includes('name="permission_code" value="reports.maintenance.export"'));
   assert.ok(index.includes('name="primary_responsible_id"'));
@@ -106,6 +112,8 @@ async function run() {
   assert.ok(app.includes("function canAccessView(view)"));
   assert.ok(app.includes("async function exportTabularExcel(kind)"));
   assert.ok(app.includes("function printTabularReport(kind)"));
+  assert.ok(app.includes("function openMaintenancePlanModal(planId = null)"));
+  assert.ok(index.includes('id="maintenancePlanModal"'));
   assert.ok(!app.includes("function exportMaintenanceCsv()"));
 
   const vercel = JSON.parse(read("vercel.json"));
@@ -126,6 +134,13 @@ async function run() {
   assert.deepEqual(JSON.parse(licenseKey.requestToAppsScript.options.body), {
     action: "getSoftwareLicenseKey",
     args: ["license-id", "session-token"],
+  });
+
+  const maintenancePlan = await invokeProxy({ fn: "saveMaintenancePlan", args: [{ asset_id: "asset-id" }, "session-token"] });
+  assert.equal(maintenancePlan.res.statusCode, 200);
+  assert.deepEqual(JSON.parse(maintenancePlan.requestToAppsScript.options.body), {
+    action: "saveMaintenancePlan",
+    args: [{ asset_id: "asset-id" }, "session-token"],
   });
 
   const denied = await invokeProxy({ fn: "notAllowed", args: [] });

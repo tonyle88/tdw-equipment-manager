@@ -3,6 +3,7 @@ const SHEET_NAMES = {
   users: "Users",
   departments: "Departments",
   maintenanceLogs: "MaintenanceLogs",
+  maintenancePlans: "MaintenancePlans",
   softwareLicenses: "SoftwareLicenses",
   inventoryMovements: "InventoryMovements",
   assetResponsibles: "AssetResponsibles",
@@ -32,6 +33,7 @@ const HEALTH_CHECK_HEADERS = {
   Users: ["user_id", "username", "email", "role", "active"],
   Departments: ["department_id", "department_name"],
   MaintenanceLogs: ["log_id", "asset_id", "date"],
+  MaintenancePlans: ["plan_id", "asset_id", "frequency", "next_due_date"],
   SoftwareLicenses: ["license_id", "software_name"],
   InventoryMovements: ["movement_id", "asset_id", "movement_date"],
   AssetResponsibles: ["responsibility_id", "asset_id", "user_id", "responsibility_role"],
@@ -66,6 +68,7 @@ function getReadableSheetRows_(user, sheetName) {
   if (sheetName === SHEET_NAMES.assets && hasPermission_(user, "assets.view")) return readActiveAssets_();
   if (sheetName === SHEET_NAMES.assetResponsibles && hasPermission_(user, "assets.view")) return readActiveAssetResponsibles_();
   if (sheetName === SHEET_NAMES.maintenanceLogs && hasPermission_(user, "maintenance.view")) return readSheetAsObjects_(SHEET_NAMES.maintenanceLogs);
+  if (sheetName === SHEET_NAMES.maintenancePlans && hasPermission_(user, "maintenance.view")) return readSheetAsObjects_(SHEET_NAMES.maintenancePlans);
   if (sheetName === SHEET_NAMES.inventoryMovements && hasPermission_(user, "movement.manage")) return readSheetAsObjects_(SHEET_NAMES.inventoryMovements);
   if (sheetName === SHEET_NAMES.softwareLicenses && hasPermission_(user, "software.view")) return readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_);
   if ([SHEET_NAMES.settings, SHEET_NAMES.departments].indexOf(sheetName) !== -1) return readSheetAsObjects_(sheetName);
@@ -104,6 +107,7 @@ function getAppData(token) {
     assetResponsibles: hasPermission_(user, "assets.view") ? readActiveAssetResponsibles_() : [],
     responsibleUsers: hasPermission_(user, "assets.view") ? readUsers_().filter(isNotificationReadyUser_).map(publicResponsibleUser_) : [],
     maintenanceLogs: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenanceLogs) : [],
+    maintenancePlans: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenancePlans) : [],
     inventoryMovements: hasPermission_(user, "movement.manage") ? readSheetAsObjects_(SHEET_NAMES.inventoryMovements) : [],
     softwareLicenses: hasPermission_(user, "software.view") ? readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_) : [],
     currentUser: publicUser_(user),
@@ -305,6 +309,13 @@ function doPost(event) {
     if (action === "deleteMaintenanceLog") {
       const logId = args[0] && typeof args[0] === "object" ? args[0].logId : args[0] || body.logId || "";
       return jsonResponse_(deleteMaintenanceLog(logId, args[1] || body.token || ""));
+    }
+    if (action === "saveMaintenancePlan") {
+      return jsonResponse_(saveMaintenancePlan(args[0] || body.plan || {}, args[1] || body.token || ""));
+    }
+    if (action === "deleteMaintenancePlan") {
+      const planId = args[0] && typeof args[0] === "object" ? args[0].planId : args[0] || body.planId || "";
+      return jsonResponse_(deleteMaintenancePlan(planId, args[1] || body.token || ""));
     }
     if (action === "saveMovementLog") {
       return jsonResponse_(saveMovementLog(args[0] || body.log || {}, args[1] || body.token || ""));
@@ -536,6 +547,50 @@ function deleteMaintenanceLog(logId, token) {
   }
 }
 
+function saveMaintenancePlan(plan, token) {
+  try {
+    const actor = requirePermission_(token || "", "maintenance.manage");
+    const action = plan && plan.plan_id ? "MAINTENANCE_PLAN_UPDATED" : "MAINTENANCE_PLAN_CREATED";
+    const normalized = normalizeMaintenancePlan_(plan || {});
+    const saved = upsertObject_(SHEET_NAMES.maintenancePlans, "plan_id", normalized);
+    logAudit_(actor, action, "maintenance_plan", saved.plan_id, saved.title || saved.asset_id);
+    return { ok: true, data: saved, updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function normalizeMaintenancePlan_(plan) {
+  const now = new Date().toISOString();
+  const normalized = Object.assign({}, plan);
+  const frequencies = ["MONTHLY", "QUARTERLY", "YEARLY"];
+  normalized.plan_id = normalized.plan_id || Utilities.getUuid();
+  normalized.asset_id = String(normalized.asset_id || "").trim();
+  normalized.title = String(normalized.title || "").trim();
+  normalized.frequency = String(normalized.frequency || "").trim().toUpperCase();
+  normalized.next_due_date = String(normalized.next_due_date || "").trim();
+  if (!normalized.asset_id) throw new Error("Thiếu thiết bị cho kế hoạch bảo trì");
+  if (!readActiveAssets_().some((asset) => asset.asset_id === normalized.asset_id)) throw new Error("Thiết bị của kế hoạch không tồn tại hoặc đã bị xóa");
+  if (!normalized.title) throw new Error("Nội dung kế hoạch là bắt buộc");
+  if (frequencies.indexOf(normalized.frequency) === -1) throw new Error("Chu kỳ bảo trì không hợp lệ");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized.next_due_date)) throw new Error("Ngày đến hạn phải có định dạng YYYY-MM-DD");
+  normalized.note = String(normalized.note || "").trim();
+  normalized.active = String(normalized.active || "TRUE").toUpperCase() === "FALSE" ? "FALSE" : "TRUE";
+  normalized.created_at = normalized.created_at || now;
+  return normalized;
+}
+
+function deleteMaintenancePlan(planId, token) {
+  try {
+    const actor = requirePermission_(token || "", "maintenance.delete");
+    const deleted = deleteObject_(SHEET_NAMES.maintenancePlans, "plan_id", planId);
+    if (deleted) logAudit_(actor, "MAINTENANCE_PLAN_DELETED", "maintenance_plan", planId, planId);
+    return { ok: deleted, deleted_id: planId, updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
 function saveMovementLog(log, token) {
   try {
     const actor = requirePermission_(token || "", "movement.manage");
@@ -705,7 +760,7 @@ function nextAssetCode_(groupCode, year) {
 function getSheet_(sheetName) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = spreadsheet.getSheetByName(sheetName);
-  if (!sheet && [SHEET_NAMES.users, SHEET_NAMES.assetResponsibles].indexOf(sheetName) !== -1) {
+  if (!sheet && [SHEET_NAMES.users, SHEET_NAMES.assetResponsibles, SHEET_NAMES.maintenancePlans].indexOf(sheetName) !== -1) {
     sheet = spreadsheet.insertSheet(sheetName);
   }
   if (!sheet) throw new Error(`Sheet not found: ${sheetName}`);
@@ -755,6 +810,10 @@ function ensureSheetHeaders_(sheetName, sheet) {
     ensureAssetResponsiblesSheet_(sheet);
     return;
   }
+  if (sheetName === SHEET_NAMES.maintenancePlans) {
+    ensureMaintenancePlansSheet_(sheet);
+    return;
+  }
   if (sheetName !== SHEET_NAMES.settings) return;
   const firstRow = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
   const headers = firstRow.map((header) => String(header).trim()).filter(Boolean);
@@ -791,6 +850,21 @@ function ensureAssetsSheet_(sheet) {
 
 function ensureAssetResponsiblesSheet_(sheet) {
   const desired = ["responsibility_id", "asset_id", "user_id", "responsibility_role", "active", "created_at", "updated_at"];
+  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim()).filter(Boolean);
+  if (!headers.length) {
+    sheet.getRange(1, 1, 1, desired.length).setValues([desired]);
+    return;
+  }
+  desired.forEach((header) => {
+    if (headers.indexOf(header) === -1) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+      headers.push(header);
+    }
+  });
+}
+
+function ensureMaintenancePlansSheet_(sheet) {
+  const desired = ["plan_id", "asset_id", "title", "frequency", "next_due_date", "note", "active", "created_at", "updated_at"];
   const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim()).filter(Boolean);
   if (!headers.length) {
     sheet.getRange(1, 1, 1, desired.length).setValues([desired]);

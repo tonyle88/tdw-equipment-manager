@@ -342,6 +342,39 @@
         </form>
       </div>
 
+      <div class="modal-backdrop" id="maintenancePlanModal" hidden>
+        <form class="modal compact-modal" id="maintenancePlanForm">
+          <div class="modal-head">
+            <div>
+              <p class="eyebrow">BẢO TRÌ</p>
+              <h2>KẾ HOẠCH BẢO TRÌ</h2>
+            </div>
+            <button class="icon-button" type="button" id="closeMaintenancePlanModal" aria-label="Đóng">×</button>
+          </div>
+          <input type="hidden" name="plan_id" />
+          <div class="form-grid">
+            <label class="span-2">Thiết bị<select name="asset_id" required></select></label>
+            <label>Chu kỳ
+              <select name="frequency" required>
+                <option value="MONTHLY">Hàng tháng</option>
+                <option value="QUARTERLY">Hàng quý</option>
+                <option value="YEARLY">Hàng năm</option>
+              </select>
+            </label>
+            <label>Ngày đến hạn tiếp theo<input name="next_due_date" type="date" required /></label>
+            <label class="span-2">Nội dung công việc<input name="title" required placeholder="VD: Kiểm tra định kỳ, vệ sinh thiết bị" /></label>
+            <label class="span-2">Ghi chú<textarea name="note" rows="2"></textarea></label>
+            <label>Trạng thái
+              <select name="active"><option value="TRUE">Đang áp dụng</option><option value="FALSE">Tạm dừng</option></select>
+            </label>
+          </div>
+          <div class="modal-actions">
+            <button class="secondary-button" type="button" id="cancelMaintenancePlanForm">Hủy</button>
+            <button class="primary-button" type="submit">Lưu kế hoạch</button>
+          </div>
+        </form>
+      </div>
+
       <div class="modal-backdrop" id="movementLogModal" hidden>
         <form class="modal compact-modal" id="movementLogForm">
           <div class="modal-head">

@@ -3,6 +3,7 @@ const state = {
     settings: [],
     departments: [],
     maintenanceLogs: [],
+    maintenancePlans: [],
     inventoryMovements: [],
     softwareLicenses: [],
     assetResponsibles: [],
@@ -161,6 +162,10 @@ const state = {
       maintenanceLogGroupFilter: document.querySelector("#maintenanceLogGroupFilter"),
       closeMaintenanceLogModal: document.querySelector("#closeMaintenanceLogModal"),
       cancelMaintenanceLogForm: document.querySelector("#cancelMaintenanceLogForm"),
+      maintenancePlanModal: document.querySelector("#maintenancePlanModal"),
+      maintenancePlanForm: document.querySelector("#maintenancePlanForm"),
+      closeMaintenancePlanModal: document.querySelector("#closeMaintenancePlanModal"),
+      cancelMaintenancePlanForm: document.querySelector("#cancelMaintenancePlanForm"),
       softwareLicenseModal: document.querySelector("#softwareLicenseModal"),
       softwareLicenseForm: document.querySelector("#softwareLicenseForm"),
       closeSoftwareLicenseModal: document.querySelector("#closeSoftwareLicenseModal"),
@@ -214,6 +219,7 @@ const state = {
       }),
     );
     state.maintenanceLogs = (payload.maintenanceLogs || []).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    state.maintenancePlans = (payload.maintenancePlans || []).sort((a, b) => new Date(a.next_due_date || "9999-12-31") - new Date(b.next_due_date || "9999-12-31"));
     state.inventoryMovements = (payload.inventoryMovements || []).sort((a, b) => new Date(b.movement_date || 0) - new Date(a.movement_date || 0));
     state.softwareLicenses = payload.softwareLicenses || [];
     state.assetResponsibles = payload.assetResponsibles || [];
@@ -1063,8 +1069,24 @@ const state = {
   function renderMaintenanceView() {
     const canManageMaintenance = hasPermission("maintenance.manage");
     const canDeleteMaintenance = hasPermission("maintenance.delete");
+    const today = new Date().toISOString().slice(0, 10);
     const watchList = state.assets.filter((asset) => ["KEM_PHAM_CHAT", "CAN_KIEM_TRA", "KHONG_SU_DUNG", "LUU_KHO_THANH_LY"].includes(asset.status));
     const byStatus = countBy(watchList, "status", "status");
+    const planRows = (state.maintenancePlans || []).map((plan) => {
+      const asset = state.assets.find((item) => item.asset_id === plan.asset_id);
+      const frequency = { MONTHLY: "Hàng tháng", QUARTERLY: "Hàng quý", YEARLY: "Hàng năm" }[plan.frequency] || plan.frequency;
+      const dueState = plan.active === "FALSE" ? "Tạm dừng" : plan.next_due_date < today ? "Quá hạn" : "Đang áp dụng";
+      const dueColor = plan.active === "FALSE" ? "var(--text-secondary)" : plan.next_due_date < today ? "#ef4444" : "#22c55e";
+      return `
+        <tr>
+          <td style="font-weight: 600;">${escapeHtml(asset?.asset_name || "Thiết bị đã xóa")}</td>
+          <td>${escapeHtml(plan.title)}</td>
+          <td style="text-align: center;">${escapeHtml(frequency)}</td>
+          <td style="text-align: center; font-weight: 700; color: ${dueColor};">${escapeHtml(formatDate(plan.next_due_date))}</td>
+          <td style="text-align: center;">${escapeHtml(dueState)}</td>
+          ${(canManageMaintenance || canDeleteMaintenance) ? `<td class="table-actions">${canManageMaintenance ? `<button class="table-action-btn edit-maintenance-plan-btn" data-id="${escapeHtml(plan.plan_id)}" type="button" aria-label="Sửa">✎</button>` : ""}${canDeleteMaintenance ? `<button class="table-action-btn danger delete-maintenance-plan-btn" data-id="${escapeHtml(plan.plan_id)}" data-name="${escapeHtml(plan.title)}" type="button" aria-label="Xóa">×</button>` : ""}</td>` : ""}
+        </tr>`;
+    }).join("");
     
     // Nhóm watchList theo status
     const statusGroups = {};
@@ -1103,6 +1125,16 @@ const state = {
                 </tr>
               </thead>
               <tbody>${tableHtml}</tbody>
+            </table>
+          </article>
+          <article class="module-card maintenance-list-card" style="grid-column: 1 / -1; margin-top: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px;">
+              <div><h3 style="margin: 0;">KẾ HOẠCH BẢO TRÌ</h3><p style="margin: 4px 0 0;">Theo dõi lịch tháng, quý và năm trước khi kích hoạt nhắc việc.</p></div>
+              ${canManageMaintenance ? `<button class="primary-button" type="button" id="openAddMaintenancePlanModal">+ THÊM KẾ HOẠCH</button>` : ""}
+            </div>
+            <table class="mini-table maintenance-table" style="min-width: 760px;">
+              <thead><tr><th>THIẾT BỊ</th><th>NỘI DUNG</th><th style="width: 130px; text-align: center;">CHU KỲ</th><th style="width: 130px; text-align: center;">ĐẾN HẠN</th><th style="width: 120px; text-align: center;">TRẠNG THÁI</th>${(canManageMaintenance || canDeleteMaintenance) ? `<th style="width: 90px;"></th>` : ""}</tr></thead>
+              <tbody>${planRows || `<tr><td colspan="${canManageMaintenance || canDeleteMaintenance ? 6 : 5}" style="text-align: center; color: var(--text-secondary); padding: 24px 0;">Chưa có kế hoạch bảo trì.</td></tr>`}</tbody>
             </table>
           </article>
           <article class="module-card maintenance-list-card" style="grid-column: 1 / -1; margin-top: 24px;">
@@ -1151,6 +1183,26 @@ const state = {
     if (openBtn) {
       openBtn.addEventListener("click", () => openMaintenanceLogModal());
     }
+    els.content.querySelector("#openAddMaintenancePlanModal")?.addEventListener("click", () => openMaintenancePlanModal());
+
+    els.content.querySelectorAll(".edit-maintenance-plan-btn").forEach((btn) => {
+      btn.addEventListener("click", (event) => openMaintenancePlanModal(event.target.dataset.id));
+    });
+
+    els.content.querySelectorAll(".delete-maintenance-plan-btn").forEach((btn) => {
+      btn.addEventListener("click", async (event) => {
+        const { id, name } = event.target.dataset;
+        if (!await confirmAction("Xóa kế hoạch bảo trì", `Xóa kế hoạch “${name}”? Dữ liệu không thể khôi phục.`)) return;
+        try {
+          await callServer("deleteMaintenancePlan", id);
+          showToast("Đã xóa", "Kế hoạch bảo trì đã được xóa");
+          await loadAppData();
+          renderMaintenanceView();
+        } catch (error) {
+          showMessageModal("Lỗi", error.message);
+        }
+      });
+    });
 
     els.content.querySelectorAll(".edit-maintenance-btn").forEach(btn => {
       btn.addEventListener("click", (e) => openMaintenanceLogModal(e.target.dataset.asset, e.target.dataset.id));
@@ -1889,6 +1941,47 @@ const state = {
     }
   }
 
+  function openMaintenancePlanModal(planId = null) {
+    els.maintenancePlanForm.reset();
+    const assetSelect = els.maintenancePlanForm.querySelector('[name="asset_id"]');
+    assetSelect.innerHTML = `<option value="">-- Chọn thiết bị --</option>${state.assets.map((asset) => `<option value="${escapeHtml(asset.asset_id)}">${escapeHtml(asset.asset_name)} (${escapeHtml(asset.asset_code)})</option>`).join("")}`;
+    const plan = planId ? state.maintenancePlans.find((item) => item.plan_id === planId) : null;
+    if (plan) {
+      Object.keys(plan).forEach((key) => {
+        const input = els.maintenancePlanForm.querySelector(`[name="${key}"]`);
+        if (input) input.value = plan[key];
+      });
+    } else {
+      els.maintenancePlanForm.elements.plan_id.value = "";
+      els.maintenancePlanForm.elements.next_due_date.value = new Date().toISOString().slice(0, 10);
+      els.maintenancePlanForm.elements.active.value = "TRUE";
+    }
+    els.maintenancePlanModal.hidden = false;
+  }
+
+  function closeMaintenancePlanModal() {
+    els.maintenancePlanModal.hidden = true;
+    els.maintenancePlanForm.reset();
+  }
+
+  async function handleMaintenancePlanSubmit(event) {
+    event.preventDefault();
+    const plan = Object.fromEntries(new FormData(event.target).entries());
+    const submitBtn = event.target.querySelector("[type=submit]");
+    if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
+    try {
+      await callServer("saveMaintenancePlan", plan);
+      showToast("Đã lưu kế hoạch", plan.title);
+      closeMaintenancePlanModal();
+      await loadAppData();
+      renderMaintenanceView();
+    } catch (error) {
+      showMessageModal("Không thể lưu", error.message);
+    } finally {
+      if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
+    }
+  }
+
   function openSoftwareLicenseModal(licenseId = null, assetIdForNew = null) {
     els.softwareLicenseForm.reset();
 
@@ -2612,6 +2705,12 @@ const state = {
     els.cancelMaintenanceLogForm.addEventListener("click", closeMaintenanceLogModal);
     els.maintenanceLogModal.addEventListener("click", (event) => {
       if (event.target === els.maintenanceLogModal) closeMaintenanceLogModal();
+    });
+    els.maintenancePlanForm.addEventListener("submit", handleMaintenancePlanSubmit);
+    els.closeMaintenancePlanModal.addEventListener("click", closeMaintenancePlanModal);
+    els.cancelMaintenancePlanForm.addEventListener("click", closeMaintenancePlanModal);
+    els.maintenancePlanModal.addEventListener("click", (event) => {
+      if (event.target === els.maintenancePlanModal) closeMaintenancePlanModal();
     });
     
     // Software License Listeners

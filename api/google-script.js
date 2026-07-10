@@ -14,12 +14,14 @@ const ALLOWED_FUNCTIONS = new Set([
   "resetUserPassword",
   "changeOwnPassword",
   "saveMaintenanceLog",
+  "saveMaintenancePlan",
   "saveMovementLog",
   "saveSoftwareLicense",
   "deleteSoftwareLicense",
   "saveDepartment",
   "deleteDepartment",
   "deleteMaintenanceLog",
+  "deleteMaintenancePlan",
 ]);
 
 const SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL;
