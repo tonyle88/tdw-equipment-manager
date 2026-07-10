@@ -167,5 +167,5 @@ Trạng thái: Hoàn tất.
 Trạng thái: Hoàn tất.
 
 - Tach quyen xuat theo thiet bi, bao tri, phan mem va luan chuyen.
-- Bao cao thiet bi giu Excel/PDF; cac phan con lai xuat CSV tuong thich Excel.
-- License key trong CSV phan mem luon duoc che.
+- Tat ca bao cao deu xuat Excel/PDF theo cung format TDW.
+- License key trong bao cao phan mem luon duoc che.

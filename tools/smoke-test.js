@@ -104,6 +104,9 @@ async function run() {
   assert.ok(index.includes('name="email" type="email"'));
   assert.ok(app.includes('function setUserPermissionCodes(rawPermissions, role)'));
   assert.ok(app.includes("function canAccessView(view)"));
+  assert.ok(app.includes("async function exportTabularExcel(kind)"));
+  assert.ok(app.includes("function printTabularReport(kind)"));
+  assert.ok(!app.includes("function exportMaintenanceCsv()"));
 
   const vercel = JSON.parse(read("vercel.json"));
   assert.equal(vercel.version, 2);

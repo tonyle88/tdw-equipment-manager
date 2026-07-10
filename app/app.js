@@ -1372,9 +1372,9 @@ const state = {
           <h2>BÁO CÁO</h2>
           <div class="report-actions">
             ${canExportAssets ? `<label class="report-group-filter"><span>Nhóm xuất thiết bị</span><select id="reportGroupSelect"><option value="">Tất cả nhóm</option>${groupOptions}</select></label><button class="secondary-button" type="button" data-export-assets>Xuất Excel thiết bị</button><button class="secondary-button" type="button" data-print-assets>Xuất PDF thiết bị</button>` : ""}
-            ${canExportMaintenance ? `<button class="secondary-button" type="button" data-export-maintenance>Xuất CSV bảo trì</button>` : ""}
-            ${canExportSoftware ? `<button class="secondary-button" type="button" data-export-software>Xuất CSV phần mềm</button>` : ""}
-            ${canExportMovement ? `<button class="secondary-button" type="button" data-export-movement>Xuất CSV luân chuyển</button>` : ""}
+            ${canExportMaintenance ? `<button class="secondary-button" type="button" data-export-maintenance>Xuất Excel bảo trì</button><button class="secondary-button" type="button" data-print-maintenance>Xuất PDF bảo trì</button>` : ""}
+            ${canExportSoftware ? `<button class="secondary-button" type="button" data-export-software>Xuất Excel phần mềm</button><button class="secondary-button" type="button" data-print-software>Xuất PDF phần mềm</button>` : ""}
+            ${canExportMovement ? `<button class="secondary-button" type="button" data-export-movement>Xuất Excel luân chuyển</button><button class="secondary-button" type="button" data-print-movement>Xuất PDF luân chuyển</button>` : ""}
           </div>
         </div>
         <div class="report-dashboard">
@@ -1399,9 +1399,12 @@ const state = {
       const selectedGroup = document.getElementById("reportGroupSelect")?.value || "";
       printReport(selectedGroup);
     });
-    els.content.querySelector("[data-export-maintenance]")?.addEventListener("click", exportMaintenanceCsv);
-    els.content.querySelector("[data-export-software]")?.addEventListener("click", exportSoftwareCsv);
-    els.content.querySelector("[data-export-movement]")?.addEventListener("click", exportMovementCsv);
+    els.content.querySelector("[data-export-maintenance]")?.addEventListener("click", () => exportTabularExcel("maintenance"));
+    els.content.querySelector("[data-print-maintenance]")?.addEventListener("click", () => printTabularReport("maintenance"));
+    els.content.querySelector("[data-export-software]")?.addEventListener("click", () => exportTabularExcel("software"));
+    els.content.querySelector("[data-print-software]")?.addEventListener("click", () => printTabularReport("software"));
+    els.content.querySelector("[data-export-movement]")?.addEventListener("click", () => exportTabularExcel("movement"));
+    els.content.querySelector("[data-print-movement]")?.addEventListener("click", () => printTabularReport("movement"));
   }
 
   function printReport(groupFilter = "") {
@@ -2212,66 +2215,142 @@ const state = {
     `;
   }
 
-  function exportCsv(filename, headers, rows) {
-    if (!rows.length) {
+  function tabularReportData(kind) {
+    const assets = new Map(state.assets.map((asset) => [asset.asset_id, asset]));
+    if (kind === "maintenance") {
+      return {
+        filename: "tdw-bao-tri",
+        title: "BÁO CÁO LỊCH SỬ BẢO TRÌ",
+        headers: ["Ngày", "Thiết bị", "Loại", "Nội dung", "Chi phí", "Nhà cung cấp", "Thực hiện bởi", "Ghi chú"],
+        rows: state.maintenanceLogs.map((log) => [formatDate(log.date), assets.get(log.asset_id)?.asset_name || "Thiết bị đã xóa", labelFor("maintenance_type", log.action_type) || log.action_type, log.description, formatMoney(log.cost), log.vendor, log.performed_by, log.note]),
+      };
+    }
+    if (kind === "software") {
+      return {
+        filename: "tdw-phan-mem",
+        title: "BÁO CÁO BẢN QUYỀN PHẦN MỀM",
+        headers: ["Phần mềm", "Phiên bản", "License key", "Thiết bị", "Người dùng", "Hết hạn", "Trạng thái", "Ghi chú"],
+        rows: state.softwareLicenses.map((license) => [license.software_name, license.version, license.license_key_masked || "Chưa có", String(license.assigned_asset_id || "").split(",").map((assetId) => assets.get(assetId.trim())?.asset_name).filter(Boolean).join(", "), license.assigned_user, formatDate(license.expiry_date), license.status, license.note]),
+      };
+    }
+    return {
+      filename: "tdw-luan-chuyen",
+      title: "BÁO CÁO LỊCH SỬ LUÂN CHUYỂN",
+      headers: ["Ngày", "Thiết bị", "Từ người dùng", "Đến người dùng", "Từ vị trí", "Đến vị trí", "Lý do", "Phê duyệt bởi", "Ghi chú"],
+      rows: state.inventoryMovements.map((movement) => [formatDate(movement.movement_date), assets.get(movement.asset_id)?.asset_name || "Thiết bị đã xóa", movement.from_user, movement.to_user, movement.from_location, movement.to_location, movement.reason, movement.approved_by, movement.note]),
+    };
+  }
+
+  function safeSpreadsheetValue(value) {
+    const text = String(value ?? "");
+    return /^[=+\-@]/.test(text) ? `'${text}` : text;
+  }
+
+  function excelColumnName(index) {
+    let value = index;
+    let name = "";
+    while (value > 0) {
+      const remainder = (value - 1) % 26;
+      name = String.fromCharCode(65 + remainder) + name;
+      value = Math.floor((value - 1) / 26);
+    }
+    return name;
+  }
+
+  async function exportTabularExcel(kind) {
+    const report = tabularReportData(kind);
+    if (!report.rows.length) {
       showMessageModal("Không có dữ liệu", "Không có dữ liệu phù hợp để xuất.");
       return;
     }
-    const cell = (value) => {
-      const text = String(value ?? "");
-      const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text;
-      return `"${safeText.replace(/"/g, '""')}"`;
-    };
-    const csv = `\uFEFF${[headers, ...rows].map((row) => row.map(cell).join(",")).join("\r\n")}`;
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    if (typeof ExcelJS === "undefined") {
+      showMessageModal("Lỗi xuất", "Thư viện ExcelJS chưa tải xong, vui lòng thử lại sau vài giây.");
+      return;
+    }
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Báo cáo");
+    const lastColumn = report.headers.length + 2;
+    const lastColumnName = excelColumnName(lastColumn);
+    worksheet.columns = [{ width: 3 }, { width: 6 }, ...report.headers.map((header) => ({ width: Math.max(14, Math.min(30, header.length + 8)) }))];
+    try {
+      const response = await fetch("assets/tdw-logo.jpg");
+      if (response.ok) {
+        const blob = await response.blob();
+        const base64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+        worksheet.addImage(workbook.addImage({ base64, extension: "jpeg" }), { tl: { col: 1, row: 1 }, ext: { width: 120, height: 44 } });
+      }
+    } catch (error) {
+      console.warn("Không thể thêm logo vào Excel", error);
+    }
+    worksheet.addRow([]);
+    worksheet.addRow([]);
+    worksheet.addRow([]);
+    const titleRow = worksheet.addRow(["", "", report.title]);
+    worksheet.mergeCells(`C${titleRow.number}:${lastColumnName}${titleRow.number}`);
+    titleRow.height = 30;
+    titleRow.getCell(3).font = { bold: true, size: 14, color: { argb: "FF176DA5" } };
+    titleRow.getCell(3).alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.addRow([]);
+    const headerRow = worksheet.addRow(["", "STT", ...report.headers]);
+    headerRow.height = 25;
+    headerRow.eachCell((cell, column) => {
+      if (column > 1) {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF176DA5" } };
+        cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+        cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
+      }
+    });
+    report.rows.forEach((row, index) => {
+      const dataRow = worksheet.addRow(["", index + 1, ...row.map(safeSpreadsheetValue)]);
+      dataRow.eachCell((cell, column) => {
+        if (column > 1) {
+          cell.alignment = { vertical: "top", horizontal: column === 2 ? "center" : "left", wrapText: true };
+          cell.border = { top: { style: "thin", color: { argb: "FFC8D8E8" } }, left: { style: "thin", color: { argb: "FFC8D8E8" } }, bottom: { style: "thin", color: { argb: "FFC8D8E8" } }, right: { style: "thin", color: { argb: "FFC8D8E8" } } };
+          if (index % 2 === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF0F6FB" } };
+        }
+      });
+    });
+    const dateText = new Date().toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const summaryRow = worksheet.addRow(["", `TỔNG CỘNG · ${report.rows.length} dòng · Ngày xuất: ${dateText}`]);
+    worksheet.mergeCells(`B${summaryRow.number}:${lastColumnName}${summaryRow.number}`);
+    summaryRow.getCell(2).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    summaryRow.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0D4F7C" } };
+    summaryRow.getCell(2).alignment = { vertical: "middle" };
+    worksheet.views = [{ state: "frozen", ySplit: 6 }];
+    worksheet.autoFilter = { from: { row: headerRow.number, column: 2 }, to: { row: headerRow.number + report.rows.length, column: lastColumn } };
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${report.filename}-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
-  function exportMaintenanceCsv() {
-    const assets = new Map(state.assets.map((asset) => [asset.asset_id, asset]));
-    exportCsv(`tdw-bao-tri-${new Date().toISOString().slice(0, 10)}.csv`, ["Ngày", "Thiết bị", "Loại", "Nội dung", "Chi phí", "Nhà cung cấp", "Thực hiện bởi", "Ghi chú"], state.maintenanceLogs.map((log) => [
-      formatDate(log.date),
-      assets.get(log.asset_id)?.asset_name || "Thiết bị đã xóa",
-      labelFor("maintenance_type", log.action_type) || log.action_type,
-      log.description,
-      formatMoney(log.cost),
-      log.vendor,
-      log.performed_by,
-      log.note,
-    ]));
-  }
-
-  function exportSoftwareCsv() {
-    const assets = new Map(state.assets.map((asset) => [asset.asset_id, asset]));
-    exportCsv(`tdw-phan-mem-${new Date().toISOString().slice(0, 10)}.csv`, ["Phần mềm", "Phiên bản", "License key", "Thiết bị", "Người dùng", "Hết hạn", "Trạng thái", "Ghi chú"], state.softwareLicenses.map((license) => [
-      license.software_name,
-      license.version,
-      license.license_key_masked || "Chưa có",
-      String(license.assigned_asset_id || "").split(",").map((assetId) => assets.get(assetId.trim())?.asset_name).filter(Boolean).join(", "),
-      license.assigned_user,
-      formatDate(license.expiry_date),
-      license.status,
-      license.note,
-    ]));
-  }
-
-  function exportMovementCsv() {
-    const assets = new Map(state.assets.map((asset) => [asset.asset_id, asset]));
-    exportCsv(`tdw-luan-chuyen-${new Date().toISOString().slice(0, 10)}.csv`, ["Ngày", "Thiết bị", "Từ người dùng", "Đến người dùng", "Từ vị trí", "Đến vị trí", "Lý do", "Phê duyệt bởi", "Ghi chú"], state.inventoryMovements.map((movement) => [
-      formatDate(movement.movement_date),
-      assets.get(movement.asset_id)?.asset_name || "Thiết bị đã xóa",
-      movement.from_user,
-      movement.to_user,
-      movement.from_location,
-      movement.to_location,
-      movement.reason,
-      movement.approved_by,
-      movement.note,
-    ]));
+  function printTabularReport(kind) {
+    const report = tabularReportData(kind);
+    if (!report.rows.length) {
+      showMessageModal("Không có dữ liệu", "Không có dữ liệu phù hợp để xuất.");
+      return;
+    }
+    const now = new Date();
+    const dateText = now.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const tableRows = report.rows.map((row, index) => `<tr><td class="pr-center">${index + 1}</td>${row.map((value) => `<td>${escapeHtml(value)}</td>`).join("")}</tr>`).join("");
+    const html = `
+      <div class="pr-header" style="position: relative;">
+        <img src="assets/tdw-logo.webp" alt="TDW" style="position: absolute; left: 0; top: 0; width: 100px; height: auto;" />
+        <div class="pr-company">CÔNG TY CỔ PHẦN NƯỚC THỦ ĐỨC &mdash; TDW</div>
+        <div class="pr-title">${escapeHtml(report.title)}</div>
+        <div class="pr-meta">Ngày xuất: ${dateText} &nbsp;|&nbsp; Tổng: ${report.rows.length} dòng</div>
+      </div>
+      <table class="pr-table"><thead><tr><th>STT</th>${report.headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table>
+      <div class="pr-footer"><span>Tài liệu nội bộ · TDW Equipment Manager</span><span>In lúc ${now.toLocaleTimeString("vi-VN")} ngày ${dateText}</span></div>`;
+    const el = document.getElementById("printReport");
+    el.innerHTML = html;
+    el.hidden = false;
+    window.print();
+    el.hidden = true;
+    el.innerHTML = "";
   }
 
   async function exportExcel(groupFilter = "") {
