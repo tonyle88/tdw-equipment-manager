@@ -5,6 +5,8 @@ const state = {
     maintenanceLogs: [],
     inventoryMovements: [],
     softwareLicenses: [],
+    assetResponsibles: [],
+    responsibleUsers: [],
     filtered: [],
     selectedId: null,
     page: 1,
@@ -213,6 +215,8 @@ const state = {
     state.maintenanceLogs = (payload.maintenanceLogs || []).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     state.inventoryMovements = (payload.inventoryMovements || []).sort((a, b) => new Date(b.movement_date || 0) - new Date(a.movement_date || 0));
     state.softwareLicenses = payload.softwareLicenses || [];
+    state.assetResponsibles = payload.assetResponsibles || [];
+    state.responsibleUsers = payload.responsibleUsers || [];
   }
 
   function isAdmin() {
@@ -611,6 +615,26 @@ const state = {
     return dept ? dept.department_name : departmentValue;
   }
 
+  function responsiblesFor(assetId) {
+    return state.assetResponsibles.filter((item) => item.asset_id === assetId);
+  }
+
+  function responsibleName(userId) {
+    const user = state.responsibleUsers.find((item) => item.user_id === userId);
+    return user?.full_name || "User không còn hiệu lực";
+  }
+
+  function primaryResponsibleName(asset) {
+    const primary = responsiblesFor(asset.asset_id).find((item) => item.responsibility_role === "primary");
+    return primary ? responsibleName(primary.user_id) : asset.assigned_to || "Chưa có dữ liệu";
+  }
+
+  function secondaryResponsibleNames(assetId) {
+    return responsiblesFor(assetId)
+      .filter((item) => item.responsibility_role === "secondary")
+      .map((item) => responsibleName(item.user_id));
+  }
+
   function settingOptions(type, extraValues = []) {
     const base = state.settings
       .filter((item) => item.setting_type === type && item.active)
@@ -646,6 +670,10 @@ const state = {
     fillSelect(els.form.elements.asset_type, settingOptions("asset_type"), "Chọn loại thiết bị");
     fillSelect(els.form.elements.department, settingOptions("department"), "Chọn phòng ban");
     fillSelect(els.form.elements.software_license, settingOptions("software_name"), "Chọn phần mềm");
+    fillSelect(els.form.elements.primary_responsible_id, state.responsibleUsers.map((user) => [user.user_id, user.full_name]), "Chọn phụ trách chính");
+    els.form.elements.secondary_responsible_ids.innerHTML = state.responsibleUsers
+      .map((user) => `<option value="${escapeHtml(user.user_id)}">${escapeHtml(user.full_name)}</option>`)
+      .join("");
   }
 
   function renderMetrics() {
@@ -714,7 +742,7 @@ const state = {
         <td class="asset-name">${escapeHtml(asset.asset_name || "")}</td>
         <td>${escapeHtml(asset.asset_group_label || "")}</td>
         <td>${escapeHtml(asset.purchase_year || "")}</td>
-        <td>${escapeHtml([asset.assigned_to, departmentLabel(asset.department)].filter(Boolean).join(" / "))}</td>
+        <td>${escapeHtml([primaryResponsibleName(asset), departmentLabel(asset.department)].filter(Boolean).join(" / "))}</td>
         <td>${escapeHtml(asset.software_license || "")}</td>
         <td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status) || "Chưa rõ")}</span></td>
       </tr>
@@ -764,6 +792,8 @@ const state = {
         <div><dt>Nhóm</dt><dd>${escapeHtml(asset.asset_group_label || "")}</dd></div>
         <div><dt>Vị trí</dt><dd>${escapeHtml(asset.location || "Chưa có dữ liệu")}</dd></div>
         <div><dt>Người dùng</dt><dd>${escapeHtml(asset.assigned_to || "Chưa có dữ liệu")}</dd></div>
+        <div><dt>Phụ trách chính</dt><dd>${escapeHtml(primaryResponsibleName(asset))}</dd></div>
+        <div><dt>Phụ trách phụ</dt><dd>${escapeHtml(secondaryResponsibleNames(asset.asset_id).join(", ") || "Chưa có")}</dd></div>
         <div><dt>Phòng ban</dt><dd>${escapeHtml(departmentLabel(asset.department) || "Chưa có dữ liệu")}</dd></div>
         <div><dt>Phần mềm</dt><dd>${escapeHtml(asset.software_license || "Không có dữ liệu")}</dd></div>
         <div><dt>Ghi chú</dt><dd>${escapeHtml(asset.note || "Không có ghi chú")}</dd></div>
@@ -863,6 +893,13 @@ const state = {
     [...els.form.elements].forEach((field) => {
       if (field.name) field.value = values[field.name] || "";
     });
+    const responsibles = asset ? responsiblesFor(asset.asset_id) : [];
+    const primary = responsibles.find((item) => item.responsibility_role === "primary");
+    els.form.elements.primary_responsible_id.value = primary?.user_id || "";
+    const secondaryIds = new Set(responsibles.filter((item) => item.responsibility_role === "secondary").map((item) => item.user_id));
+    [...els.form.elements.secondary_responsible_ids.options].forEach((option) => {
+      option.selected = secondaryIds.has(option.value);
+    });
     els.modal.hidden = false;
   }
 
@@ -873,6 +910,16 @@ const state = {
 
   function getFormAsset() {
     const data = Object.fromEntries(new FormData(els.form).entries());
+    const primaryUserId = els.form.elements.primary_responsible_id.value;
+    const secondaryUserIds = [...els.form.elements.secondary_responsible_ids.selectedOptions]
+      .map((option) => option.value)
+      .filter((userId) => userId && userId !== primaryUserId);
+    data.responsibles = [
+      ...(primaryUserId ? [{ user_id: primaryUserId, responsibility_role: "primary" }] : []),
+      ...secondaryUserIds.map((userId) => ({ user_id: userId, responsibility_role: "secondary" })),
+    ];
+    delete data.primary_responsible_id;
+    delete data.secondary_responsible_ids;
     data.asset_group_label = labelFor("asset_group", data.asset_group);
     return data;
   }
@@ -971,7 +1018,7 @@ const state = {
         <div class="panel-head"><h2>${view === "devices" ? "Quản lý thiết bị" : "Danh sách thiết bị"}</h2><span id="resultCount">0 thiết bị</span></div>
         <div class="table-wrap">
           <table class="assets-table">
-            <thead><tr><th>Mã tài sản</th><th>Thiết bị</th><th>Nhóm</th><th>Năm</th><th>Người dùng</th><th>Phần mềm</th><th>Tình trạng</th></tr></thead>
+            <thead><tr><th>Mã tài sản</th><th>Thiết bị</th><th>Nhóm</th><th>Năm</th><th>Phụ trách/Bộ phận</th><th>Phần mềm</th><th>Tình trạng</th></tr></thead>
             <tbody id="assetRows"></tbody>
           </table>
         </div>
@@ -1660,7 +1707,7 @@ const state = {
       <div class="user-row">
         <div>
           <strong>${escapeHtml(user.full_name || user.username)}</strong>
-          <small>${escapeHtml(user.username)}</small>
+          <small>${escapeHtml([user.username, user.email].filter(Boolean).join(" · "))}</small>
         </div>
         <span class="role-pill ${safeClass(user.role)}">${escapeHtml(user.role)}</span>
         <span class="user-status">${user.active ? "Đang hoạt động" : "Đã khóa"}</span>
@@ -1688,6 +1735,7 @@ const state = {
     state.editingUserId = "";
     form.reset();
     form.elements.user_id.value = "";
+    form.elements.username.readOnly = false;
     form.elements.role.value = "user";
     form.elements.active.value = "TRUE";
     setUserPermissionCodes(defaultPermissionsForRole("user"), "user");
@@ -1700,7 +1748,9 @@ const state = {
       state.editingUserId = user.user_id;
       els.userForm.elements.user_id.value = user.user_id;
       els.userForm.elements.username.value = user.username;
+      els.userForm.elements.username.readOnly = true;
       els.userForm.elements.full_name.value = user.full_name;
+      els.userForm.elements.email.value = user.email || "";
       els.userForm.elements.role.value = user.role;
       els.userForm.elements.active.value = user.active ? "TRUE" : "FALSE";
       setUserPermissionCodes(user.permissions || defaultPermissionsForRole(user.role), user.role);

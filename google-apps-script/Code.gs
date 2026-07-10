@@ -5,6 +5,7 @@ const SHEET_NAMES = {
   maintenanceLogs: "MaintenanceLogs",
   softwareLicenses: "SoftwareLicenses",
   inventoryMovements: "InventoryMovements",
+  assetResponsibles: "AssetResponsibles",
   settings: "Settings",
   auditLogs: "AuditLogs",
 };
@@ -27,11 +28,12 @@ const MODULE_PERMISSION_CODES = [
 
 const HEALTH_CHECK_HEADERS = {
   Assets: ["asset_id", "asset_name", "status"],
-  Users: ["user_id", "username", "role", "active"],
+  Users: ["user_id", "username", "email", "role", "active"],
   Departments: ["department_id", "department_name"],
   MaintenanceLogs: ["log_id", "asset_id", "date"],
   SoftwareLicenses: ["license_id", "software_name"],
   InventoryMovements: ["movement_id", "asset_id", "movement_date"],
+  AssetResponsibles: ["responsibility_id", "asset_id", "user_id", "responsibility_role"],
   Settings: ["setting_id", "setting_type", "setting_value", "display_name"],
 };
 
@@ -44,9 +46,9 @@ function doGet(event) {
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
 
-    requireAuth_(event.parameter.token || "");
+    const user = requireAuth_(event.parameter.token || "");
     const sheetName = (event.parameter.sheet || SHEET_NAMES.assets).trim();
-    const rows = sheetName === SHEET_NAMES.assets ? readActiveAssets_() : readSheetAsObjects_(sheetName);
+    const rows = getReadableSheetRows_(user, sheetName);
     return jsonResponse_({
       ok: true,
       sheet: sheetName,
@@ -57,6 +59,16 @@ function doGet(event) {
   } catch (error) {
     return jsonResponse_({ ok: false, error: error.message });
   }
+}
+
+function getReadableSheetRows_(user, sheetName) {
+  if (sheetName === SHEET_NAMES.assets && hasPermission_(user, "assets.view")) return readActiveAssets_();
+  if (sheetName === SHEET_NAMES.assetResponsibles && hasPermission_(user, "assets.view")) return readActiveAssetResponsibles_();
+  if (sheetName === SHEET_NAMES.maintenanceLogs && hasPermission_(user, "maintenance.view")) return readSheetAsObjects_(SHEET_NAMES.maintenanceLogs);
+  if (sheetName === SHEET_NAMES.inventoryMovements && hasPermission_(user, "movement.manage")) return readSheetAsObjects_(SHEET_NAMES.inventoryMovements);
+  if (sheetName === SHEET_NAMES.softwareLicenses && hasPermission_(user, "software.view")) return readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_);
+  if ([SHEET_NAMES.settings, SHEET_NAMES.departments].indexOf(sheetName) !== -1) return readSheetAsObjects_(sheetName);
+  throw new Error("Không có quyền đọc sheet này");
 }
 
 function include(filename) {
@@ -88,6 +100,8 @@ function getAppData(token) {
     assets: hasPermission_(user, "assets.view") ? readActiveAssets_() : [],
     settings: readSheetAsObjects_(SHEET_NAMES.settings),
     departments: readSheetAsObjects_(SHEET_NAMES.departments),
+    assetResponsibles: hasPermission_(user, "assets.view") ? readActiveAssetResponsibles_() : [],
+    responsibleUsers: hasPermission_(user, "assets.view") ? readUsers_().filter(isNotificationReadyUser_).map(publicResponsibleUser_) : [],
     maintenanceLogs: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenanceLogs) : [],
     inventoryMovements: hasPermission_(user, "movement.manage") ? readSheetAsObjects_(SHEET_NAMES.inventoryMovements) : [],
     softwareLicenses: hasPermission_(user, "software.view") ? readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_) : [],
@@ -164,8 +178,18 @@ function saveAsset(asset) {
   try {
     const actor = requirePermission_(arguments[1] || "", "assets.manage");
     const action = asset && asset.asset_id ? "ASSET_UPDATED" : "ASSET_CREATED";
+    const hasResponsibles = Object.prototype.hasOwnProperty.call(asset || {}, "responsibles");
     const normalized = normalizeAsset_(asset || {});
+    const previousResponsibles = hasResponsibles ? readActiveAssetResponsibles_(normalized.asset_id) : [];
+    const responsibles = hasResponsibles ? normalizeAssetResponsibles_(asset.responsibles, normalized.asset_id) : [];
+    delete normalized.responsibles;
     const saved = upsertObject_(SHEET_NAMES.assets, "asset_id", normalized);
+    if (hasResponsibles) {
+      replaceAssetResponsibles_(saved.asset_id, responsibles);
+      if (responsibilitiesSignature_(previousResponsibles) !== responsibilitiesSignature_(responsibles)) {
+        logAudit_(actor, "ASSET_RESPONSIBLES_UPDATED", "asset", saved.asset_id, saved.asset_name);
+      }
+    }
     logAudit_(actor, action, "asset", saved.asset_id, saved.asset_name);
     return { ok: true, data: saved, updated_at: new Date().toISOString() };
   } catch (error) {
@@ -400,6 +424,58 @@ function normalizeAsset_(asset) {
   return normalized;
 }
 
+function normalizeAssetResponsibles_(responsibles, assetId) {
+  if (!Array.isArray(responsibles)) throw new Error("Danh sách người phụ trách không hợp lệ");
+  const seenUserIds = new Set();
+  const normalized = responsibles.map((item) => {
+    const userId = String(item.user_id || "").trim();
+    const role = String(item.responsibility_role || "").trim().toLowerCase();
+    if (!userId || ["primary", "secondary"].indexOf(role) === -1) throw new Error("Người phụ trách không hợp lệ");
+    if (seenUserIds.has(userId)) throw new Error("Một user chỉ được chọn một lần cho mỗi thiết bị");
+    seenUserIds.add(userId);
+    const user = findUserById_(userId);
+    if (!isNotificationReadyUser_(user)) throw new Error("Người phụ trách phải đang hoạt động và có email hợp lệ");
+    return {
+      responsibility_id: Utilities.getUuid(),
+      asset_id: assetId,
+      user_id: userId,
+      responsibility_role: role,
+      active: "TRUE",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  });
+  const primaryCount = normalized.filter((item) => item.responsibility_role === "primary").length;
+  if (primaryCount > 1) throw new Error("Mỗi thiết bị chỉ có một người phụ trách chính");
+  if (normalized.length && primaryCount !== 1) throw new Error("Cần chọn một người phụ trách chính trước khi thêm người phụ trách phụ");
+  return normalized;
+}
+
+function readActiveAssetResponsibles_(assetId) {
+  return readSheetAsObjects_(SHEET_NAMES.assetResponsibles)
+    .filter((item) => String(item.active || "TRUE").toUpperCase() !== "FALSE")
+    .filter((item) => !assetId || item.asset_id === assetId);
+}
+
+function replaceAssetResponsibles_(assetId, responsibles) {
+  const sheet = getSheet_(SHEET_NAMES.assetResponsibles);
+  ensureSheetHeaders_(SHEET_NAMES.assetResponsibles, sheet);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map((header) => String(header).trim());
+  const assetIndex = headers.indexOf("asset_id");
+  for (let index = values.length - 1; index > 0; index -= 1) {
+    if (values[index][assetIndex] === assetId) sheet.deleteRow(index + 1);
+  }
+  responsibles.forEach((responsibility) => upsertObject_(SHEET_NAMES.assetResponsibles, "responsibility_id", responsibility));
+}
+
+function responsibilitiesSignature_(responsibles) {
+  return responsibles
+    .map((item) => `${item.user_id}:${item.responsibility_role}`)
+    .sort()
+    .join(",");
+}
+
 function normalizeSetting_(setting) {
   const normalized = Object.assign({}, setting);
   const type = String(normalized.setting_type || "").trim();
@@ -628,7 +704,7 @@ function nextAssetCode_(groupCode, year) {
 function getSheet_(sheetName) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = spreadsheet.getSheetByName(sheetName);
-  if (!sheet && sheetName === SHEET_NAMES.users) {
+  if (!sheet && [SHEET_NAMES.users, SHEET_NAMES.assetResponsibles].indexOf(sheetName) !== -1) {
     sheet = spreadsheet.insertSheet(sheetName);
   }
   if (!sheet) throw new Error(`Sheet not found: ${sheetName}`);
@@ -674,6 +750,10 @@ function ensureSheetHeaders_(sheetName, sheet) {
     ensureAssetsSheet_(sheet);
     return;
   }
+  if (sheetName === SHEET_NAMES.assetResponsibles) {
+    ensureAssetResponsiblesSheet_(sheet);
+    return;
+  }
   if (sheetName !== SHEET_NAMES.settings) return;
   const firstRow = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
   const headers = firstRow.map((header) => String(header).trim()).filter(Boolean);
@@ -700,6 +780,21 @@ function ensureSheetHeaders_(sheetName, sheet) {
 function ensureAssetsSheet_(sheet) {
   const desired = ["serial_number", "location", "warranty_end_date", "unit_price", "last_maintenance_date", "deleted_at", "deleted_by"];
   const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim());
+  desired.forEach((header) => {
+    if (headers.indexOf(header) === -1) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+      headers.push(header);
+    }
+  });
+}
+
+function ensureAssetResponsiblesSheet_(sheet) {
+  const desired = ["responsibility_id", "asset_id", "user_id", "responsibility_role", "active", "created_at", "updated_at"];
+  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim()).filter(Boolean);
+  if (!headers.length) {
+    sheet.getRange(1, 1, 1, desired.length).setValues([desired]);
+    return;
+  }
   desired.forEach((header) => {
     if (headers.indexOf(header) === -1) {
       sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
@@ -765,8 +860,12 @@ function saveUser(user, token) {
     if (user && user.user_id && !existing) throw new Error("Không tìm thấy user để cập nhật");
     const action = existing ? "USER_UPDATED" : "USER_CREATED";
     const normalized = normalizeUser_(existing ? Object.assign({}, existing, user || {}) : user || {});
+    if (existing && normalized.username !== existing.username) throw new Error("Tên tài khoản không được phép thay đổi");
     const duplicate = readUsers_().find((item) => item.username === normalized.username && item.user_id !== normalized.user_id);
     if (duplicate) throw new Error("Tên đăng nhập đã tồn tại");
+    const duplicateEmail = normalized.email && readUsers_().find((item) => String(item.email || "").trim().toLowerCase() === normalized.email && item.user_id !== normalized.user_id);
+    if (duplicateEmail) throw new Error("Email này đã được dùng cho user khác");
+    assertUserCanRemainResponsible_(normalized);
     const saved = upsertObject_(SHEET_NAMES.users, "user_id", normalized);
     logAudit_(actor, action, "user", saved.user_id, saved.username);
     return { ok: true, data: publicUser_(saved), updated_at: new Date().toISOString() };
@@ -782,6 +881,7 @@ function deleteUser(userId, token) {
     if (userId === admin.user_id) throw new Error("Không thể xóa chính tài khoản đang đăng nhập");
     const user = findUserById_(userId);
     if (!user) throw new Error("Không tìm thấy user");
+    assertUserCanRemainResponsible_(Object.assign({}, user, { active: "FALSE" }));
     user.active = "FALSE";
     upsertObject_(SHEET_NAMES.users, "user_id", user);
     logAudit_(admin, "USER_DISABLED", "user", userId, user.username);
@@ -904,7 +1004,7 @@ function ensureUsersReady_() {
 }
 
 function ensureUsersSheet_(sheet) {
-  const desired = ["user_id", "username", "full_name", "role", "permissions", "active", "password_salt", "password_hash", "must_change_password", "created_at", "updated_at", "last_login_at"];
+  const desired = ["user_id", "username", "full_name", "email", "role", "permissions", "active", "password_salt", "password_hash", "must_change_password", "created_at", "updated_at", "last_login_at"];
   const firstRow = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
   const headers = firstRow.map((header) => String(header).trim()).filter(Boolean);
   if (!headers.length) {
@@ -960,6 +1060,7 @@ function normalizeUser_(user) {
   normalized.username = String(normalized.username || "").trim().toLowerCase();
   if (!normalized.username) throw new Error("Tên đăng nhập là bắt buộc");
   normalized.full_name = String(normalized.full_name || normalized.username).trim();
+  normalized.email = normalizeEmail_(normalized.email);
   normalized.role = String(normalized.role || "user").trim().toLowerCase();
   if (["admin", "manager", "user", "viewer"].indexOf(normalized.role) === -1) normalized.role = "user";
   normalized.permissions = normalizePermissions_(normalized.permissions, normalized.role);
@@ -975,6 +1076,29 @@ function normalizeUser_(user) {
 
 function readUsers_() {
   return readSheetAsObjects_(SHEET_NAMES.users);
+}
+
+function normalizeEmail_(email) {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized) return "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) throw new Error("Email không đúng định dạng");
+  return normalized;
+}
+
+function isNotificationReadyUser_(user) {
+  return Boolean(user) && String(user.active || "TRUE").toUpperCase() !== "FALSE" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(user.email || "").trim());
+}
+
+function assertUserCanRemainResponsible_(user) {
+  const assignments = readActiveAssetResponsibles_()
+    .filter((item) => item.user_id === user.user_id);
+  if (!assignments.length || isNotificationReadyUser_(user)) return;
+  const assetNames = readActiveAssets_()
+    .filter((asset) => assignments.some((item) => item.asset_id === asset.asset_id))
+    .slice(0, 3)
+    .map((asset) => asset.asset_name)
+    .join(", ");
+  throw new Error(`Không thể khóa hoặc bỏ email của user đang phụ trách thiết bị. Hãy chuyển trách nhiệm trước${assetNames ? `: ${assetNames}` : ""}`);
 }
 
 function findUserByUsername_(username) {
@@ -1000,6 +1124,7 @@ function publicUser_(user) {
     user_id: user.user_id,
     username: user.username,
     full_name: user.full_name,
+    email: user.email || "",
     role: user.role,
     permissions: user.permissions,
     active: String(user.active || "TRUE").toUpperCase() !== "FALSE",
@@ -1007,5 +1132,13 @@ function publicUser_(user) {
     created_at: user.created_at || "",
     updated_at: user.updated_at || "",
     last_login_at: user.last_login_at || "",
+  };
+}
+
+function publicResponsibleUser_(user) {
+  return {
+    user_id: user.user_id,
+    full_name: user.full_name,
+    username: user.username,
   };
 }

@@ -74,6 +74,10 @@ async function run() {
   assert.ok(appsScript.includes("function getSoftwareLicenseKey(licenseId, token)"));
   assert.ok(appsScript.includes("function requirePermission_(token, permission)"));
   assert.ok(appsScript.includes("Object.assign({}, existing, user || {})"));
+  assert.ok(appsScript.includes("Tên tài khoản không được phép thay đổi"));
+  assert.ok(appsScript.includes("function normalizeAssetResponsibles_(responsibles, assetId)"));
+  assert.ok(appsScript.includes("function getReadableSheetRows_(user, sheetName)"));
+  assert.ok(appsScript.includes("function assertUserCanRemainResponsible_(user)"));
   assert.ok(!app.includes("license.license_key)"));
 
   const permissions = vm.createContext();
@@ -89,7 +93,13 @@ async function run() {
   assert.equal(vm.runInContext('hasPermission_({ role: "user", permissions: "view" }, "reports.export")', permissions), false);
   assert.equal(vm.runInContext('hasPermission_({ role: "admin", permissions: "all" }, "settings.manage")', permissions), true);
   assert.equal(vm.runInContext('normalizeUser_({ user_id: "user-id", username: "user", role: "user", password_salt: "salt", password_hash: "hash" }).password_hash', permissions), "hash");
+  assert.equal(vm.runInContext('normalizeUser_({ user_id: "user-id", username: "user", email: "TDW@Example.com", role: "user", password_salt: "salt", password_hash: "hash" }).email', permissions), "tdw@example.com");
+  assert.throws(() => vm.runInContext('normalizeEmail_("not-an-email")', permissions), /Email không đúng định dạng/);
+  assert.equal(vm.runInContext('isNotificationReadyUser_({ active: "TRUE", email: "notice@example.com" })', permissions), true);
+  assert.equal(vm.runInContext('isNotificationReadyUser_({ active: "FALSE", email: "notice@example.com" })', permissions), false);
   assert.ok(index.includes('name="permission_code" value="assets.manage"'));
+  assert.ok(index.includes('name="primary_responsible_id"'));
+  assert.ok(index.includes('name="email" type="email"'));
   assert.ok(app.includes('function setUserPermissionCodes(rawPermissions, role)'));
   assert.ok(app.includes("function canAccessView(view)"));
 

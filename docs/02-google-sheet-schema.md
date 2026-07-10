@@ -65,6 +65,7 @@ status
 user_id
 username
 full_name
+email
 role
 permissions
 active
@@ -106,6 +107,22 @@ movement.manage
 software.view, software.manage, software.delete
 reports.view, reports.export
 ```
+
+## AssetResponsibles
+
+Tab nay duoc Apps Script tu tao khi luu nguoi phu trach lan dau. Moi nguoi phu trach phai la User dang hoat dong va co email hop le.
+
+```text
+responsibility_id
+asset_id
+user_id
+responsibility_role
+active
+created_at
+updated_at
+```
+
+`responsibility_role` chi nhan `primary` hoac `secondary`. Mot thiet bi co toi da mot `primary`, va co the co nhieu `secondary`.
 
 ## Departments
 

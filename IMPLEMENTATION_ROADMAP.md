@@ -152,3 +152,12 @@ Trạng thái: Hoàn tất.
 
 - Menu, nút thao tác và dữ liệu trả về chỉ hiển thị khi có quyền tương ứng.
 - Bổ sung test cho Admin, Manager, User và Viewer trước khi deploy.
+
+## Phase 5 - User email va nguoi phu trach thiet bi
+
+Trạng thái: Hoàn tất.
+
+- Them email thong bao, username bat bien va kiem tra email trung.
+- Them `AssetResponsibles` cho mot nguoi chinh va nhieu nguoi phu.
+- Chi user dang hoat dong co email hop le moi duoc gan phu trach.
+- Chan khoa hoac bo email cua user dang phu trach thiet bi cho den khi chuyen trach nhiem.

@@ -192,6 +192,8 @@
             <label>Đơn giá<input name="unit_price" type="number" min="0" step="1000" /></label>
             <label>Vị trí<input name="location" placeholder="VD: Phòng IT - Tầng 2" /></label>
             <label>Người dùng<input name="assigned_to" placeholder="Tên người đang sử dụng" /></label>
+            <label>Phụ trách chính<select name="primary_responsible_id"></select></label>
+            <label>Phụ trách phụ<select name="secondary_responsible_ids" multiple size="3"></select></label>
             <label>Phòng ban<select name="department"></select></label>
             <label>Hết bảo hành<input name="warranty_end_date" type="date" /></label>
             <label>Bảo trì gần nhất<input name="last_maintenance_date" type="date" /></label>
@@ -240,8 +242,9 @@
           </div>
           <input type="hidden" name="user_id" />
           <div class="form-grid">
-            <label>Tài khoản<input name="username" required autocomplete="off" /></label>
+            <label>Tài khoản (không đổi sau khi tạo)<input name="username" required autocomplete="off" /></label>
             <label>Họ tên<input name="full_name" required autocomplete="off" /></label>
+            <label class="span-2">Email nhận thông báo<input name="email" type="email" autocomplete="email" placeholder="email@tdw.com.vn hoặc email cá nhân" /></label>
             <label>Vai trò
               <select name="role">
                 <option value="admin">Admin</option>
