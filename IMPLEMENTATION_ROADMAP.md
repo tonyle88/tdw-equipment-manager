@@ -64,6 +64,8 @@ Xác minh:
 
 ## Sprint 3 - Smoke test trước deploy
 
+Trạng thái: Hoàn tất.
+
 Mục tiêu:
 
 - Có checklist tự động tối thiểu để giảm lỗi lặp lại trước khi up GitHub/Vercel.

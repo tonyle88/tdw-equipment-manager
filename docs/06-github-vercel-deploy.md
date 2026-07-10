@@ -89,3 +89,13 @@ Nếu thiếu biến này, app Vercel sẽ báo lỗi API proxy khi đăng nhậ
 5. Kiểm tra lại dữ liệu trong Google Sheet.
 
 Nếu frontend đã đổi nhưng Vercel chưa cập nhật, kiểm tra `Deployments` trong Vercel và hard refresh trình duyệt.
+
+## 8. Kiểm tra trước khi push
+
+Chạy lệnh sau tại thư mục dự án:
+
+```text
+npm test
+```
+
+Smoke test kiểm tra cú pháp frontend/Apps Script, route Vercel và định dạng request từ proxy sang Apps Script. Test không gọi Google Sheet thật va khong thay doi du lieu.
