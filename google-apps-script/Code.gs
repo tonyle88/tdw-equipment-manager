@@ -8,6 +8,16 @@ const SHEET_NAMES = {
   settings: "Settings",
 };
 
+const HEALTH_CHECK_HEADERS = {
+  Assets: ["asset_id", "asset_name", "status"],
+  Users: ["user_id", "username", "role", "active"],
+  Departments: ["department_id", "department_name"],
+  MaintenanceLogs: ["log_id", "asset_id", "date"],
+  SoftwareLicenses: ["license_id", "software_name"],
+  InventoryMovements: ["movement_id", "asset_id", "movement_date"],
+  Settings: ["setting_id", "setting_type", "setting_value", "display_name"],
+};
+
 function doGet(event) {
   try {
     if (!event.parameter.api && !event.parameter.sheet) {
@@ -71,6 +81,38 @@ function getAppData() {
     currentUser: user ? publicUser_(user) : null,
     updated_at: new Date().toISOString(),
   };
+}
+
+function healthCheck(token) {
+  try {
+    const user = requireAdmin_(token);
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = Object.entries(HEALTH_CHECK_HEADERS).map(([name, requiredHeaders]) => {
+      const sheet = spreadsheet.getSheetByName(name);
+      if (!sheet) {
+        return { name, exists: false, headers: [], missing: requiredHeaders };
+      }
+      const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+        .getDisplayValues()[0]
+        .map((header) => String(header).trim())
+        .filter(Boolean);
+      return {
+        name,
+        exists: true,
+        headers,
+        missing: requiredHeaders.filter((header) => !headers.includes(header)),
+      };
+    });
+    return {
+      ok: true,
+      healthy: sheets.every((sheet) => sheet.exists && sheet.missing.length === 0),
+      checked_by: user.username,
+      checked_at: new Date().toISOString(),
+      sheets,
+    };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
 }
 
 function saveAsset(asset) {
@@ -166,6 +208,9 @@ function doPost(event) {
     }
     if (action === "getAppData") {
       return jsonResponse_(getAppData(args[0] || body.token || ""));
+    }
+    if (action === "healthCheck") {
+      return jsonResponse_(healthCheck(args[0] || body.token || ""));
     }
     if (action === "saveAsset" || action === "upsertAsset") {
       return jsonResponse_(saveAsset(args[0] || body.asset || {}, args[1] || body.token || ""));

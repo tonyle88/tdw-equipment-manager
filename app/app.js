@@ -1333,7 +1333,10 @@ const state = {
       <div class="view-only-panel">
         <div class="settings-title-row">
           <h2>CẤU HÌNH</h2>
-          <button class="primary-button" type="button" id="openSettingModal">+ Thêm cấu hình</button>
+          <div class="settings-header-actions">
+            ${isAdmin() ? '<button class="secondary-button" type="button" id="healthCheckButton">Kiểm tra kết nối</button>' : ""}
+            <button class="primary-button" type="button" id="openSettingModal">+ Thêm cấu hình</button>
+          </div>
         </div>
         <div class="settings-layout full-settings-layout">
           <div class="module-card settings-list">
@@ -1366,6 +1369,7 @@ const state = {
       </div>
     `;
     els.content.querySelector("#openSettingModal").addEventListener("click", () => openSettingModal());
+    els.content.querySelector("#healthCheckButton")?.addEventListener("click", handleHealthCheck);
     els.content.querySelectorAll("[data-edit-setting]").forEach((button) => {
       button.addEventListener("click", () => openSettingModal(state.settings.find((item) => item.setting_id === button.dataset.editSetting)));
     });
@@ -1375,6 +1379,27 @@ const state = {
     els.content.querySelectorAll("[data-delete-setting]").forEach((button) => {
       button.addEventListener("click", () => handleDeleteSetting(button.dataset.deleteSetting));
     });
+  }
+
+  async function handleHealthCheck(event) {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.classList.add("is-loading");
+    try {
+      const result = await callServer("healthCheck");
+      const failed = (result.sheets || []).filter((sheet) => !sheet.exists || sheet.missing.length);
+      if (!result.healthy) {
+        const details = failed.map((sheet) => `${sheet.name}: ${sheet.exists ? `thiếu ${sheet.missing.join(", ")}` : "chưa tồn tại"}`).join("; ");
+        showMessageModal("Kết nối cần kiểm tra", details || "Một hoặc nhiều sheet chưa đúng cấu trúc.");
+        return;
+      }
+      showToast("Kết nối hoạt động tốt", `${result.sheets.length} sheet đã được kiểm tra.`);
+    } catch (error) {
+      showMessageModal("Không thể kiểm tra kết nối", error.message);
+    } finally {
+      button.disabled = false;
+      button.classList.remove("is-loading");
+    }
   }
 
   function settingsByType(type) {

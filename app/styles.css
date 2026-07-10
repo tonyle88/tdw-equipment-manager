@@ -782,6 +782,7 @@
   }
   .report-item-stat em { color: rgba(255,255,255,.62); font-style: normal; font-weight: 800; }
   .settings-title-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 20px 20px 0; }
+  .settings-header-actions { display: flex; align-items: center; gap: 10px; }
   .settings-title-row h2 {
     margin: 0;
     color: #fff;
@@ -1067,4 +1068,3 @@
 
     @page { size: A4 landscape; margin: 10mm 8mm; }
   }
-

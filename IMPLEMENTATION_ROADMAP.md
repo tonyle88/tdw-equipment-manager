@@ -23,6 +23,8 @@ Xác minh:
 
 ## Sprint 1 - Health check triển khai
 
+Trạng thái: Hoàn tất.
+
 Mục tiêu:
 
 - Admin có thể kiểm tra nhanh Vercel proxy, Apps Script và Google Sheet đang kết nối đúng.
