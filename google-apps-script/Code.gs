@@ -4,6 +4,7 @@ const SHEET_NAMES = {
   departments: "Departments",
   maintenanceLogs: "MaintenanceLogs",
   maintenancePlans: "MaintenancePlans",
+  maintenanceNotificationLogs: "MaintenanceNotificationLogs",
   softwareLicenses: "SoftwareLicenses",
   inventoryMovements: "InventoryMovements",
   assetResponsibles: "AssetResponsibles",
@@ -12,6 +13,8 @@ const SHEET_NAMES = {
 };
 
 const AUDIT_LOG_HEADERS = ["audit_id", "created_at", "actor_user_id", "actor_username", "action", "entity_type", "entity_id", "entity_name"];
+const MAINTENANCE_REMINDER_DAYS = [7, 3, 1, 0];
+const MAINTENANCE_OVERDUE_REMINDER_INTERVAL_DAYS = 7;
 
 const LEGACY_PERMISSION_PRESETS = {
   view: ["overview.view", "assets.view", "maintenance.view", "software.view", "reports.view", "settings.view"],
@@ -317,6 +320,9 @@ function doPost(event) {
       const planId = args[0] && typeof args[0] === "object" ? args[0].planId : args[0] || body.planId || "";
       return jsonResponse_(deleteMaintenancePlan(planId, args[1] || body.token || ""));
     }
+    if (action === "sendMaintenancePlanReminders") {
+      return jsonResponse_(sendMaintenancePlanReminders(args[0] || body.token || ""));
+    }
     if (action === "saveMovementLog") {
       return jsonResponse_(saveMovementLog(args[0] || body.log || {}, args[1] || body.token || ""));
     }
@@ -568,7 +574,7 @@ function normalizeMaintenancePlan_(plan) {
   normalized.asset_id = String(normalized.asset_id || "").trim();
   normalized.title = String(normalized.title || "").trim();
   normalized.frequency = String(normalized.frequency || "").trim().toUpperCase();
-  normalized.next_due_date = String(normalized.next_due_date || "").trim();
+  normalized.next_due_date = normalizeIsoDate_(normalized.next_due_date);
   if (!normalized.asset_id) throw new Error("Thiếu thiết bị cho kế hoạch bảo trì");
   if (!readActiveAssets_().some((asset) => asset.asset_id === normalized.asset_id)) throw new Error("Thiết bị của kế hoạch không tồn tại hoặc đã bị xóa");
   if (!normalized.title) throw new Error("Nội dung kế hoạch là bắt buộc");
@@ -589,6 +595,164 @@ function deleteMaintenancePlan(planId, token) {
   } catch (error) {
     return { ok: false, error: error.message };
   }
+}
+
+function sendMaintenancePlanReminders(token) {
+  try {
+    const admin = requireAdmin_(token || "");
+    const result = sendDueMaintenancePlanReminders_();
+    logAudit_(admin, "MAINTENANCE_REMINDERS_SENT", "maintenance_plan", "", `${result.sent} email`);
+    return Object.assign({ ok: true }, result);
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function runMaintenancePlanReminders() {
+  return sendDueMaintenancePlanReminders_();
+}
+
+function installMaintenancePlanReminderTrigger() {
+  ScriptApp.getProjectTriggers()
+    .filter((trigger) => trigger.getHandlerFunction() === "runMaintenancePlanReminders")
+    .forEach((trigger) => ScriptApp.deleteTrigger(trigger));
+  ScriptApp.newTrigger("runMaintenancePlanReminders").timeBased().everyDays(1).atHour(8).create();
+  return { ok: true, message: "Đã cài lịch kiểm tra email nhắc bảo trì hằng ngày" };
+}
+
+function sendDueMaintenancePlanReminders_() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) throw new Error("Hệ thống đang gửi email nhắc, vui lòng thử lại sau ít phút");
+  try {
+    return sendDueMaintenancePlanRemindersUnlocked_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function sendDueMaintenancePlanRemindersUnlocked_() {
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  const assetsById = {};
+  readActiveAssets_().forEach((asset) => { assetsById[asset.asset_id] = asset; });
+  const usersById = {};
+  readUsers_().filter(isNotificationReadyUser_).forEach((user) => { usersById[user.user_id] = user; });
+  const responsiblesByAsset = {};
+  readActiveAssetResponsibles_().forEach((responsibility) => {
+    if (!responsiblesByAsset[responsibility.asset_id]) responsiblesByAsset[responsibility.asset_id] = [];
+    responsiblesByAsset[responsibility.asset_id].push(responsibility);
+  });
+
+  const sentSignatures = new Set(readSheetAsObjects_(SHEET_NAMES.maintenanceNotificationLogs)
+    .filter((item) => item.status === "SENT")
+    .map((item) => maintenanceNotificationSignature_(item.plan_id, item.recipient_email, item.notification_type, item.due_date)));
+  const result = { checked: 0, sent: 0, skipped: 0, failed: 0, today };
+
+  readSheetAsObjects_(SHEET_NAMES.maintenancePlans)
+    .filter((plan) => String(plan.active || "TRUE").toUpperCase() !== "FALSE")
+    .forEach((plan) => {
+      const dueDate = normalizeIsoDate_(plan.next_due_date);
+      const notificationType = maintenanceReminderType_(dueDate, today);
+      if (!notificationType) return;
+      result.checked += 1;
+      const reminderPlan = Object.assign({}, plan, { next_due_date: dueDate });
+      const asset = assetsById[plan.asset_id];
+      const recipients = (responsiblesByAsset[plan.asset_id] || [])
+        .map((responsibility) => usersById[responsibility.user_id])
+        .filter(Boolean);
+      if (!asset || !recipients.length) {
+        result.skipped += 1;
+        return;
+      }
+      recipients.forEach((recipient) => {
+        const signature = maintenanceNotificationSignature_(reminderPlan.plan_id, recipient.email, notificationType, reminderPlan.next_due_date);
+        if (sentSignatures.has(signature)) {
+          result.skipped += 1;
+          return;
+        }
+        try {
+          MailApp.sendEmail({
+            to: recipient.email,
+            subject: `[TDW] Nhắc bảo trì: ${asset.asset_name}`,
+            body: maintenanceReminderText_(asset, reminderPlan, notificationType),
+            htmlBody: maintenanceReminderHtml_(recipient, asset, reminderPlan, notificationType),
+            name: "TDW Equipment Manager",
+          });
+          writeMaintenanceNotificationLog_(reminderPlan, recipient.email, notificationType, "SENT", "");
+          sentSignatures.add(signature);
+          result.sent += 1;
+        } catch (error) {
+          writeMaintenanceNotificationLog_(reminderPlan, recipient.email, notificationType, "FAILED", error.message);
+          result.failed += 1;
+        }
+      });
+    });
+  return result;
+}
+
+function maintenanceReminderType_(dueDate, today) {
+  const daysUntil = daysBetweenIsoDates_(today, dueDate);
+  if (MAINTENANCE_REMINDER_DAYS.indexOf(daysUntil) !== -1) return `DUE_${daysUntil}`;
+  if (daysUntil < 0 && Math.abs(daysUntil) % MAINTENANCE_OVERDUE_REMINDER_INTERVAL_DAYS === 0) return `OVERDUE_${Math.abs(daysUntil)}`;
+  return "";
+}
+
+function daysBetweenIsoDates_(fromDate, toDate) {
+  const from = String(fromDate || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const to = String(toDate || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!from || !to) return NaN;
+  const fromTime = Date.UTC(Number(from[1]), Number(from[2]) - 1, Number(from[3]));
+  const toTime = Date.UTC(Number(to[1]), Number(to[2]) - 1, Number(to[3]));
+  return Math.round((toTime - fromTime) / 86400000);
+}
+
+function normalizeIsoDate_(value) {
+  const text = String(value || "").trim();
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return text;
+  const vietnamese = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!vietnamese) return text;
+  return `${vietnamese[3]}-${String(vietnamese[2]).padStart(2, "0")}-${String(vietnamese[1]).padStart(2, "0")}`;
+}
+
+function maintenanceNotificationSignature_(planId, email, type, dueDate) {
+  return [planId, String(email || "").toLowerCase(), type, dueDate].join("|");
+}
+
+function maintenanceReminderText_(asset, plan, notificationType) {
+  return `TDW Equipment Manager\n\nNhắc bảo trì: ${asset.asset_name}\nMã tài sản: ${asset.asset_code || "Chưa có"}\nNội dung: ${plan.title}\nNgày đến hạn: ${formatIsoDate_(plan.next_due_date)}\nTrạng thái: ${maintenanceReminderStatus_(notificationType)}\n\nVui lòng kiểm tra và cập nhật lịch sử bảo trì sau khi thực hiện.`;
+}
+
+function maintenanceReminderHtml_(recipient, asset, plan, notificationType) {
+  return `<div style="font-family:Arial,sans-serif;color:#17202a;line-height:1.55"><h2 style="color:#176fa6">Nhắc bảo trì thiết bị TDW</h2><p>Chào ${escapeHtml_(recipient.full_name || recipient.username)},</p><p>Thiết bị sau cần được theo dõi:</p><table style="border-collapse:collapse"><tr><td style="padding:4px 12px 4px 0;color:#64748b">Thiết bị</td><td><strong>${escapeHtml_(asset.asset_name)}</strong></td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Mã tài sản</td><td>${escapeHtml_(asset.asset_code || "Chưa có")}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Nội dung</td><td>${escapeHtml_(plan.title)}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Đến hạn</td><td><strong>${escapeHtml_(formatIsoDate_(plan.next_due_date))}</strong></td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Trạng thái</td><td>${escapeHtml_(maintenanceReminderStatus_(notificationType))}</td></tr></table><p>Vui lòng kiểm tra và cập nhật lịch sử bảo trì sau khi thực hiện.</p></div>`;
+}
+
+function formatIsoDate_(value) {
+  const match = normalizeIsoDate_(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : String(value || "");
+}
+
+function maintenanceReminderStatus_(type) {
+  if (String(type).indexOf("OVERDUE_") === 0) return "Đã quá hạn";
+  const days = String(type).replace("DUE_", "");
+  return days === "0" ? "Đến hạn hôm nay" : `Còn ${days} ngày đến hạn`;
+}
+
+function writeMaintenanceNotificationLog_(plan, email, type, status, error) {
+  upsertObject_(SHEET_NAMES.maintenanceNotificationLogs, "notification_id", {
+    notification_id: Utilities.getUuid(),
+    plan_id: plan.plan_id,
+    asset_id: plan.asset_id,
+    recipient_email: email,
+    notification_type: type,
+    due_date: plan.next_due_date,
+    sent_at: new Date().toISOString(),
+    status,
+    error: String(error || "").slice(0, 500),
+  });
+}
+
+function escapeHtml_(value) {
+  return String(value || "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[character]));
 }
 
 function saveMovementLog(log, token) {
@@ -760,7 +924,7 @@ function nextAssetCode_(groupCode, year) {
 function getSheet_(sheetName) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = spreadsheet.getSheetByName(sheetName);
-  if (!sheet && [SHEET_NAMES.users, SHEET_NAMES.assetResponsibles, SHEET_NAMES.maintenancePlans].indexOf(sheetName) !== -1) {
+  if (!sheet && [SHEET_NAMES.users, SHEET_NAMES.assetResponsibles, SHEET_NAMES.maintenancePlans, SHEET_NAMES.maintenanceNotificationLogs].indexOf(sheetName) !== -1) {
     sheet = spreadsheet.insertSheet(sheetName);
   }
   if (!sheet) throw new Error(`Sheet not found: ${sheetName}`);
@@ -814,6 +978,10 @@ function ensureSheetHeaders_(sheetName, sheet) {
     ensureMaintenancePlansSheet_(sheet);
     return;
   }
+  if (sheetName === SHEET_NAMES.maintenanceNotificationLogs) {
+    ensureMaintenanceNotificationLogsSheet_(sheet);
+    return;
+  }
   if (sheetName !== SHEET_NAMES.settings) return;
   const firstRow = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
   const headers = firstRow.map((header) => String(header).trim()).filter(Boolean);
@@ -865,6 +1033,21 @@ function ensureAssetResponsiblesSheet_(sheet) {
 
 function ensureMaintenancePlansSheet_(sheet) {
   const desired = ["plan_id", "asset_id", "title", "frequency", "next_due_date", "note", "active", "created_at", "updated_at"];
+  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim()).filter(Boolean);
+  if (!headers.length) {
+    sheet.getRange(1, 1, 1, desired.length).setValues([desired]);
+    return;
+  }
+  desired.forEach((header) => {
+    if (headers.indexOf(header) === -1) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+      headers.push(header);
+    }
+  });
+}
+
+function ensureMaintenanceNotificationLogsSheet_(sheet) {
+  const desired = ["notification_id", "plan_id", "asset_id", "recipient_email", "notification_type", "due_date", "sent_at", "status", "error", "created_at", "updated_at"];
   const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim()).filter(Boolean);
   if (!headers.length) {
     sheet.getRange(1, 1, 1, desired.length).setValues([desired]);

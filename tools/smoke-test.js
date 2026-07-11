@@ -74,6 +74,9 @@ async function run() {
   assert.ok(appsScript.includes('maintenancePlans: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenancePlans) : []'));
   assert.ok(appsScript.includes("function normalizeMaintenancePlan_(plan)"));
   assert.ok(appsScript.includes("function ensureMaintenancePlansSheet_(sheet)"));
+  assert.ok(appsScript.includes("function sendMaintenancePlanReminders(token)"));
+  assert.ok(appsScript.includes("function runMaintenancePlanReminders()"));
+  assert.ok(appsScript.includes("function installMaintenancePlanReminderTrigger()"));
   assert.ok(appsScript.includes("function getSoftwareLicenseKey(licenseId, token)"));
   assert.ok(appsScript.includes("function requirePermission_(token, permission)"));
   assert.ok(appsScript.includes("Object.assign({}, existing, user || {})"));
@@ -104,6 +107,10 @@ async function run() {
   vm.runInContext('readActiveAssets_ = () => [{ asset_id: "asset-id" }];', permissions);
   assert.equal(vm.runInContext('normalizeMaintenancePlan_({ plan_id: "plan-id", asset_id: "asset-id", title: "Kiểm tra định kỳ", frequency: "monthly", next_due_date: "2026-08-01" }).frequency', permissions), "MONTHLY");
   assert.throws(() => vm.runInContext('normalizeMaintenancePlan_({ plan_id: "plan-id", asset_id: "asset-id", title: "Kiểm tra", frequency: "weekly", next_due_date: "2026-08-01" })', permissions), /Chu kỳ bảo trì không hợp lệ/);
+  assert.equal(vm.runInContext('maintenanceReminderType_("2026-07-17", "2026-07-10")', permissions), "DUE_7");
+  assert.equal(vm.runInContext('maintenanceReminderType_("2026-07-03", "2026-07-10")', permissions), "OVERDUE_7");
+  assert.equal(vm.runInContext('maintenanceReminderType_("2026-07-15", "2026-07-10")', permissions), "");
+  assert.equal(vm.runInContext('normalizeIsoDate_("01/08/2026")', permissions), "2026-08-01");
   assert.ok(index.includes('name="permission_code" value="assets.manage"'));
   assert.ok(index.includes('name="permission_code" value="reports.maintenance.export"'));
   assert.ok(index.includes('name="primary_responsible_id"'));
@@ -113,6 +120,7 @@ async function run() {
   assert.ok(app.includes("async function exportTabularExcel(kind)"));
   assert.ok(app.includes("function printTabularReport(kind)"));
   assert.ok(app.includes("function openMaintenancePlanModal(planId = null)"));
+  assert.ok(app.includes('callServer("sendMaintenancePlanReminders")'));
   assert.ok(app.includes("function bindModalCloseGuard(modal, form, closeModal, buttons)"));
   assert.ok(app.includes('"BỎ NỘI DUNG ĐANG SOẠN?"'));
   assert.ok((app.match(/bindModalCloseGuard\(/g) || []).length >= 9);
@@ -144,6 +152,13 @@ async function run() {
   assert.deepEqual(JSON.parse(maintenancePlan.requestToAppsScript.options.body), {
     action: "saveMaintenancePlan",
     args: [{ asset_id: "asset-id" }, "session-token"],
+  });
+
+  const reminders = await invokeProxy({ fn: "sendMaintenancePlanReminders", args: ["session-token"] });
+  assert.equal(reminders.res.statusCode, 200);
+  assert.deepEqual(JSON.parse(reminders.requestToAppsScript.options.body), {
+    action: "sendMaintenancePlanReminders",
+    args: ["session-token"],
   });
 
   const denied = await invokeProxy({ fn: "notAllowed", args: [] });

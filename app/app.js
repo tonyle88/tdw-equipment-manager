@@ -1163,8 +1163,11 @@ const state = {
           </article>
           <article class="module-card maintenance-list-card" style="grid-column: 1 / -1; margin-top: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px;">
-              <div><h3 style="margin: 0;">KẾ HOẠCH BẢO TRÌ</h3><p style="margin: 4px 0 0;">Theo dõi lịch tháng, quý và năm trước khi kích hoạt nhắc việc.</p></div>
-              ${canManageMaintenance ? `<button class="primary-button" type="button" id="openAddMaintenancePlanModal">+ THÊM KẾ HOẠCH</button>` : ""}
+              <div><h3 style="margin: 0;">KẾ HOẠCH BẢO TRÌ</h3><p style="margin: 4px 0 0;">Theo dõi lịch tháng, quý, năm và nhắc email cho người phụ trách.</p></div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                ${isAdmin() ? `<button class="secondary-button" type="button" id="sendMaintenancePlanReminders">GỬI NHẮC EMAIL</button>` : ""}
+                ${canManageMaintenance ? `<button class="primary-button" type="button" id="openAddMaintenancePlanModal">+ THÊM KẾ HOẠCH</button>` : ""}
+              </div>
             </div>
             <table class="mini-table maintenance-table" style="min-width: 760px;">
               <thead><tr><th>THIẾT BỊ</th><th>NỘI DUNG</th><th style="width: 130px; text-align: center;">CHU KỲ</th><th style="width: 130px; text-align: center;">ĐẾN HẠN</th><th style="width: 120px; text-align: center;">TRẠNG THÁI</th>${(canManageMaintenance || canDeleteMaintenance) ? `<th style="width: 90px;"></th>` : ""}</tr></thead>
@@ -1218,6 +1221,20 @@ const state = {
       openBtn.addEventListener("click", () => openMaintenanceLogModal());
     }
     els.content.querySelector("#openAddMaintenancePlanModal")?.addEventListener("click", () => openMaintenancePlanModal());
+    els.content.querySelector("#sendMaintenancePlanReminders")?.addEventListener("click", async () => {
+      const confirmed = await showConfirmModal(
+        "GỬI NHẮC EMAIL",
+        "Hệ thống sẽ gửi email nhắc kế hoạch đến hạn cho những người phụ trách thiết bị. Bạn có muốn tiếp tục?",
+        "Gửi email",
+      );
+      if (!confirmed) return;
+      try {
+        const result = await callServer("sendMaintenancePlanReminders");
+        showToast("Đã xử lý nhắc email", `${result.sent || 0} email đã gửi, ${result.skipped || 0} mục được bỏ qua`);
+      } catch (error) {
+        showMessageModal("Không thể gửi email", error.message);
+      }
+    });
 
     els.content.querySelectorAll(".edit-maintenance-plan-btn").forEach((btn) => {
       btn.addEventListener("click", (event) => openMaintenancePlanModal(event.target.dataset.id));

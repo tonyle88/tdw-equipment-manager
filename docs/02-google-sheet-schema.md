@@ -175,6 +175,24 @@ created_at
 updated_at
 ```
 
+## MaintenanceNotificationLogs
+
+Tab nay duoc Apps Script tu tao khi gui email nhac bao tri lan dau. Log dung de chong gui trung mot moc nhac toi cung nguoi nhan.
+
+```text
+notification_id
+plan_id
+asset_id
+recipient_email
+notification_type
+due_date
+sent_at
+status
+error
+created_at
+updated_at
+```
+
 ## InventoryMovements
 
 ```text

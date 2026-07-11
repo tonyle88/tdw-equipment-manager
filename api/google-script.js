@@ -15,6 +15,7 @@ const ALLOWED_FUNCTIONS = new Set([
   "changeOwnPassword",
   "saveMaintenanceLog",
   "saveMaintenancePlan",
+  "sendMaintenancePlanReminders",
   "saveMovementLog",
   "saveSoftwareLicense",
   "deleteSoftwareLicense",
