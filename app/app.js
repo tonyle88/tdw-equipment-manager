@@ -1621,15 +1621,24 @@ const state = {
               <h3 style="margin: 0;">LỊCH SỬ BẢO TRÌ GẦN ĐÂY</h3>
               ${canManageMaintenance ? `<button class="primary-button" type="button" id="openAddLogModal" style="padding: 6px 12px; font-size: 12px;">+ GHI NHẬN BẢO TRÌ</button>` : ""}
             </div>
-            <table class="mini-table">
+            <div class="maintenance-history-scroll">
+            <table class="mini-table maintenance-history-table">
+              <colgroup>
+                <col class="maintenance-history-date-col">
+                <col class="maintenance-history-asset-col">
+                <col class="maintenance-history-type-col">
+                <col class="maintenance-history-content-col">
+                <col class="maintenance-history-cost-col">
+                ${(canManageMaintenance || canDeleteMaintenance) ? `<col class="maintenance-history-actions-col">` : ""}
+              </colgroup>
               <thead>
                 <tr>
-                  <th style="width: 100px;">NGÀY</th>
+                  <th>NGÀY</th>
                   <th>THIẾT BỊ</th>
-                  <th style="width: 150px; text-align: center;">LOẠI</th>
+                  <th>LOẠI</th>
                   <th>NỘI DUNG</th>
-                  <th style="width: 120px; text-align: right;">CHI PHÍ</th>
-                  ${(canManageMaintenance || canDeleteMaintenance) ? `<th style="width: 90px; text-align: center;"></th>` : ""}
+                  <th>CHI PHÍ</th>
+                  ${(canManageMaintenance || canDeleteMaintenance) ? `<th>THAO TÁC</th>` : ""}
                 </tr>
               </thead>
               <tbody>
@@ -1638,10 +1647,10 @@ const state = {
                   return `
                     <tr>
                       <td style="color: var(--text-secondary);">${escapeHtml(formatDate(log.date))}</td>
-                      <td style="font-weight: 500;">${escapeHtml(asset ? asset.asset_name : "Thiết bị đã xóa")}</td>
-                      <td style="text-align: center;"><span class="badge" style="background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color);">${escapeHtml(labelFor("maintenance_type", log.action_type) || log.action_type)}</span></td>
+                      <td class="maintenance-history-text">${escapeHtml(asset ? asset.asset_name : "Thiết bị đã xóa")}</td>
+                      <td><span class="badge" style="background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color);">${escapeHtml(labelFor("maintenance_type", log.action_type) || log.action_type)}</span></td>
                       <td>${escapeHtml(log.description)}</td>
-                      <td style="text-align: right; font-weight: 500; color: #e11d48;">${escapeHtml(formatMoney(log.cost))}</td>
+                      <td class="maintenance-history-cost">${escapeHtml(formatMoney(log.cost))}</td>
                       ${(canManageMaintenance || canDeleteMaintenance) ? `
                         <td class="table-actions">
                           ${canManageMaintenance ? `<button class="table-action-btn edit-maintenance-btn" data-id="${escapeHtml(log.log_id)}" data-asset="${escapeHtml(log.asset_id)}" type="button" aria-label="Sửa">✎</button>` : ""}
@@ -1653,6 +1662,7 @@ const state = {
                 }).join('') || `<tr><td colspan="${canManageMaintenance || canDeleteMaintenance ? 6 : 5}" style="text-align: center; color: var(--text-secondary); padding: 24px 0;">Chưa có lịch sử bảo trì.</td></tr>`}
               </tbody>
             </table>
+            </div>
           </article>
         </div>
       </div>

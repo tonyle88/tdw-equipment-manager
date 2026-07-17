@@ -730,6 +730,35 @@
     min-height: 36px;
     margin: 0 auto;
   }
+  .maintenance-history-scroll { width: 100%; overflow-x: auto; }
+  .maintenance-history-table { min-width: 1040px; table-layout: fixed; }
+  .maintenance-history-table col.maintenance-history-date-col { width: 110px; }
+  .maintenance-history-table col.maintenance-history-asset-col { width: 35%; }
+  .maintenance-history-table col.maintenance-history-type-col { width: 140px; }
+  .maintenance-history-table col.maintenance-history-content-col { width: 25%; }
+  .maintenance-history-table col.maintenance-history-cost-col { width: 150px; }
+  .maintenance-history-table col.maintenance-history-actions-col { width: 100px; }
+  .maintenance-history-table th,
+  .maintenance-history-table td { vertical-align: middle; }
+  .maintenance-history-table th:nth-child(3),
+  .maintenance-history-table td:nth-child(3),
+  .maintenance-history-table th:last-child,
+  .maintenance-history-table td:last-child { text-align: center; }
+  .maintenance-history-table th:nth-child(5),
+  .maintenance-history-table td:nth-child(5) { text-align: right; }
+  .maintenance-history-table td:nth-child(2),
+  .maintenance-history-table td:nth-child(4) {
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+  .maintenance-history-table .badge { max-width: 100%; white-space: normal; }
+  .maintenance-history-table .maintenance-history-text { font-weight: 600; }
+  .maintenance-history-table .maintenance-history-cost {
+    color: #fb7185;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .maintenance-history-table .table-actions { height: 100%; white-space: nowrap; }
   .bar-chart { display: grid; gap: 14px; }
   .bar-row { display: grid; grid-template-columns: 220px minmax(160px, 1fr) 42px; gap: 12px; }
   .bar-label { color: rgba(255,255,255,.82); font-weight: 800; }

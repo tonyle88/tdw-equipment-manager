@@ -177,6 +177,10 @@ async function run() {
   assert.ok(styles.includes("size: 100mm 140mm"));
   assert.ok(styles.includes(".qr-label:nth-child(2n)"));
   assert.ok(app.includes('data-edit-maintenance='));
+  assert.ok(app.includes('class="mini-table maintenance-history-table"'));
+  assert.ok(app.includes('<th>THAO TÁC</th>'));
+  assert.ok(styles.includes('.maintenance-history-scroll'));
+  assert.ok(styles.includes('.maintenance-history-actions-col'));
   assert.ok(app.includes("async function convertImageToWebp(file)"));
   assert.ok(app.includes('url.searchParams.set("asset", assetId)'));
   assert.ok(!app.includes("function exportMaintenanceCsv()"));
