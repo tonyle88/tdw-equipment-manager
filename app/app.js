@@ -1083,7 +1083,11 @@ const state = {
         </dl>
         <div class="profile-qr">
           ${qrUrl ? `<img src="${qrUrl}" alt="Mã QR thiết bị ${escapeHtml(asset.asset_code)}" />` : ""}
-          <div><strong>MÃ QR THIẾT BỊ</strong><span>Quét để mở hồ sơ, bảo hành và bảo trì.</span></div>
+          <div>
+            <strong>MÃ QR THIẾT BỊ</strong>
+            <span>Quét để mở hồ sơ, bảo hành và bảo trì.</span>
+            ${qrUrl ? `<button class="secondary-button profile-qr-download" type="button" data-download-qr="${escapeHtml(asset.asset_code || asset.asset_id)}">Tải mã QR</button>` : ""}
+          </div>
         </div>
       </section>
       <section class="asset-profile-panel" data-profile-panel="movement">
@@ -1136,6 +1140,14 @@ const state = {
     els.assetProfileActions.querySelector("[data-profile-edit]")?.addEventListener("click", () => { closeAssetProfile(); openAssetModal(asset); });
     els.assetProfileActions.querySelector("[data-profile-movement]")?.addEventListener("click", () => { closeAssetProfile(); openMovementLogModal(asset.asset_id); });
     els.assetProfileActions.querySelector("[data-profile-maintenance]")?.addEventListener("click", () => { closeAssetProfile(); openMaintenanceLogModal(asset.asset_id); });
+    els.assetProfileBody.querySelector("[data-download-qr]")?.addEventListener("click", (event) => {
+      const image = els.assetProfileBody.querySelector(".profile-qr img");
+      if (!image?.src) return;
+      const link = document.createElement("a");
+      link.href = image.src;
+      link.download = `${safeClass(event.currentTarget.dataset.downloadQr) || "TDW-THIET-BI"}-QR.gif`;
+      link.click();
+    });
   }
 
   async function hydrateProfileImages() {
@@ -1183,8 +1195,14 @@ const state = {
     const mediaId = state.lightboxItems[state.lightboxIndex];
     const media = state.mediaFiles.find((item) => item.media_id === mediaId);
     if (!media) return;
-    els.mediaLightboxImage.src = await mediaObjectUrl(media);
-    els.mediaLightboxCount.textContent = `${state.lightboxIndex + 1} / ${state.lightboxItems.length}`;
+    els.mediaLightboxCount.textContent = "Đang tải ảnh...";
+    try {
+      els.mediaLightboxImage.src = await mediaObjectUrl(media);
+      els.mediaLightboxCount.textContent = `${state.lightboxIndex + 1} / ${state.lightboxItems.length}`;
+    } catch (error) {
+      els.mediaLightboxImage.removeAttribute("src");
+      els.mediaLightboxCount.textContent = "Không tải được ảnh";
+    }
     const hasMultiple = state.lightboxItems.length > 1;
     els.mediaLightboxPrev.hidden = !hasMultiple;
     els.mediaLightboxNext.hidden = !hasMultiple;
@@ -3101,6 +3119,12 @@ const state = {
     });
     els.mediaLightboxPrev?.addEventListener("click", () => moveLightbox(-1));
     els.mediaLightboxNext?.addEventListener("click", () => moveLightbox(1));
+    document.addEventListener("keydown", (event) => {
+      if (els.mediaLightbox?.hidden) return;
+      if (event.key === "ArrowLeft") moveLightbox(-1);
+      if (event.key === "ArrowRight") moveLightbox(1);
+      if (event.key === "Escape") els.mediaLightbox.hidden = true;
+    });
     els.navLinks.forEach((link) => {
       link.addEventListener("click", (event) => {
         event.preventDefault();

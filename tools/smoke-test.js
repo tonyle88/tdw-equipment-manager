@@ -81,6 +81,7 @@ async function run() {
   assert.ok(appsScript.includes("function saveMediaFile(payload, token)"));
   assert.ok(appsScript.includes("function getMediaFile(mediaId, token)"));
   assert.ok(appsScript.includes("function ensureMediaFilesSheet_(sheet)"));
+  assert.ok(appsScript.includes("function assertMediaOwnerExists_(media)"));
   assert.ok(appsScript.includes("function getSoftwareLicenseKey(licenseId, token)"));
   assert.ok(appsScript.includes("function requirePermission_(token, permission)"));
   assert.ok(appsScript.includes("Object.assign({}, existing, user || {})"));
@@ -136,6 +137,8 @@ async function run() {
   assert.ok(index.includes('id="maintenancePlanModal"'));
   assert.ok(index.includes('id="assetProfileModal"'));
   assert.ok(index.includes('src="assets/qrcode.js"'));
+  assert.ok(app.includes('data-download-qr='));
+  assert.ok(app.includes('event.key === "ArrowLeft"'));
   assert.ok(app.includes("async function convertImageToWebp(file)"));
   assert.ok(app.includes('url.searchParams.set("asset", assetId)'));
   assert.ok(!app.includes("function exportMaintenanceCsv()"));

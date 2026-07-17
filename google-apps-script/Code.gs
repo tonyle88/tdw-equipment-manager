@@ -681,6 +681,7 @@ function getMediaFile(mediaId, token) {
     if (!media) throw new Error("Không tìm thấy ảnh");
     const permission = media.owner_type === "MAINTENANCE" ? "maintenance.view" : "assets.view";
     if (!hasPermission_(user, permission)) throw new Error("Không có quyền xem ảnh này");
+    assertMediaOwnerExists_(media);
     const blob = DriveApp.getFileById(media.drive_file_id).getBlob();
     return { ok: true, media_id: mediaId, mime_type: "image/webp", data_base64: Utilities.base64Encode(blob.getBytes()) };
   } catch (error) {
@@ -694,6 +695,7 @@ function deleteMediaFile(mediaId, token) {
     if (!media) throw new Error("Không tìm thấy ảnh");
     const permission = media.owner_type === "MAINTENANCE" ? "maintenance.manage" : "assets.manage";
     const actor = requirePermission_(token || "", permission);
+    assertMediaOwnerExists_(media);
     DriveApp.getFileById(media.drive_file_id).setTrashed(true);
     deleteObject_(SHEET_NAMES.mediaFiles, "media_id", mediaId);
     logAudit_(actor, "MEDIA_DELETED", "media_file", mediaId, media.file_name || mediaId);
@@ -701,6 +703,16 @@ function deleteMediaFile(mediaId, token) {
   } catch (error) {
     return { ok: false, error: error.message };
   }
+}
+
+function assertMediaOwnerExists_(media) {
+  if (!readActiveAssets_().some((asset) => asset.asset_id === media.asset_id)) {
+    throw new Error("Thiết bị chứa ảnh không tồn tại hoặc đã bị xóa");
+  }
+  if (media.owner_type === "MAINTENANCE" && !readSheetAsObjects_(SHEET_NAMES.maintenanceLogs).some((log) => log.log_id === media.owner_id && log.asset_id === media.asset_id)) {
+    throw new Error("Lịch sử bảo trì chứa ảnh không còn tồn tại");
+  }
+  if (["ASSET", "MAINTENANCE"].indexOf(media.owner_type) === -1) throw new Error("Loại ảnh không hợp lệ");
 }
 
 function getMediaFolder_() {
