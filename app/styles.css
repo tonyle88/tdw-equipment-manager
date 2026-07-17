@@ -1132,12 +1132,13 @@
       margin: 0;
     }
     @page qr-labels-a4 { size: A4 portrait; margin: 10mm; }
-    @page qr-labels-single { size: 100mm 70mm; margin: 5mm; }
+    @page qr-labels-single { size: 100mm 140mm; margin: 5mm; }
     .qr-label-sheet { display: grid; align-content: start; justify-content: center; }
     .qr-label-sheet--a4 { page: qr-labels-a4; grid-template-columns: repeat(2, 90mm); gap: 5mm; }
-    .qr-label-sheet--label { page: qr-labels-single; grid-template-columns: 90mm; gap: 0; }
-    .qr-label-sheet--label .qr-label { break-after: page; page-break-after: always; }
-    .qr-label-sheet--label .qr-label:last-child { break-after: auto; page-break-after: auto; }
+    .qr-label-sheet--label { page: qr-labels-single; display: block; width: 90mm; }
+    .qr-label-sheet--label .qr-label { margin-bottom: 5mm; }
+    .qr-label-sheet--label .qr-label:nth-child(2n) { break-after: page; page-break-after: always; }
+    .qr-label-sheet--label .qr-label:last-child { margin-bottom: 0; break-after: auto; page-break-after: auto; }
     .qr-label { display: grid; grid-template-columns: 28mm 1fr; align-items: center; gap: 4mm; width: 90mm; min-height: 52mm; padding: 5mm; border: .4mm solid #176da5; border-radius: 3mm; background: #fff; }
     .qr-label { break-inside: avoid; page-break-inside: avoid; box-sizing: border-box; }
     .qr-label-logo { width: 22mm; height: auto; margin-bottom: 1mm; }

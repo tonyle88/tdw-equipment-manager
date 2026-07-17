@@ -154,6 +154,8 @@ async function run() {
   assert.ok(index.includes('id="qrLabelDeviceList"'));
   assert.ok(index.includes('id="qrLabelPaperSize"'));
   assert.ok(styles.includes("@page qr-labels-single"));
+  assert.ok(styles.includes("size: 100mm 140mm"));
+  assert.ok(styles.includes(".qr-label:nth-child(2n)"));
   assert.ok(app.includes('data-edit-maintenance='));
   assert.ok(app.includes("async function convertImageToWebp(file)"));
   assert.ok(app.includes('url.searchParams.set("asset", assetId)'));
