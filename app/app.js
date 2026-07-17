@@ -942,7 +942,7 @@ const state = {
       <div class="detail-grid">
         <div class="mini-card"><span>Năm</span><strong>${escapeHtml(asset.purchase_year || "Chưa rõ")}</strong></div>
         <div class="mini-card"><span>Số lượng</span><strong>${escapeHtml(asset.quantity || "Chưa rõ")}</strong></div>
-        <div class="mini-card"><span>Loại</span><strong>${escapeHtml(asset.asset_type || "Thiết bị")}</strong></div>
+        <div class="mini-card"><span>Loại</span><strong>${escapeHtml(labelFor("asset_type", asset.asset_type) || "Thiết bị")}</strong></div>
         <div class="mini-card"><span>Hãng</span><strong>${escapeHtml(asset.brand || "Chưa tách")}</strong></div>
         <div class="mini-card"><span>Serial</span><strong>${escapeHtml(asset.serial_number || "Chưa có")}</strong></div>
         <div class="mini-card"><span>Đơn giá</span><strong>${escapeHtml(formatMoney(asset.unit_price) || "Chưa có")}</strong></div>
@@ -1094,7 +1094,7 @@ const state = {
         ${renderMediaGallery(assetImages, "Chưa có ảnh thiết bị")}
         <div class="profile-facts">
           <div><span>Nhóm</span><strong>${escapeHtml(asset.asset_group_label || "Chưa có")}</strong></div>
-          <div><span>Loại</span><strong>${escapeHtml(asset.asset_type || "Chưa có")}</strong></div>
+          <div><span>Loại</span><strong>${escapeHtml(labelFor("asset_type", asset.asset_type) || "Chưa có")}</strong></div>
           <div><span>Hãng</span><strong>${escapeHtml(asset.brand || "Chưa có")}</strong></div>
           <div><span>Serial</span><strong>${escapeHtml(asset.serial_number || "Chưa có")}</strong></div>
           <div><span>Năm</span><strong>${escapeHtml(asset.purchase_year || "Chưa có")}</strong></div>

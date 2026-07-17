@@ -153,6 +153,7 @@ async function run() {
   assert.ok(app.includes("await waitForPrintImages(el)"));
   assert.ok(app.includes('Bảo trì: ${escapeHtml(formatDate(asset.last_maintenance_date)'));
   assert.ok(app.includes('Năm: ${escapeHtml(asset.purchase_year'));
+  assert.equal((app.match(/labelFor\("asset_type", asset\.asset_type\)/g) || []).length, 2);
   assert.ok(app.includes('paperSize === "label"'));
   assert.ok(app.includes("function openQrLabelModal()"));
   assert.ok(index.includes('id="qrLabelDeviceList"'));
