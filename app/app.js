@@ -1208,7 +1208,7 @@ const state = {
     const labels = assets.map((asset) => {
       const qrUrl = qrDataUrl(asset.asset_id);
       if (!qrUrl) return "";
-      return `<article class="qr-label"><img class="qr-label-code" src="${qrUrl}" alt="Mã QR ${escapeHtml(asset.asset_code)}" /><div><img class="qr-label-logo" src="assets/tdw-logo.webp" alt="TDW" /><strong>${escapeHtml(asset.asset_code || "THIẾT BỊ TDW")}</strong><span>${escapeHtml(asset.asset_name || "Thiết bị chưa đặt tên")}</span><small>Hết bảo hành: ${escapeHtml(formatDate(asset.warranty_end_date) || "Chưa có")}</small><small>Quét QR để xem hồ sơ thiết bị</small></div></article>`;
+      return `<article class="qr-label"><img class="qr-label-code" src="${qrUrl}" alt="Mã QR ${escapeHtml(asset.asset_code)}" /><div><img class="qr-label-logo" src="assets/tdw-logo.webp" alt="TDW" /><strong>${escapeHtml(asset.asset_code || "THIẾT BỊ TDW")}</strong><span>${escapeHtml(asset.asset_name || "Thiết bị chưa đặt tên")}</span><small>Năm: ${escapeHtml(asset.purchase_year || "Chưa có")} · Bảo trì: ${escapeHtml(formatDate(asset.last_maintenance_date) || "Chưa có")}</small><small>Hết bảo hành: ${escapeHtml(formatDate(asset.warranty_end_date) || "Chưa có")}</small><small class="qr-label-note">Quét QR để xem hồ sơ thiết bị</small></div></article>`;
     }).filter(Boolean);
     if (!labels.length) {
       showMessageModal("Không thể in QR", "Chưa có thiết bị hợp lệ để tạo tem QR.");

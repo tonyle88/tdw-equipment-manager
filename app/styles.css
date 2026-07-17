@@ -1147,6 +1147,7 @@
     .qr-label strong { color: #176da5; font-size: 12pt; overflow-wrap: anywhere; }
     .qr-label span { color: #111; font-size: 9pt; font-weight: 700; overflow-wrap: anywhere; }
     .qr-label small { color: #555; font-size: 7.5pt; }
+    .qr-label-note { margin-top: .5mm; color: #176da5 !important; font-weight: 700; }
 
     /* Header công ty */
     .pr-header {
