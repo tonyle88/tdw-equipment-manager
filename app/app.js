@@ -2469,20 +2469,56 @@ const state = {
 
   function openMaintenancePlanModal(planId = null) {
     els.maintenancePlanForm.reset();
+    const form = els.maintenancePlanForm;
     const assetSelect = els.maintenancePlanForm.querySelector('[name="asset_id"]');
     assetSelect.innerHTML = `<option value="">-- Chọn thiết bị --</option>${state.assets.map((asset) => `<option value="${escapeHtml(asset.asset_id)}">${escapeHtml(asset.asset_name)} (${escapeHtml(asset.asset_code)})</option>`).join("")}`;
+    const groupSelect = form.elements.asset_group;
+    const typeSelect = form.elements.asset_type;
+    groupSelect.innerHTML = `<option value="">-- Chọn nhóm thiết bị --</option>${settingOptions("asset_group").map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("")}`;
+    typeSelect.innerHTML = `<option value="">-- Chọn loại thiết bị --</option>${settingOptions("asset_type").map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("")}`;
     const plan = planId ? state.maintenancePlans.find((item) => item.plan_id === planId) : null;
+    const scopeField = document.querySelector("#maintenancePlanScopeField");
+    const assetField = document.querySelector("#maintenancePlanAssetField");
+    const groupField = document.querySelector("#maintenancePlanGroupField");
+    const typeField = document.querySelector("#maintenancePlanTypeField");
+    const targetCount = document.querySelector("#maintenancePlanTargetCount");
+    const updateScope = () => {
+      const scope = form.elements.scope_type.value;
+      assetField.hidden = scope !== "ASSET";
+      groupField.hidden = scope !== "GROUP";
+      typeField.hidden = scope !== "TYPE";
+      assetSelect.required = scope === "ASSET";
+      groupSelect.required = scope === "GROUP";
+      typeSelect.required = scope === "TYPE";
+      if (scope === "ASSET") {
+        targetCount.textContent = assetSelect.value ? "Kế hoạch áp dụng cho 1 thiết bị." : "";
+      } else {
+        const field = scope === "GROUP" ? "asset_group" : "asset_type";
+        const value = scope === "GROUP" ? groupSelect.value : typeSelect.value;
+        const count = value ? state.assets.filter((asset) => asset[field] === value).length : 0;
+        targetCount.textContent = value ? `Kế hoạch sẽ được tạo cho ${count} thiết bị hiện có.` : "";
+      }
+    };
+    form.elements.scope_type.onchange = updateScope;
+    assetSelect.onchange = updateScope;
+    groupSelect.onchange = updateScope;
+    typeSelect.onchange = updateScope;
     if (plan) {
+      form.elements.scope_type.value = "ASSET";
+      scopeField.hidden = true;
       Object.keys(plan).forEach((key) => {
-        const input = els.maintenancePlanForm.querySelector(`[name="${key}"]`);
+        const input = form.querySelector(`[name="${key}"]`);
         if (input) input.value = plan[key];
       });
     } else {
-      els.maintenancePlanForm.elements.plan_id.value = "";
-      els.maintenancePlanForm.elements.next_due_date.value = new Date().toISOString().slice(0, 10);
-      els.maintenancePlanForm.elements.active.value = "TRUE";
+      scopeField.hidden = false;
+      form.elements.scope_type.value = "ASSET";
+      form.elements.plan_id.value = "";
+      form.elements.next_due_date.value = new Date().toISOString().slice(0, 10);
+      form.elements.active.value = "TRUE";
     }
-    markFormClean(els.maintenancePlanForm);
+    updateScope();
+    markFormClean(form);
     els.maintenancePlanModal.hidden = false;
   }
 
@@ -2494,11 +2530,25 @@ const state = {
   async function handleMaintenancePlanSubmit(event) {
     event.preventDefault();
     const plan = Object.fromEntries(new FormData(event.target).entries());
+    const scope = plan.scope_type;
+    delete plan.scope_type;
+    delete plan.asset_group;
+    delete plan.asset_type;
     const submitBtn = event.target.querySelector("[type=submit]");
     if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
     try {
-      await callServer("saveMaintenancePlan", plan);
-      showToast("Đã lưu kế hoạch", plan.title);
+      if (plan.plan_id || scope === "ASSET") {
+        await callServer("saveMaintenancePlan", plan);
+        showToast("Đã lưu kế hoạch", plan.title);
+      } else {
+        const field = scope === "GROUP" ? "asset_group" : "asset_type";
+        const value = event.target.elements[field].value;
+        const assetIds = state.assets.filter((asset) => asset[field] === value).map((asset) => asset.asset_id);
+        if (!assetIds.length) throw new Error("Không có thiết bị nào phù hợp với phạm vi đã chọn.");
+        const plans = assetIds.map((assetId) => ({ ...plan, plan_id: "", asset_id: assetId }));
+        const response = await callServer("saveMaintenancePlans", plans);
+        showToast("Đã tạo kế hoạch", `${response.created || plans.length} thiết bị`);
+      }
       closeMaintenancePlanModal();
       await loadAppData();
       renderMaintenanceView();

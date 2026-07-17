@@ -346,6 +346,9 @@ function doPost(event) {
     if (action === "saveMaintenancePlan") {
       return jsonResponse_(saveMaintenancePlan(args[0] || body.plan || {}, args[1] || body.token || ""));
     }
+    if (action === "saveMaintenancePlans") {
+      return jsonResponse_(saveMaintenancePlans(args[0] || body.plans || [], args[1] || body.token || ""));
+    }
     if (action === "deleteMaintenancePlan") {
       const planId = args[0] && typeof args[0] === "object" ? args[0].planId : args[0] || body.planId || "";
       return jsonResponse_(deleteMaintenancePlan(planId, args[1] || body.token || ""));
@@ -606,7 +609,34 @@ function saveMaintenancePlan(plan, token) {
   }
 }
 
-function normalizeMaintenancePlan_(plan) {
+function saveMaintenancePlans(plans, token) {
+  try {
+    const actor = requirePermission_(token || "", "maintenance.manage");
+    if (!Array.isArray(plans) || !plans.length) throw new Error("Danh sách kế hoạch bảo trì đang trống");
+    if (plans.length > 200) throw new Error("Mỗi lần chỉ được tạo tối đa 200 kế hoạch bảo trì");
+    const activeAssets = readActiveAssets_();
+    const normalizedPlans = plans.map((plan) => {
+      if (plan && plan.plan_id) throw new Error("Tạo hàng loạt không hỗ trợ cập nhật kế hoạch đã có");
+      return normalizeMaintenancePlan_(plan || {}, activeAssets);
+    });
+    const sheet = getSheet_(SHEET_NAMES.maintenancePlans);
+    ensureSheetHeaders_(SHEET_NAMES.maintenancePlans, sheet);
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map((header) => String(header).trim());
+    const now = new Date().toISOString();
+    normalizedPlans.forEach((plan) => {
+      plan.created_at = plan.created_at || now;
+      plan.updated_at = now;
+    });
+    sheet.getRange(sheet.getLastRow() + 1, 1, normalizedPlans.length, headers.length)
+      .setValues(normalizedPlans.map((plan) => headers.map((header) => plan[header] || "")));
+    logAudit_(actor, "MAINTENANCE_PLANS_CREATED", "maintenance_plan", "", `${normalizedPlans.length} kế hoạch`);
+    return { ok: true, created: normalizedPlans.length, data: normalizedPlans, updated_at: now };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function normalizeMaintenancePlan_(plan, activeAssets) {
   const now = new Date().toISOString();
   const normalized = Object.assign({}, plan);
   const frequencies = ["MONTHLY", "QUARTERLY", "YEARLY"];
@@ -616,7 +646,7 @@ function normalizeMaintenancePlan_(plan) {
   normalized.frequency = String(normalized.frequency || "").trim().toUpperCase();
   normalized.next_due_date = normalizeIsoDate_(normalized.next_due_date);
   if (!normalized.asset_id) throw new Error("Thiếu thiết bị cho kế hoạch bảo trì");
-  if (!readActiveAssets_().some((asset) => asset.asset_id === normalized.asset_id)) throw new Error("Thiết bị của kế hoạch không tồn tại hoặc đã bị xóa");
+  if (!(activeAssets || readActiveAssets_()).some((asset) => asset.asset_id === normalized.asset_id)) throw new Error("Thiết bị của kế hoạch không tồn tại hoặc đã bị xóa");
   if (!normalized.title) throw new Error("Nội dung kế hoạch là bắt buộc");
   if (frequencies.indexOf(normalized.frequency) === -1) throw new Error("Chu kỳ bảo trì không hợp lệ");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized.next_due_date)) throw new Error("Ngày đến hạn phải có định dạng YYYY-MM-DD");

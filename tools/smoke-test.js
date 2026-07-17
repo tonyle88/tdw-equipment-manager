@@ -81,9 +81,11 @@ async function run() {
   assert.ok(appsScript.includes('softwareLicenses: hasPermission_(user, "software.view") ? readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_) : []'));
   assert.ok(appsScript.includes('maintenanceLogs: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenanceLogs) : []'));
   assert.ok(appsScript.includes('maintenancePlans: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenancePlans) : []'));
-  assert.ok(appsScript.includes("function normalizeMaintenancePlan_(plan)"));
+  assert.ok(appsScript.includes("function normalizeMaintenancePlan_(plan, activeAssets)"));
   assert.ok(appsScript.includes("function ensureMaintenancePlansSheet_(sheet)"));
   assert.ok(appsScript.includes("function sendMaintenancePlanReminders(token)"));
+  assert.ok(appsScript.includes("function saveMaintenancePlans(plans, token)"));
+  assert.ok(appsScript.includes("plans.length > 200"));
   assert.ok(appsScript.includes("function runMaintenancePlanReminders()"));
   assert.ok(appsScript.includes("function installMaintenancePlanReminderTrigger()"));
   assert.ok(appsScript.includes("function saveMediaFile(payload, token)"));
@@ -150,6 +152,10 @@ async function run() {
   assert.ok(app.includes('"BỎ NỘI DUNG ĐANG SOẠN?"'));
   assert.ok((app.match(/bindModalCloseGuard\(/g) || []).length >= 9);
   assert.ok(index.includes('id="maintenancePlanModal"'));
+  assert.ok(index.includes('name="scope_type"'));
+  assert.ok(index.includes('id="maintenancePlanGroupField"'));
+  assert.ok(index.includes('id="maintenancePlanTypeField"'));
+  assert.ok(app.includes('callServer("saveMaintenancePlans", plans)'));
   assert.ok(index.includes('id="assetProfileModal"'));
   assert.ok(index.includes('src="assets/qrcode.js"'));
   assert.ok(app.includes('data-download-qr='));
@@ -215,6 +221,13 @@ async function run() {
   assert.deepEqual(JSON.parse(maintenancePlan.requestToAppsScript.options.body), {
     action: "saveMaintenancePlan",
     args: [{ asset_id: "asset-id" }, "session-token"],
+  });
+
+  const maintenancePlans = await invokeProxy({ fn: "saveMaintenancePlans", args: [[{ asset_id: "asset-id" }], "session-token"] });
+  assert.equal(maintenancePlans.res.statusCode, 200);
+  assert.deepEqual(JSON.parse(maintenancePlans.requestToAppsScript.options.body), {
+    action: "saveMaintenancePlans",
+    args: [[{ asset_id: "asset-id" }], "session-token"],
   });
 
   const reminders = await invokeProxy({ fn: "sendMaintenancePlanReminders", args: ["session-token"] });

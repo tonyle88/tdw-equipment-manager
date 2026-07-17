@@ -363,7 +363,17 @@
           </div>
           <input type="hidden" name="plan_id" />
           <div class="form-grid">
-            <label class="span-2">Thiết bị<select name="asset_id" required></select></label>
+            <label class="span-2" id="maintenancePlanScopeField">Áp dụng cho
+              <select name="scope_type">
+                <option value="ASSET">Một thiết bị</option>
+                <option value="GROUP">Nhóm thiết bị</option>
+                <option value="TYPE">Loại thiết bị</option>
+              </select>
+            </label>
+            <label class="span-2" id="maintenancePlanAssetField">Thiết bị<select name="asset_id" required></select></label>
+            <label class="span-2" id="maintenancePlanGroupField" hidden>Nhóm thiết bị<select name="asset_group"></select></label>
+            <label class="span-2" id="maintenancePlanTypeField" hidden>Loại thiết bị<select name="asset_type"></select></label>
+            <p class="span-2 field-help" id="maintenancePlanTargetCount"></p>
             <label>Chu kỳ
               <select name="frequency" required>
                 <option value="MONTHLY">Hàng tháng</option>
