@@ -207,11 +207,9 @@ const state = {
       filterCount: document.querySelector("#filterCount"),
       resultCount: document.querySelector("#resultCount"),
       pagination: document.querySelector("#pagination"),
-      dataSource: document.querySelector("#dataSource"),
       modal: document.querySelector("#assetModal"),
       form: document.querySelector("#assetForm"),
       formTitle: document.querySelector("#assetFormTitle"),
-      addButton: document.querySelector("#addAssetButton"),
       logoutButton: document.querySelector("#logoutButton"),
       currentUserChip: document.querySelector("#currentUserChip"),
       closeModal: document.querySelector("#closeAssetModal"),
@@ -559,7 +557,6 @@ const state = {
     els.navLinks.forEach((link) => {
       link.hidden = !canAccessView(link.dataset.view);
     });
-    if (els.addButton) els.addButton.hidden = !canEditAssets();
   }
 
   async function handleLogin(event) {
@@ -637,7 +634,6 @@ const state = {
       showPasswordChange();
       return;
     }
-    els.dataSource.textContent = "Google Sheet";
     fillFilters();
     fillFormSelects();
     renderMetrics();
@@ -816,7 +812,7 @@ const state = {
     const inactive = state.assets.filter((asset) => ["KHONG_SU_DUNG", "LUU_KHO_THANH_LY"].includes(asset.status)).length;
     const groups = new Set(state.assets.map((asset) => asset.asset_group)).size;
     const metrics = [
-      ["Tổng thiết bị", total, "Từ Google Sheet"],
+      ["Tổng thiết bị", total, "Từ Danh mục thiết bị"],
       ["Đang sử dụng", inUse, "Thiết bị hoạt động"],
       ["Kém phẩm chất", poor, "Cần theo dõi"],
       ["Không sử dụng/lưu kho", inactive, "Chờ xử lý"],
@@ -3046,7 +3042,6 @@ const state = {
     [els.search, els.group, els.year, els.department, els.status]
       .filter(Boolean)
       .forEach((el) => el.addEventListener("input", () => applyFilters({ resetPage: true })));
-    els.addButton.addEventListener("click", () => openAssetModal());
     bindModalCloseGuard(els.modal, els.form, closeAssetModal, [els.closeModal, els.cancelForm]);
     els.form.addEventListener("submit", handleAssetSubmit);
     els.assetImageInput?.addEventListener("change", () => previewSelectedImages(els.assetImageInput, els.assetImagePreview));
