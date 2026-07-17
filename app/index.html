@@ -500,6 +500,29 @@
         </form>
       </div>
 
+      <div class="modal-backdrop" id="qrLabelModal" hidden>
+        <section class="modal compact-modal qr-label-modal" role="dialog" aria-modal="true" aria-labelledby="qrLabelModalTitle">
+          <div class="modal-head">
+            <div>
+              <p class="eyebrow">TEM THIẾT BỊ</p>
+              <h2 id="qrLabelModalTitle">IN TEM QR HÀNG LOẠT</h2>
+            </div>
+            <button class="icon-button" type="button" id="closeQrLabelModal" aria-label="Đóng">×</button>
+          </div>
+          <div class="qr-label-options">
+            <label>Nhóm thiết bị<select id="qrLabelGroupFilter"></select></label>
+            <label>Khổ giấy<select id="qrLabelPaperSize"><option value="a4">A4 · Dàn nhiều tem</option><option value="label">Tem 100 × 70 mm · Mỗi tem một trang</option></select></label>
+          </div>
+          <label class="qr-label-select-all"><input id="qrLabelSelectAll" type="checkbox" /> Chọn tất cả thiết bị trong nhóm</label>
+          <div class="qr-label-device-list" id="qrLabelDeviceList"></div>
+          <div class="modal-actions">
+            <span class="qr-label-selection-count" id="qrLabelSelectionCount">Đã chọn 0 thiết bị</span>
+            <button class="secondary-button" type="button" id="cancelQrLabelModal">Hủy</button>
+            <button class="primary-button" type="button" id="printQrLabelsButton">In tem đã chọn</button>
+          </div>
+        </section>
+      </div>
+
       <div class="modal-backdrop asset-profile-backdrop" id="assetProfileModal" hidden>
         <section class="asset-profile-modal" role="dialog" aria-modal="true" aria-labelledby="assetProfileTitle">
           <header class="asset-profile-head">

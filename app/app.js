@@ -282,6 +282,15 @@ const state = {
       systemModalInput: document.querySelector("#systemModalInput"),
       systemModalCancel: document.querySelector("#systemModalCancel"),
       systemModalConfirm: document.querySelector("#systemModalConfirm"),
+      qrLabelModal: document.querySelector("#qrLabelModal"),
+      qrLabelGroupFilter: document.querySelector("#qrLabelGroupFilter"),
+      qrLabelPaperSize: document.querySelector("#qrLabelPaperSize"),
+      qrLabelSelectAll: document.querySelector("#qrLabelSelectAll"),
+      qrLabelDeviceList: document.querySelector("#qrLabelDeviceList"),
+      qrLabelSelectionCount: document.querySelector("#qrLabelSelectionCount"),
+      closeQrLabelModal: document.querySelector("#closeQrLabelModal"),
+      cancelQrLabelModal: document.querySelector("#cancelQrLabelModal"),
+      printQrLabelsButton: document.querySelector("#printQrLabelsButton"),
       assetProfileModal: document.querySelector("#assetProfileModal"),
       assetProfileTitle: document.querySelector("#assetProfileTitle"),
       assetProfileSubtitle: document.querySelector("#assetProfileSubtitle"),
@@ -1179,17 +1188,62 @@ const state = {
   }
 
   function printAssetQrLabel(asset) {
-    const qrUrl = qrDataUrl(asset.asset_id);
-    if (!qrUrl) {
-      showMessageModal("Không thể in QR", "Thư viện tạo mã QR chưa sẵn sàng.");
+    printAssetQrLabels([asset], "a4");
+  }
+
+  function printAssetQrLabels(assets, paperSize = "a4") {
+    const labels = assets.map((asset) => {
+      const qrUrl = qrDataUrl(asset.asset_id);
+      if (!qrUrl) return "";
+      return `<article class="qr-label"><img class="qr-label-code" src="${qrUrl}" alt="Mã QR ${escapeHtml(asset.asset_code)}" /><div><img class="qr-label-logo" src="assets/tdw-logo.webp" alt="TDW" /><strong>${escapeHtml(asset.asset_code || "THIẾT BỊ TDW")}</strong><span>${escapeHtml(asset.asset_name || "Thiết bị chưa đặt tên")}</span><small>Hết bảo hành: ${escapeHtml(formatDate(asset.warranty_end_date) || "Chưa có")}</small><small>Quét QR để xem hồ sơ thiết bị</small></div></article>`;
+    }).filter(Boolean);
+    if (!labels.length) {
+      showMessageModal("Không thể in QR", "Chưa có thiết bị hợp lệ để tạo tem QR.");
       return;
     }
     const el = document.getElementById("printReport");
-    el.innerHTML = `<div class="qr-label-sheet"><article class="qr-label"><img class="qr-label-logo" src="assets/tdw-logo.webp" alt="TDW" /><img class="qr-label-code" src="${qrUrl}" alt="Mã QR ${escapeHtml(asset.asset_code)}" /><div><strong>${escapeHtml(asset.asset_code || "THIẾT BỊ TDW")}</strong><span>${escapeHtml(asset.asset_name || "Thiết bị chưa đặt tên")}</span><small>Hết bảo hành: ${escapeHtml(formatDate(asset.warranty_end_date) || "Chưa có")}</small><small>Quét QR để xem hồ sơ thiết bị</small></div></article></div>`;
+    const sizeClass = paperSize === "label" ? "qr-label-sheet--label" : "qr-label-sheet--a4";
+    el.innerHTML = `<div class="qr-label-sheet ${sizeClass}">${labels.join("")}</div>`;
     el.hidden = false;
     window.print();
     el.hidden = true;
     el.innerHTML = "";
+  }
+
+  function qrLabelFilteredAssets() {
+    const group = els.qrLabelGroupFilter?.value || "";
+    return group ? state.assets.filter((asset) => asset.asset_group === group) : state.assets;
+  }
+
+  function updateQrLabelSelectionCount() {
+    const checked = els.qrLabelDeviceList?.querySelectorAll('input[type="checkbox"]:checked').length || 0;
+    if (els.qrLabelSelectionCount) els.qrLabelSelectionCount.textContent = `Đã chọn ${checked} thiết bị`;
+    if (els.qrLabelSelectAll) {
+      const total = els.qrLabelDeviceList?.querySelectorAll('input[type="checkbox"]').length || 0;
+      els.qrLabelSelectAll.checked = total > 0 && checked === total;
+      els.qrLabelSelectAll.indeterminate = checked > 0 && checked < total;
+    }
+  }
+
+  function renderQrLabelDeviceList() {
+    const assets = qrLabelFilteredAssets();
+    els.qrLabelDeviceList.innerHTML = assets.length ? assets.map((asset) => `
+      <label><input type="checkbox" value="${escapeHtml(asset.asset_id)}" />
+        <span><strong>${escapeHtml(asset.asset_code || "Chưa có mã")}</strong><small>${escapeHtml(asset.asset_name || "Thiết bị chưa đặt tên")}</small></span>
+      </label>`).join("") : `<p class="empty-state">Nhóm này chưa có thiết bị.</p>`;
+    els.qrLabelDeviceList.querySelectorAll('input[type="checkbox"]').forEach((input) => input.addEventListener("change", updateQrLabelSelectionCount));
+    updateQrLabelSelectionCount();
+  }
+
+  function openQrLabelModal() {
+    const options = settingOptions("asset_group").map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("");
+    els.qrLabelGroupFilter.innerHTML = `<option value="">Tất cả nhóm</option>${options}`;
+    els.qrLabelModal.hidden = false;
+    renderQrLabelDeviceList();
+  }
+
+  function closeQrLabelModal() {
+    els.qrLabelModal.hidden = true;
   }
 
   async function hydrateProfileImages() {
@@ -1827,7 +1881,7 @@ const state = {
           <h2>BÁO CÁO</h2>
         </div>
         <div class="report-actions report-actions--toolbar">
-          ${canExportAssets ? `<label class="report-group-filter"><span>Nhóm xuất thiết bị</span><select id="reportGroupSelect"><option value="">Tất cả nhóm</option>${groupOptions}</select></label><button class="secondary-button" type="button" data-export-assets>Excel thiết bị</button><button class="secondary-button" type="button" data-print-assets>PDF thiết bị</button>` : ""}
+          ${canExportAssets ? `<label class="report-group-filter"><span>Nhóm xuất thiết bị</span><select id="reportGroupSelect"><option value="">Tất cả nhóm</option>${groupOptions}</select></label><button class="secondary-button" type="button" data-export-assets>Excel thiết bị</button><button class="secondary-button" type="button" data-print-assets>PDF thiết bị</button><button class="secondary-button" type="button" data-print-qr-labels>In tem QR</button>` : ""}
           ${canExportMaintenance ? `<button class="secondary-button" type="button" data-export-maintenance>Excel bảo trì</button><button class="secondary-button" type="button" data-print-maintenance>PDF bảo trì</button>` : ""}
           ${canExportSoftware ? `<button class="secondary-button" type="button" data-export-software>Excel phần mềm</button><button class="secondary-button" type="button" data-print-software>PDF phần mềm</button>` : ""}
           ${canExportMovement ? `<button class="secondary-button" type="button" data-export-movement>Excel luân chuyển</button><button class="secondary-button" type="button" data-print-movement>PDF luân chuyển</button>` : ""}
@@ -1854,6 +1908,7 @@ const state = {
       const selectedGroup = document.getElementById("reportGroupSelect")?.value || "";
       printReport(selectedGroup);
     });
+    els.content.querySelector("[data-print-qr-labels]")?.addEventListener("click", openQrLabelModal);
     els.content.querySelector("[data-export-maintenance]")?.addEventListener("click", () => exportTabularExcel("maintenance"));
     els.content.querySelector("[data-print-maintenance]")?.addEventListener("click", () => printTabularReport("maintenance"));
     els.content.querySelector("[data-export-software]")?.addEventListener("click", () => exportTabularExcel("software"));
@@ -3151,6 +3206,19 @@ const state = {
     els.systemModalCancel?.addEventListener("click", () => closeSystemModal(false));
     els.systemModal?.addEventListener("click", (event) => {
       if (event.target === els.systemModal) closeSystemModal(false);
+    });
+    els.qrLabelGroupFilter?.addEventListener("change", renderQrLabelDeviceList);
+    els.qrLabelSelectAll?.addEventListener("change", () => {
+      els.qrLabelDeviceList.querySelectorAll('input[type="checkbox"]').forEach((input) => { input.checked = els.qrLabelSelectAll.checked; });
+      updateQrLabelSelectionCount();
+    });
+    [els.closeQrLabelModal, els.cancelQrLabelModal].forEach((button) => button?.addEventListener("click", closeQrLabelModal));
+    els.qrLabelModal?.addEventListener("click", (event) => { if (event.target === els.qrLabelModal) closeQrLabelModal(); });
+    els.printQrLabelsButton?.addEventListener("click", () => {
+      const selectedIds = [...els.qrLabelDeviceList.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
+      if (!selectedIds.length) { showMessageModal("Chưa chọn thiết bị", "Hãy chọn ít nhất một thiết bị để in tem QR."); return; }
+      closeQrLabelModal();
+      printAssetQrLabels(state.assets.filter((asset) => selectedIds.includes(asset.asset_id)), els.qrLabelPaperSize?.value || "a4");
     });
     els.closeAssetProfileModal?.addEventListener("click", closeAssetProfile);
     els.assetProfileModal?.addEventListener("click", (event) => {

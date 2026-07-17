@@ -70,6 +70,7 @@ async function run() {
   const appsScript = read("google-apps-script/Code.gs");
   const app = read("app/app.js");
   const index = read("app/index.html");
+  const styles = read("app/styles.css");
   assert.ok(appsScript.includes('softwareLicenses: hasPermission_(user, "software.view") ? readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_) : []'));
   assert.ok(appsScript.includes('maintenanceLogs: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenanceLogs) : []'));
   assert.ok(appsScript.includes('maintenancePlans: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenancePlans) : []'));
@@ -147,6 +148,12 @@ async function run() {
   assert.ok(app.includes('"Hoàn tất", "done"'));
   assert.ok(index.includes('capture="environment"'));
   assert.ok(app.includes("function printAssetQrLabel(asset)"));
+  assert.ok(app.includes('function printAssetQrLabels(assets, paperSize = "a4")'));
+  assert.ok(app.includes('paperSize === "label"'));
+  assert.ok(app.includes("function openQrLabelModal()"));
+  assert.ok(index.includes('id="qrLabelDeviceList"'));
+  assert.ok(index.includes('id="qrLabelPaperSize"'));
+  assert.ok(styles.includes("@page qr-labels-single"));
   assert.ok(app.includes('data-edit-maintenance='));
   assert.ok(app.includes("async function convertImageToWebp(file)"));
   assert.ok(app.includes('url.searchParams.set("asset", assetId)'));
