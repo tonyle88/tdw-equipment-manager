@@ -148,7 +148,9 @@ async function run() {
   assert.ok(app.includes('"Hoàn tất", "done"'));
   assert.ok(index.includes('capture="environment"'));
   assert.ok(app.includes("function printAssetQrLabel(asset)"));
-  assert.ok(app.includes('function printAssetQrLabels(assets, paperSize = "a4")'));
+  assert.ok(app.includes('async function printAssetQrLabels(assets, paperSize = "a4")'));
+  assert.ok(app.includes("async function waitForPrintImages(container)"));
+  assert.ok(app.includes("await waitForPrintImages(el)"));
   assert.ok(app.includes('paperSize === "label"'));
   assert.ok(app.includes("function openQrLabelModal()"));
   assert.ok(index.includes('id="qrLabelDeviceList"'));

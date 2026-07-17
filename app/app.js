@@ -1188,10 +1188,23 @@ const state = {
   }
 
   function printAssetQrLabel(asset) {
-    printAssetQrLabels([asset], "a4");
+    return printAssetQrLabels([asset], "a4");
   }
 
-  function printAssetQrLabels(assets, paperSize = "a4") {
+  async function waitForPrintImages(container) {
+    const images = [...container.querySelectorAll("img")];
+    await Promise.all(images.map(async (image) => {
+      if (!image.complete) {
+        await new Promise((resolve, reject) => {
+          image.addEventListener("load", resolve, { once: true });
+          image.addEventListener("error", reject, { once: true });
+        });
+      }
+      if (image.decode) await image.decode();
+    }));
+  }
+
+  async function printAssetQrLabels(assets, paperSize = "a4") {
     const labels = assets.map((asset) => {
       const qrUrl = qrDataUrl(asset.asset_id);
       if (!qrUrl) return "";
@@ -1205,9 +1218,16 @@ const state = {
     const sizeClass = paperSize === "label" ? "qr-label-sheet--label" : "qr-label-sheet--a4";
     el.innerHTML = `<div class="qr-label-sheet ${sizeClass}">${labels.join("")}</div>`;
     el.hidden = false;
-    window.print();
-    el.hidden = true;
-    el.innerHTML = "";
+    try {
+      await waitForPrintImages(el);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      window.print();
+    } catch (error) {
+      showMessageModal("Không thể tạo tem QR", "Ảnh QR hoặc logo chưa tải được. Vui lòng thử lại.");
+    } finally {
+      el.hidden = true;
+      el.innerHTML = "";
+    }
   }
 
   function qrLabelFilteredAssets() {
@@ -3217,7 +3237,6 @@ const state = {
     els.printQrLabelsButton?.addEventListener("click", () => {
       const selectedIds = [...els.qrLabelDeviceList.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
       if (!selectedIds.length) { showMessageModal("Chưa chọn thiết bị", "Hãy chọn ít nhất một thiết bị để in tem QR."); return; }
-      closeQrLabelModal();
       printAssetQrLabels(state.assets.filter((asset) => selectedIds.includes(asset.asset_id)), els.qrLabelPaperSize?.value || "a4");
     });
     els.closeAssetProfileModal?.addEventListener("click", closeAssetProfile);
