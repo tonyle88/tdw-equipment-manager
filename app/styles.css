@@ -1025,10 +1025,11 @@
   .qr-label-modal { width: min(680px, calc(100vw - 24px)); }
   .qr-label-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .qr-label-select-all { display: flex; align-items: center; gap: 9px; margin: 14px 0 8px; font-weight: 800; }
+  .qr-label-select-all input, .qr-label-device-list input[type="checkbox"] { flex: 0 0 18px; width: 18px; height: 18px; min-height: 18px; margin: 0; padding: 0; accent-color: var(--tdw-blue); }
   .qr-label-device-list { display: grid; max-height: min(48vh, 460px); overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
   .qr-label-device-list > label { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
   .qr-label-device-list > label:last-child { border-bottom: 0; }
-  .qr-label-device-list span { display: grid; gap: 2px; min-width: 0; }
+  .qr-label-device-list span { flex: 1; display: grid; gap: 2px; min-width: 0; text-align: left; }
   .qr-label-device-list strong, .qr-label-device-list small { overflow-wrap: anywhere; }
   .qr-label-device-list small { color: var(--text-secondary); }
   .qr-label-selection-count { margin-right: auto; color: var(--text-secondary); font-weight: 800; }
