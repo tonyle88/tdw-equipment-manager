@@ -6,7 +6,8 @@
 - Moi thiet bi va moi lan bao tri co toi da 4 anh; moi file WebP phai nho hon 2 MB.
 - Apps Script luu file trong thu muc Drive rieng `TDW Equipment Manager Media`.
 - ID thu muc duoc luu trong Apps Script > Project Settings > Script Properties voi key `TDW_MEDIA_FOLDER_ID`.
-- Co the tao truoc mot thu muc Drive va nhap ID (phan sau `/folders/` trong URL) vao property nay. Neu property chua co, lan upload dau tien se tu tao thu muc va luu ID.
+- Co the tao truoc mot thu muc Drive va nhap ID hoac URL thu muc day du vao property nay. He thong se tu chuan hoa va luu lai ID. Neu property chua co, lan upload dau tien se tu tao thu muc va luu ID.
+- Chay ham `checkMediaFolderConfiguration` trong Apps Script Editor de kiem tra ten, ID va URL thu muc ma tai khoan Apps Script dang truy cap.
 - Neu ID khong hop le hoac tai khoan Apps Script khong co quyen truy cap, upload se bao loi ro rang va khong tu tao them thu muc khac.
 - Tab `MediaFiles` chi luu metadata. File Drive khong duoc chia se cong khai.
 - Anh duoc doc qua API sau khi xac thuc token va kiem tra quyen module.

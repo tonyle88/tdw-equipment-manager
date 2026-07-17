@@ -717,17 +717,35 @@ function assertMediaOwnerExists_(media) {
 
 function getMediaFolder_() {
   const properties = PropertiesService.getScriptProperties();
-  const folderId = String(properties.getProperty("TDW_MEDIA_FOLDER_ID") || "").trim();
-  if (folderId) {
+  const configuredValue = String(properties.getProperty("TDW_MEDIA_FOLDER_ID") || "").trim();
+  if (configuredValue) {
+    const folderId = normalizeMediaFolderId_(configuredValue);
     try {
-      return DriveApp.getFolderById(folderId);
+      const folder = DriveApp.getFolderById(folderId);
+      if (configuredValue !== folderId) properties.setProperty("TDW_MEDIA_FOLDER_ID", folderId);
+      return folder;
     } catch (error) {
-      throw new Error("TDW_MEDIA_FOLDER_ID không hợp lệ hoặc tài khoản Apps Script không có quyền truy cập thư mục");
+      throw new Error("Không truy cập được thư mục ảnh. Hãy cấp quyền Editor cho tài khoản sở hữu Apps Script hoặc kiểm tra TDW_MEDIA_FOLDER_ID");
     }
   }
   const folder = DriveApp.createFolder("TDW Equipment Manager Media");
   properties.setProperty("TDW_MEDIA_FOLDER_ID", folder.getId());
   return folder;
+}
+
+function normalizeMediaFolderId_(value) {
+  const text = String(value || "").trim();
+  const urlMatch = text.match(/\/folders\/([A-Za-z0-9_-]+)/);
+  const folderId = urlMatch ? urlMatch[1] : text;
+  if (!/^[A-Za-z0-9_-]{10,}$/.test(folderId)) throw new Error("TDW_MEDIA_FOLDER_ID phải là ID hoặc URL thư mục Google Drive");
+  return folderId;
+}
+
+function checkMediaFolderConfiguration() {
+  const folder = getMediaFolder_();
+  const result = { ok: true, folder_id: folder.getId(), folder_name: folder.getName(), folder_url: folder.getUrl() };
+  console.log(JSON.stringify(result));
+  return result;
 }
 
 function deleteMediaForOwner_(ownerType, ownerId) {

@@ -82,6 +82,7 @@ async function run() {
   assert.ok(appsScript.includes("function getMediaFile(mediaId, token)"));
   assert.ok(appsScript.includes("function ensureMediaFilesSheet_(sheet)"));
   assert.ok(appsScript.includes("function assertMediaOwnerExists_(media)"));
+  assert.ok(appsScript.includes("function checkMediaFolderConfiguration()"));
   assert.ok(appsScript.includes("function getSoftwareLicenseKey(licenseId, token)"));
   assert.ok(appsScript.includes("function requirePermission_(token, permission)"));
   assert.ok(appsScript.includes("Object.assign({}, existing, user || {})"));
@@ -93,6 +94,9 @@ async function run() {
 
   const permissions = vm.createContext();
   vm.runInContext(appsScript, permissions, { filename: "google-apps-script/Code.gs" });
+  assert.equal(vm.runInContext('normalizeMediaFolderId_("https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOp?usp=sharing")', permissions), "1AbCdEfGhIjKlMnOp");
+  assert.equal(vm.runInContext('normalizeMediaFolderId_("1AbCdEfGhIjKlMnOp")', permissions), "1AbCdEfGhIjKlMnOp");
+  assert.throws(() => vm.runInContext('normalizeMediaFolderId_("not-an-id")', permissions), /phải là ID hoặc URL/);
   assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "edit,report" }, "assets.manage")', permissions), true);
   assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "edit,report" }, "reports.assets.export")', permissions), true);
   assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "reports.export" }, "reports.assets.export")', permissions), true);
