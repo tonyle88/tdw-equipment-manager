@@ -1028,6 +1028,9 @@
   .upload-progress-item[data-upload-state="processing"] strong, .upload-progress-item[data-upload-state="uploading"] strong { color: var(--tdw-blue); }
   .upload-progress-item[data-upload-state="done"] strong { color: #15803d; }
   .upload-progress-item[data-upload-state="error"] strong { color: #b91c1c; }
+  .maintenance-existing-images > strong { display: block; margin-bottom: 8px; color: var(--text-primary); font-size: 13px; }
+  .maintenance-edit-gallery { grid-template-columns: repeat(4, minmax(0, 110px)); margin: 0; }
+  .maintenance-edit-gallery .profile-image-button { max-width: 110px; aspect-ratio: 4 / 3; }
 
   .asset-profile-backdrop { z-index: 30; }
   .asset-profile-modal {
@@ -1166,6 +1169,7 @@
     .asset-profile-actions { overflow-x: auto; justify-content: flex-start; }
     .asset-profile-actions button { flex: 0 0 auto; }
     .profile-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .maintenance-edit-gallery { grid-template-columns: repeat(2, minmax(0, 110px)); }
   }
   @media print {
     /* Ép in màu nền — bắt buộc để header/row màu hiện đúng */

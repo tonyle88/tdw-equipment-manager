@@ -199,6 +199,10 @@ async function run() {
   assert.ok(styles.includes('.maintenance-history-scroll'));
   assert.ok(styles.includes('.maintenance-history-actions-col'));
   assert.ok(app.includes("async function convertImageToWebp(file)"));
+  assert.ok(app.includes("async function renderMaintenanceExistingImages(logId)"));
+  assert.ok(app.includes('mediaFor("MAINTENANCE", logId)'));
+  assert.ok(index.includes('id="maintenanceExistingImagePreview"'));
+  assert.ok(styles.includes(".maintenance-edit-gallery"));
   assert.ok(app.includes('url.searchParams.set("asset", assetId)'));
   assert.ok(!app.includes("function exportMaintenanceCsv()"));
 

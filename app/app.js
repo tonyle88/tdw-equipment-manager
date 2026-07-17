@@ -254,6 +254,7 @@ const state = {
       closeMaintenanceLogModal: document.querySelector("#closeMaintenanceLogModal"),
       cancelMaintenanceLogForm: document.querySelector("#cancelMaintenanceLogForm"),
       maintenanceImageInput: document.querySelector("#maintenanceImageInput"),
+      maintenanceExistingImagePreview: document.querySelector("#maintenanceExistingImagePreview"),
       maintenanceImagePreview: document.querySelector("#maintenanceImagePreview"),
       maintenancePlanModal: document.querySelector("#maintenancePlanModal"),
       maintenancePlanForm: document.querySelector("#maintenancePlanForm"),
@@ -1073,6 +1074,37 @@ const state = {
         </button>
         ${hasPermission(item.owner_type === "MAINTENANCE" ? "maintenance.manage" : "assets.manage") ? `<button class="profile-image-delete" type="button" data-delete-media="${escapeHtml(item.media_id)}" aria-label="Xóa ảnh">×</button>` : ""}
       </div>`).join("")}</div>`;
+  }
+
+  async function renderMaintenanceExistingImages(logId) {
+    const container = els.maintenanceExistingImagePreview;
+    if (!container) return;
+    const items = logId ? mediaFor("MAINTENANCE", logId) : [];
+    if (!items.length) {
+      container.innerHTML = "";
+      return;
+    }
+    container.innerHTML = `<div class="maintenance-existing-images">
+      <strong>Ảnh đã lưu (${items.length}/4)</strong>
+      <div class="profile-gallery maintenance-edit-gallery">${items.map((item) => `
+        <div class="profile-image-item">
+          <button class="profile-image-button" type="button" data-media-id="${escapeHtml(item.media_id)}" aria-label="Phóng to ảnh">
+            <span>Đang tải ảnh...</span>
+            <img data-existing-maintenance-image="${escapeHtml(item.media_id)}" alt="Ảnh kết quả bảo trì" hidden />
+          </button>
+        </div>`).join("")}</div>
+    </div>`;
+    await Promise.all([...container.querySelectorAll("[data-existing-maintenance-image]")].map(async (image) => {
+      const media = items.find((item) => item.media_id === image.dataset.existingMaintenanceImage);
+      try {
+        image.src = await mediaObjectUrl(media);
+        image.hidden = false;
+        image.previousElementSibling.hidden = true;
+      } catch (error) {
+        image.previousElementSibling.textContent = "Không tải được ảnh";
+      }
+    }));
+    container.querySelectorAll("[data-media-id]").forEach((button) => button.addEventListener("click", () => openMediaLightbox(button)));
   }
 
   function assetDeepLink(assetId) {
@@ -2432,8 +2464,10 @@ const state = {
     if (els.maintenanceLogFormTitle) els.maintenanceLogFormTitle.textContent = isEditing ? "SỬA LỊCH SỬ BẢO TRÌ" : "GHI NHẬN LỊCH SỬ BẢO TRÌ";
     
     markFormClean(els.maintenanceLogForm);
+    if (els.maintenanceExistingImagePreview) els.maintenanceExistingImagePreview.innerHTML = "";
     if (els.maintenanceImagePreview) els.maintenanceImagePreview.innerHTML = "";
     els.maintenanceLogModal.hidden = false;
+    if (isEditing) renderMaintenanceExistingImages(logId);
   }
 
   function closeMaintenanceLogModal() {
