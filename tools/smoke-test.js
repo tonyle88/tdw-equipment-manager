@@ -154,8 +154,16 @@ async function run() {
   assert.ok(index.includes('name="email" type="email"'));
   assert.ok(app.includes('function setUserPermissionCodes(rawPermissions, role)'));
   assert.ok(app.includes("function canAccessView(view)"));
-  assert.ok(app.includes("async function exportTabularExcel(kind)"));
-  assert.ok(app.includes("function printTabularReport(kind)"));
+  assert.ok(app.includes("async function exportTabularExcel(kind, filters = {})"));
+  assert.ok(app.includes("function tabularReportData(kind, filters = {})"));
+  assert.ok(app.includes('id="maintenanceReportYear"'));
+  assert.ok(app.includes('id="maintenanceReportMonth"'));
+  assert.ok(app.includes("async function mediaPngDataUrl(media)"));
+  assert.ok(app.includes('mediaFor("MAINTENANCE", report.imageOwnerIds[index])'));
+  assert.ok(app.includes("await waitForPrintImages(el)"));
+  assert.ok(styles.includes(".report-export-zones"));
+  assert.ok(styles.includes(".pr-maintenance-images"));
+  assert.ok(app.includes("async function printTabularReport(kind, filters = {})"));
   assert.ok(app.includes("function openMaintenancePlanModal(planId = null)"));
   assert.ok(app.includes('callServer("sendMaintenancePlanReminders")'));
   assert.ok(app.includes("function bindModalCloseGuard(modal, form, closeModal, buttons)"));

@@ -684,6 +684,26 @@
     font-size: 13px;
     white-space: nowrap;
   }
+  .report-export-zones {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0 20px 18px;
+  }
+  .report-export-zone {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 8px;
+    background: rgba(255,255,255,.06);
+  }
+  .report-export-zone h3 { margin: 0 0 9px; color: #61ddf1; font-size: 12px; }
+  .report-export-zone .report-actions { display: flex; }
+  .report-export-zone .secondary-button { min-height: 36px; padding: 0 11px; font-size: 12px; white-space: nowrap; }
+  .report-export-zone #reportGroupSelect { width: min(220px, 32vw); }
+  .report-export-zone #maintenanceReportYear,
+  .report-export-zone #maintenanceReportMonth { width: 120px; }
+  .report-export-zone--qr { border-color: rgba(97,221,241,.28); }
   .report-group-filter { display: flex; align-items: center; gap: 6px; }
   .report-group-filter span { color: rgba(255,255,255,0.8); font-size: 13px; white-space: nowrap; }
   .report-group-filter select { width: min(340px, 42vw); height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.15); color: #fff; font-size: 13px; cursor: pointer; }
@@ -1161,6 +1181,9 @@
     .report-group-filter { width: 100%; }
     .report-group-filter select { flex: 1; width: auto; }
     .report-actions--toolbar .secondary-button { flex: 1 1 calc(50% - 4px); }
+    .report-export-zones { grid-template-columns: 1fr; margin: 0 0 16px; }
+    .report-export-zone .report-actions { align-items: stretch; }
+    .report-export-zone .secondary-button { flex: 1 1 calc(50% - 5px); }
     .qr-label-options { grid-template-columns: 1fr; }
     .qr-label-selection-count { flex-basis: 100%; }
     .asset-profile-backdrop { padding: 0; }
@@ -1260,6 +1283,9 @@
 
     /* Dòng chẵn — nền xanh nhạt */
     .pr-table tbody tr:nth-child(even) td { background: #f0f6fb; }
+    .pr-maintenance-images { display: grid; grid-template-columns: repeat(2, 18mm); gap: 1mm; min-width: 37mm; }
+    .pr-maintenance-images:empty::after { content: "Không có"; color: #777; font-size: 7.5pt; }
+    .pr-maintenance-images img { width: 18mm; height: 14mm; border: .2mm solid #c8d8e8; border-radius: 1mm; object-fit: cover; }
 
     /* Hàng tiêu đề nhóm — nền xanh vừa, chữ đậm */
     .pr-group-row td {

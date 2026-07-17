@@ -1971,16 +1971,20 @@ const state = {
     const groupOptions = settingOptions("asset_group")
       .map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`)
       .join("");
+    const maintenanceYears = [...new Set(state.maintenanceLogs.map((log) => String(log.date || "").slice(0, 4)).filter((year) => /^\d{4}$/.test(year)))]
+      .sort((a, b) => Number(b) - Number(a));
+    const maintenanceYearOptions = maintenanceYears.map((year) => `<option value="${year}">${year}</option>`).join("");
+    const maintenanceMonthOptions = Array.from({ length: 12 }, (_, index) => `<option value="${String(index + 1).padStart(2, "0")}">Tháng ${index + 1}</option>`).join("");
     els.content.innerHTML = `
       <div class="view-only-panel">
         <div class="panel-head report-title-row">
           <h2>BÁO CÁO</h2>
         </div>
-        <div class="report-actions report-actions--toolbar">
-          ${canExportAssets ? `<label class="report-group-filter"><span>Nhóm xuất thiết bị</span><select id="reportGroupSelect"><option value="">Tất cả nhóm</option>${groupOptions}</select></label><button class="secondary-button" type="button" data-export-assets>Excel thiết bị</button><button class="secondary-button" type="button" data-print-assets>PDF thiết bị</button><button class="secondary-button" type="button" data-print-qr-labels>In tem QR</button>` : ""}
-          ${canExportMaintenance ? `<button class="secondary-button" type="button" data-export-maintenance>Excel bảo trì</button><button class="secondary-button" type="button" data-print-maintenance>PDF bảo trì</button>` : ""}
-          ${canExportSoftware ? `<button class="secondary-button" type="button" data-export-software>Excel phần mềm</button><button class="secondary-button" type="button" data-print-software>PDF phần mềm</button>` : ""}
-          ${canExportMovement ? `<button class="secondary-button" type="button" data-export-movement>Excel luân chuyển</button><button class="secondary-button" type="button" data-print-movement>PDF luân chuyển</button>` : ""}
+        <div class="report-export-zones">
+          ${canExportAssets ? `<section class="report-export-zone"><h3>THIẾT BỊ</h3><div class="report-actions"><label class="report-group-filter"><span>Nhóm</span><select id="reportGroupSelect"><option value="">Tất cả nhóm</option>${groupOptions}</select></label><button class="secondary-button" type="button" data-export-assets>Excel</button><button class="secondary-button" type="button" data-print-assets>PDF</button></div></section>` : ""}
+          ${canExportMaintenance ? `<section class="report-export-zone"><h3>BẢO TRÌ</h3><div class="report-actions"><label class="report-group-filter"><span>Năm</span><select id="maintenanceReportYear"><option value="">Tất cả năm</option>${maintenanceYearOptions}</select></label><label class="report-group-filter"><span>Tháng</span><select id="maintenanceReportMonth"><option value="">Tất cả tháng</option>${maintenanceMonthOptions}</select></label><button class="secondary-button" type="button" data-export-maintenance>Excel kèm ảnh</button><button class="secondary-button" type="button" data-print-maintenance>PDF kèm ảnh</button></div></section>` : ""}
+          ${(canExportSoftware || canExportMovement) ? `<section class="report-export-zone"><h3>PHẦN MỀM & LUÂN CHUYỂN</h3><div class="report-actions">${canExportSoftware ? `<button class="secondary-button" type="button" data-export-software>Excel phần mềm</button><button class="secondary-button" type="button" data-print-software>PDF phần mềm</button>` : ""}${canExportMovement ? `<button class="secondary-button" type="button" data-export-movement>Excel luân chuyển</button><button class="secondary-button" type="button" data-print-movement>PDF luân chuyển</button>` : ""}</div></section>` : ""}
+          ${canExportAssets ? `<section class="report-export-zone report-export-zone--qr"><h3>TEM & QR</h3><div class="report-actions"><button class="secondary-button" type="button" data-print-qr-labels>Chọn thiết bị và in tem QR</button></div></section>` : ""}
         </div>
         <div class="report-dashboard">
           <article class="module-card report-main-card">
@@ -2005,8 +2009,12 @@ const state = {
       printReport(selectedGroup);
     });
     els.content.querySelector("[data-print-qr-labels]")?.addEventListener("click", openQrLabelModal);
-    els.content.querySelector("[data-export-maintenance]")?.addEventListener("click", () => exportTabularExcel("maintenance"));
-    els.content.querySelector("[data-print-maintenance]")?.addEventListener("click", () => printTabularReport("maintenance"));
+    const maintenanceFilters = () => ({
+      year: els.content.querySelector("#maintenanceReportYear")?.value || "",
+      month: els.content.querySelector("#maintenanceReportMonth")?.value || "",
+    });
+    els.content.querySelector("[data-export-maintenance]")?.addEventListener("click", () => exportTabularExcel("maintenance", maintenanceFilters()));
+    els.content.querySelector("[data-print-maintenance]")?.addEventListener("click", () => printTabularReport("maintenance", maintenanceFilters()));
     els.content.querySelector("[data-export-software]")?.addEventListener("click", () => exportTabularExcel("software"));
     els.content.querySelector("[data-print-software]")?.addEventListener("click", () => printTabularReport("software"));
     els.content.querySelector("[data-export-movement]")?.addEventListener("click", () => exportTabularExcel("movement"));
@@ -2954,14 +2962,21 @@ const state = {
     `;
   }
 
-  function tabularReportData(kind) {
+  function tabularReportData(kind, filters = {}) {
     const assets = new Map(state.assets.map((asset) => [asset.asset_id, asset]));
     if (kind === "maintenance") {
+      const logs = state.maintenanceLogs.filter((log) => {
+        const date = String(log.date || "");
+        return (!filters.year || date.slice(0, 4) === filters.year) && (!filters.month || date.slice(5, 7) === filters.month);
+      });
+      const period = [filters.month ? `thang-${filters.month}` : "", filters.year || ""].filter(Boolean).join("-");
       return {
-        filename: "tdw-bao-tri",
+        filename: `tdw-bao-tri${period ? `-${period}` : ""}`,
         title: "BÁO CÁO LỊCH SỬ BẢO TRÌ",
-        headers: ["Ngày", "Thiết bị", "Loại", "Nội dung", "Chi phí", "Nhà cung cấp", "Thực hiện bởi", "Ghi chú"],
-        rows: state.maintenanceLogs.map((log) => [formatDate(log.date), assets.get(log.asset_id)?.asset_name || "Thiết bị đã xóa", labelFor("maintenance_type", log.action_type) || log.action_type, log.description, formatMoney(log.cost), log.vendor, log.performed_by, log.note]),
+        periodLabel: filters.month || filters.year ? `Kỳ báo cáo: ${filters.month ? `Tháng ${Number(filters.month)} · ` : ""}${filters.year || "Tất cả năm"}` : "",
+        headers: ["Ngày", "Thiết bị", "Loại", "Nội dung", "Chi phí", "Nhà cung cấp", "Thực hiện bởi", "Ghi chú", "Hình ảnh"],
+        rows: logs.map((log) => [formatDate(log.date), assets.get(log.asset_id)?.asset_name || "Thiết bị đã xóa", labelFor("maintenance_type", log.action_type) || log.action_type, log.description, formatMoney(log.cost), log.vendor, log.performed_by, log.note, ""]),
+        imageOwnerIds: logs.map((log) => log.log_id),
       };
     }
     if (kind === "software") {
@@ -2996,8 +3011,21 @@ const state = {
     return name;
   }
 
-  async function exportTabularExcel(kind) {
-    const report = tabularReportData(kind);
+  async function mediaPngDataUrl(media) {
+    const source = await mediaObjectUrl(media);
+    const image = new Image();
+    image.src = source;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, 240 / Math.max(image.naturalWidth, image.naturalHeight));
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  }
+
+  async function exportTabularExcel(kind, filters = {}) {
+    const report = tabularReportData(kind, filters);
     if (!report.rows.length) {
       showMessageModal("Không có dữ liệu", "Không có dữ liệu phù hợp để xuất.");
       return;
@@ -3033,7 +3061,12 @@ const state = {
     titleRow.height = 30;
     titleRow.getCell(3).font = { bold: true, size: 14, color: { argb: "FF176DA5" } };
     titleRow.getCell(3).alignment = { vertical: "middle", horizontal: "center" };
-    worksheet.addRow([]);
+    const periodRow = worksheet.addRow(["", "", report.periodLabel || ""]);
+    if (report.periodLabel) {
+      worksheet.mergeCells(`C${periodRow.number}:${lastColumnName}${periodRow.number}`);
+      periodRow.getCell(3).font = { italic: true, size: 10, color: { argb: "FF64748B" } };
+      periodRow.getCell(3).alignment = { horizontal: "center" };
+    }
     const headerRow = worksheet.addRow(["", "STT", ...report.headers]);
     headerRow.height = 25;
     headerRow.eachCell((cell, column) => {
@@ -3044,8 +3077,10 @@ const state = {
         cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
       }
     });
+    const excelRows = [];
     report.rows.forEach((row, index) => {
       const dataRow = worksheet.addRow(["", index + 1, ...row.map(safeSpreadsheetValue)]);
+      excelRows.push(dataRow);
       dataRow.eachCell((cell, column) => {
         if (column > 1) {
           cell.alignment = { vertical: "top", horizontal: column === 2 ? "center" : "left", wrapText: true };
@@ -3054,6 +3089,23 @@ const state = {
         }
       });
     });
+    if (report.imageOwnerIds) {
+      const imageColumn = report.headers.length + 2;
+      worksheet.getColumn(imageColumn).width = 30;
+      for (let index = 0; index < report.imageOwnerIds.length; index += 1) {
+        const images = mediaFor("MAINTENANCE", report.imageOwnerIds[index]).slice(0, 4);
+        if (!images.length) continue;
+        excelRows[index].height = Math.max(excelRows[index].height || 15, 48);
+        for (let imageIndex = 0; imageIndex < images.length; imageIndex += 1) {
+          try {
+            const imageId = workbook.addImage({ base64: await mediaPngDataUrl(images[imageIndex]), extension: "png" });
+            worksheet.addImage(imageId, { tl: { col: imageColumn - 1 + imageIndex * 0.24, row: excelRows[index].number - 1 + 0.08 }, ext: { width: 42, height: 42 } });
+          } catch (error) {
+            console.warn("Không thể thêm ảnh bảo trì vào Excel", error);
+          }
+        }
+      }
+    }
     const dateText = new Date().toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
     const summaryRow = worksheet.addRow(["", `TỔNG CỘNG · ${report.rows.length} dòng · Ngày xuất: ${dateText}`]);
     worksheet.mergeCells(`B${summaryRow.number}:${lastColumnName}${summaryRow.number}`);
@@ -3066,27 +3118,34 @@ const state = {
     saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${report.filename}-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
-  function printTabularReport(kind) {
-    const report = tabularReportData(kind);
+  async function printTabularReport(kind, filters = {}) {
+    const report = tabularReportData(kind, filters);
     if (!report.rows.length) {
       showMessageModal("Không có dữ liệu", "Không có dữ liệu phù hợp để xuất.");
       return;
     }
     const now = new Date();
     const dateText = now.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
-    const tableRows = report.rows.map((row, index) => `<tr><td class="pr-center">${index + 1}</td>${row.map((value) => `<td>${escapeHtml(value)}</td>`).join("")}</tr>`).join("");
+    const imageCells = report.imageOwnerIds ? await Promise.all(report.imageOwnerIds.map(async (ownerId) => {
+      const urls = await Promise.all(mediaFor("MAINTENANCE", ownerId).slice(0, 4).map(async (media) => {
+        try { return await mediaObjectUrl(media); } catch (error) { return ""; }
+      }));
+      return `<div class="pr-maintenance-images">${urls.filter(Boolean).map((url) => `<img src="${escapeHtml(url)}" alt="Ảnh bảo trì" />`).join("")}</div>`;
+    })) : [];
+    const tableRows = report.rows.map((row, index) => `<tr><td class="pr-center">${index + 1}</td>${row.map((value, column) => `<td>${report.imageOwnerIds && column === row.length - 1 ? imageCells[index] : escapeHtml(value)}</td>`).join("")}</tr>`).join("");
     const html = `
       <div class="pr-header" style="position: relative;">
         <img src="assets/tdw-logo.webp" alt="TDW" style="position: absolute; left: 0; top: 0; width: 100px; height: auto;" />
         <div class="pr-company">CÔNG TY CỔ PHẦN NƯỚC THỦ ĐỨC &mdash; TDW</div>
         <div class="pr-title">${escapeHtml(report.title)}</div>
-        <div class="pr-meta">Ngày xuất: ${dateText} &nbsp;|&nbsp; Tổng: ${report.rows.length} dòng</div>
+        <div class="pr-meta">${report.periodLabel ? `${escapeHtml(report.periodLabel)} &nbsp;|&nbsp; ` : ""}Ngày xuất: ${dateText} &nbsp;|&nbsp; Tổng: ${report.rows.length} dòng</div>
       </div>
       <table class="pr-table"><thead><tr><th>STT</th>${report.headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table>
       <div class="pr-footer"><span>Tài liệu nội bộ · TDW Equipment Manager</span><span>In lúc ${now.toLocaleTimeString("vi-VN")} ngày ${dateText}</span></div>`;
     const el = document.getElementById("printReport");
     el.innerHTML = html;
     el.hidden = false;
+    await waitForPrintImages(el);
     window.print();
     el.hidden = true;
     el.innerHTML = "";
