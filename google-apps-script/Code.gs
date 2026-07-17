@@ -32,8 +32,14 @@ const MODULE_PERMISSION_CODES = [
   "reports.view", "reports.assets.export", "reports.maintenance.export", "reports.software.export", "reports.movement.export",
 ];
 
+const ASSET_HEADERS = [
+  "asset_id", "asset_code", "asset_name", "asset_group", "asset_group_label", "asset_type", "brand", "serial_number",
+  "purchase_year", "quantity", "unit_price", "location", "assigned_to", "department", "warranty_end_date",
+  "last_maintenance_date", "software_license", "status", "note", "created_at", "updated_at", "deleted_at", "deleted_by",
+];
+
 const HEALTH_CHECK_HEADERS = {
-  Assets: ["asset_id", "asset_name", "asset_type", "status"],
+  Assets: ASSET_HEADERS,
   Users: ["user_id", "username", "email", "role", "active"],
   Departments: ["department_id", "department_name"],
   MaintenanceLogs: ["log_id", "asset_id", "date"],
@@ -1170,9 +1176,12 @@ function ensureSheetHeaders_(sheetName, sheet) {
 }
 
 function ensureAssetsSheet_(sheet) {
-  const desired = ["asset_type", "serial_number", "location", "warranty_end_date", "unit_price", "last_maintenance_date", "deleted_at", "deleted_by"];
-  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim());
-  desired.forEach((header) => {
+  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim()).filter(Boolean);
+  if (!headers.length) {
+    sheet.getRange(1, 1, 1, ASSET_HEADERS.length).setValues([ASSET_HEADERS]);
+    return;
+  }
+  ASSET_HEADERS.forEach((header) => {
     if (headers.indexOf(header) === -1) {
       sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
       headers.push(header);

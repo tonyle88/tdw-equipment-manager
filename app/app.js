@@ -328,7 +328,7 @@ const state = {
     state.settings = normalizeSettings(payload.settings || []);
     state.departments = payload.departments || [];
     state.assets = sortAssets(
-      (payload.assets || []).map((a) => {
+      normalizeAssets(payload.assets || []).map((a) => {
         a.costStr = formatMoney(a.unit_price);
         return a;
       }),
@@ -703,7 +703,7 @@ const state = {
       asset_code: asset.asset_code || "",
       asset_name: asset.asset_name || "",
       asset_group: asset.asset_group || "",
-      asset_group_label: asset.asset_group_label || labelFor("asset_group", asset.asset_group),
+      asset_group_label: labelFor("asset_group", asset.asset_group, asset.asset_group_label),
       asset_type: asset.asset_type || "",
       brand: asset.brand || "",
       serial_number: asset.serial_number || "",
@@ -764,14 +764,24 @@ const state = {
     });
   }
 
-  function labelFor(type, value) {
+  function labelFor(type, value, legacyLabel = "") {
     const setting = state.settings.find((item) => item.setting_type === type && item.setting_value === value && item.active);
-    return setting?.display_name || fallbackLabels[type]?.[value] || value || "";
+    return setting?.display_name || fallbackLabels[type]?.[value] || legacyLabel || value || "";
   }
 
   function departmentLabel(departmentValue) {
+    const configuredLabel = labelFor("department", departmentValue);
+    if (configuredLabel && configuredLabel !== departmentValue) return configuredLabel;
     const dept = state.departments.find((d) => d.department_name === departmentValue || d.department_id === departmentValue);
-    return dept ? dept.department_name : departmentValue;
+    return dept ? dept.department_name : configuredLabel;
+  }
+
+  function softwareLabel(softwareValue) {
+    return String(softwareValue || "")
+      .split(/\s*[,;\n]\s*/)
+      .filter(Boolean)
+      .map((value) => labelFor("software_name", value))
+      .join(", ");
   }
 
   function responsiblesFor(assetId) {
@@ -824,11 +834,12 @@ const state = {
   }
 
   function fillFormSelects() {
-    fillSelect(els.form.elements.asset_group, settingOptions("asset_group"), "");
-    fillSelect(els.form.elements.status, settingOptions("status"), "");
-    fillSelect(els.form.elements.asset_type, settingOptions("asset_type"), "Chọn loại thiết bị");
-    fillSelect(els.form.elements.department, settingOptions("department"), "Chọn phòng ban");
-    fillSelect(els.form.elements.software_license, settingOptions("software_name"), "Chọn phần mềm");
+    fillSelect(els.form.elements.asset_group, settingOptions("asset_group", state.assets.map((asset) => asset.asset_group)), "");
+    fillSelect(els.form.elements.status, settingOptions("status", state.assets.map((asset) => asset.status)), "");
+    fillSelect(els.form.elements.asset_type, settingOptions("asset_type", state.assets.map((asset) => asset.asset_type)), "Chọn loại thiết bị");
+    fillSelect(els.form.elements.department, settingOptions("department", state.assets.map((asset) => asset.department)), "Chọn phòng ban");
+    const softwareValues = state.assets.flatMap((asset) => String(asset.software_license || "").split(/\s*[,;\n]\s*/)).filter(Boolean);
+    fillSelect(els.form.elements.software_license, settingOptions("software_name", softwareValues), "Chọn phần mềm");
     fillSelect(els.form.elements.primary_responsible_id, state.responsibleUsers.map((user) => [user.user_id, user.full_name]), "Chọn phụ trách chính");
     els.form.elements.secondary_responsible_ids.innerHTML = state.responsibleUsers
       .map((user) => `<option value="${escapeHtml(user.user_id)}">${escapeHtml(user.full_name)}</option>`)
@@ -864,7 +875,7 @@ const state = {
     const department = els.department?.value || "";
     const status = els.status?.value || "";
     state.filtered = state.assets.filter((asset) => {
-      const searchText = normalize([asset.asset_code, asset.asset_name, asset.asset_group_label, asset.serial_number, asset.location, asset.assigned_to, departmentLabel(asset.department), asset.software_license, asset.note].join(" "));
+      const searchText = normalize([asset.asset_code, asset.asset_name, asset.asset_group_label, asset.serial_number, asset.location, asset.assigned_to, departmentLabel(asset.department), softwareLabel(asset.software_license), asset.note].join(" "));
       return (
         (!keyword || searchText.includes(keyword)) &&
         (!group || asset.asset_group === group) &&
@@ -903,7 +914,7 @@ const state = {
         <td>${escapeHtml(asset.asset_group_label || "")}</td>
         <td>${escapeHtml(asset.purchase_year || "")}</td>
         <td>${escapeHtml([primaryResponsibleName(asset), departmentLabel(asset.department)].filter(Boolean).join(" / "))}</td>
-        <td>${escapeHtml(asset.software_license || "")}</td>
+        <td>${escapeHtml(softwareLabel(asset.software_license))}</td>
         <td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status) || "Chưa rõ")}</span></td>
         ${showActions ? `<td class="asset-row-actions"><button class="row-edit-button" data-row-edit="${escapeHtml(asset.asset_id)}" type="button" aria-label="Sửa ${escapeHtml(asset.asset_name || asset.asset_code)}">Sửa</button></td>` : ""}
       </tr>
@@ -956,7 +967,7 @@ const state = {
         <div><dt>Phụ trách chính</dt><dd>${escapeHtml(primaryResponsibleName(asset))}</dd></div>
         <div><dt>Phụ trách phụ</dt><dd>${escapeHtml(secondaryResponsibleNames(asset.asset_id).join(", ") || "Chưa có")}</dd></div>
         <div><dt>Phòng ban</dt><dd>${escapeHtml(departmentLabel(asset.department) || "Chưa có dữ liệu")}</dd></div>
-        <div><dt>Phần mềm</dt><dd>${escapeHtml(asset.software_license || "Không có dữ liệu")}</dd></div>
+        <div><dt>Phần mềm</dt><dd>${escapeHtml(softwareLabel(asset.software_license) || "Không có dữ liệu")}</dd></div>
         <div><dt>Ghi chú</dt><dd>${escapeHtml(asset.note || "Không có ghi chú")}</dd></div>
       </dl>
       
@@ -1108,7 +1119,7 @@ const state = {
           <div><dt>Phòng ban</dt><dd>${escapeHtml(departmentLabel(asset.department) || "Chưa có")}</dd></div>
           <div><dt>Phụ trách chính</dt><dd>${escapeHtml(primaryResponsibleName(asset) || "Chưa có")}</dd></div>
           <div><dt>Phụ trách phụ</dt><dd>${escapeHtml(secondaryResponsibleNames(asset.asset_id).join(", ") || "Chưa có")}</dd></div>
-          <div><dt>Phần mềm</dt><dd>${escapeHtml(asset.software_license || "Chưa có")}</dd></div>
+          <div><dt>Phần mềm</dt><dd>${escapeHtml(softwareLabel(asset.software_license) || "Chưa có")}</dd></div>
           <div><dt>Ghi chú</dt><dd>${escapeHtml(asset.note || "Không có ghi chú")}</dd></div>
         </dl>
         <div class="profile-qr">
@@ -1338,6 +1349,10 @@ const state = {
     [...els.form.elements].forEach((field) => {
       if (field.name) field.value = values[field.name] || "";
     });
+    const selectedSoftware = new Set(String(values.software_license || "").split(/\s*[,;\n]\s*/).filter(Boolean));
+    [...els.form.elements.software_license.options].forEach((option) => {
+      option.selected = selectedSoftware.has(option.value);
+    });
     const responsibles = asset ? responsiblesFor(asset.asset_id) : [];
     const primary = responsibles.find((item) => item.responsibility_role === "primary");
     els.form.elements.primary_responsible_id.value = primary?.user_id || "";
@@ -1357,6 +1372,7 @@ const state = {
 
   function getFormAsset() {
     const data = Object.fromEntries(new FormData(els.form).entries());
+    data.software_license = [...els.form.elements.software_license.selectedOptions].map((option) => option.value).filter(Boolean).join(",");
     const primaryUserId = els.form.elements.primary_responsible_id.value;
     const secondaryUserIds = [...els.form.elements.secondary_responsible_ids.selectedOptions]
       .map((option) => option.value)
@@ -1958,7 +1974,7 @@ const state = {
         label = specialGroupLabel;
       } else {
         key = asset.asset_group;
-        label = asset.asset_group_label || labelFor("asset_group", key) || key;
+        label = labelFor("asset_group", key, asset.asset_group_label) || key;
       }
 
       if (!groups[key]) { 
@@ -1991,7 +2007,7 @@ const state = {
             <td>${escapeHtml(asset.assigned_to)}</td>
             <td>${escapeHtml(departmentLabel(asset.department))}</td>
             <td class="pr-right">${escapeHtml(price)}</td>
-            <td>${escapeHtml(asset.software_license)}</td>
+            <td>${escapeHtml(softwareLabel(asset.software_license))}</td>
             <td style="color: ${colorForLabel(labelFor("status", asset.status), i)}; font-weight: bold;">${escapeHtml(labelFor("status", asset.status))}</td>
           </tr>`;
       });
@@ -2979,7 +2995,7 @@ const state = {
         label = specialGroupLabel;
       } else {
         key = asset.asset_group;
-        label = asset.asset_group_label || labelFor("asset_group", key) || key;
+        label = labelFor("asset_group", key, asset.asset_group_label) || key;
       }
 
       if (!groups[key]) { 
@@ -3083,7 +3099,7 @@ const state = {
           asset.assigned_to,
           departmentLabel(asset.department),
           asset.unit_price ? Number(asset.unit_price) : "",
-          asset.software_license,
+          softwareLabel(asset.software_license),
           statusLabel,
           asset.note
         ]);

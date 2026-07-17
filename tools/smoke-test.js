@@ -71,6 +71,13 @@ async function run() {
   const app = read("app/app.js");
   const index = read("app/index.html");
   const styles = read("app/styles.css");
+  const assetForm = index.match(/id="assetForm"[\s\S]*?<\/form>/)?.[0] || "";
+  const assetFormFields = [...assetForm.matchAll(/name="([^"]+)"/g)]
+    .map((match) => match[1])
+    .filter((name) => !["pending_images", "primary_responsible_id", "secondary_responsible_ids"].includes(name));
+  const assetHeaderBlock = appsScript.match(/const ASSET_HEADERS = \[([\s\S]*?)\];/)?.[1] || "";
+  const assetHeaders = [...assetHeaderBlock.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(assetFormFields.filter((name) => !assetHeaders.includes(name)), []);
   assert.ok(appsScript.includes('softwareLicenses: hasPermission_(user, "software.view") ? readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_) : []'));
   assert.ok(appsScript.includes('maintenanceLogs: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenanceLogs) : []'));
   assert.ok(appsScript.includes('maintenancePlans: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenancePlans) : []'));
@@ -84,8 +91,9 @@ async function run() {
   assert.ok(appsScript.includes("function ensureMediaFilesSheet_(sheet)"));
   assert.ok(appsScript.includes("function assertMediaOwnerExists_(media)"));
   assert.ok(appsScript.includes("function checkMediaFolderConfiguration()"));
-  assert.ok(appsScript.includes('Assets: ["asset_id", "asset_name", "asset_type", "status"]'));
-  assert.ok(appsScript.includes('const desired = ["asset_type", "serial_number"'));
+  assert.ok(appsScript.includes("const ASSET_HEADERS = ["));
+  assert.ok(appsScript.includes("Assets: ASSET_HEADERS"));
+  assert.ok(appsScript.includes("ASSET_HEADERS.forEach"));
   assert.ok(appsScript.includes("function getSoftwareLicenseKey(licenseId, token)"));
   assert.ok(appsScript.includes("function requirePermission_(token, permission)"));
   assert.ok(appsScript.includes("Object.assign({}, existing, user || {})"));
@@ -156,10 +164,15 @@ async function run() {
   assert.ok(app.includes('Bảo trì: ${escapeHtml(formatDate(asset.last_maintenance_date)'));
   assert.ok(app.includes('Năm: ${escapeHtml(asset.purchase_year'));
   assert.equal((app.match(/labelFor\("asset_type", asset\.asset_type\)/g) || []).length, 2);
+  assert.ok(app.includes('if (configuredLabel && configuredLabel !== departmentValue) return configuredLabel'));
+  assert.ok(app.includes('function softwareLabel(softwareValue)'));
+  assert.ok(app.includes("normalizeAssets(payload.assets || []).map"));
   assert.ok(app.includes('paperSize === "label"'));
   assert.ok(app.includes("function openQrLabelModal()"));
   assert.ok(index.includes('id="qrLabelDeviceList"'));
   assert.ok(index.includes('id="qrLabelPaperSize"'));
+  assert.ok(index.includes('name="software_license" multiple'));
+  assert.ok(app.includes("data.software_license = [...els.form.elements.software_license.selectedOptions]"));
   assert.ok(styles.includes("@page qr-labels-single"));
   assert.ok(styles.includes("size: 100mm 140mm"));
   assert.ok(styles.includes(".qr-label:nth-child(2n)"));
