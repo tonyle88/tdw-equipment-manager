@@ -84,6 +84,8 @@ async function run() {
   assert.ok(appsScript.includes("function ensureMediaFilesSheet_(sheet)"));
   assert.ok(appsScript.includes("function assertMediaOwnerExists_(media)"));
   assert.ok(appsScript.includes("function checkMediaFolderConfiguration()"));
+  assert.ok(appsScript.includes('Assets: ["asset_id", "asset_name", "asset_type", "status"]'));
+  assert.ok(appsScript.includes('const desired = ["asset_type", "serial_number"'));
   assert.ok(appsScript.includes("function getSoftwareLicenseKey(licenseId, token)"));
   assert.ok(appsScript.includes("function requirePermission_(token, permission)"));
   assert.ok(appsScript.includes("Object.assign({}, existing, user || {})"));

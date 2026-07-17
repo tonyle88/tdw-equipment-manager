@@ -33,7 +33,7 @@ const MODULE_PERMISSION_CODES = [
 ];
 
 const HEALTH_CHECK_HEADERS = {
-  Assets: ["asset_id", "asset_name", "status"],
+  Assets: ["asset_id", "asset_name", "asset_type", "status"],
   Users: ["user_id", "username", "email", "role", "active"],
   Departments: ["department_id", "department_name"],
   MaintenanceLogs: ["log_id", "asset_id", "date"],
@@ -1170,7 +1170,7 @@ function ensureSheetHeaders_(sheetName, sheet) {
 }
 
 function ensureAssetsSheet_(sheet) {
-  const desired = ["serial_number", "location", "warranty_end_date", "unit_price", "last_maintenance_date", "deleted_at", "deleted_by"];
+  const desired = ["asset_type", "serial_number", "location", "warranty_end_date", "unit_price", "last_maintenance_date", "deleted_at", "deleted_by"];
   const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim());
   desired.forEach((header) => {
     if (headers.indexOf(header) === -1) {
