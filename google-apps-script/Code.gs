@@ -460,6 +460,19 @@ function upsertObject_(sheetName, keyField, object) {
   return object;
 }
 
+function deleteObject_(sheetName, keyField, keyValue) {
+  const sheet = getSheet_(sheetName);
+  ensureSheetHeaders_(sheetName, sheet);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map((header) => String(header).trim());
+  const keyIndex = headers.indexOf(keyField);
+  if (keyIndex === -1) throw new Error(`Missing key field: ${keyField}`);
+  const rowIndex = values.findIndex((row, index) => index > 0 && String(row[keyIndex]) === String(keyValue));
+  if (rowIndex < 1) return false;
+  sheet.deleteRow(rowIndex + 1);
+  return true;
+}
+
 function normalizeAsset_(asset) {
   const now = new Date().toISOString();
   const normalized = Object.assign({}, asset);

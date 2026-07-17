@@ -93,6 +93,7 @@ async function run() {
   assert.ok(appsScript.includes("function saveMediaFile(payload, token)"));
   assert.ok(appsScript.includes("function getMediaFile(mediaId, token)"));
   assert.ok(appsScript.includes("function ensureMediaFilesSheet_(sheet)"));
+  assert.ok(appsScript.includes("function deleteObject_(sheetName, keyField, keyValue)"));
   assert.ok(appsScript.includes("function assertMediaOwnerExists_(media)"));
   assert.ok(appsScript.includes("function checkMediaFolderConfiguration()"));
   assert.ok(appsScript.includes("const ASSET_HEADERS = ["));
@@ -200,6 +201,8 @@ async function run() {
   assert.ok(styles.includes('.maintenance-history-actions-col'));
   assert.ok(app.includes("async function convertImageToWebp(file)"));
   assert.ok(app.includes("async function renderMaintenanceExistingImages(logId)"));
+  assert.ok(app.includes("async function deleteMaintenanceMedia(mediaId, logId)"));
+  assert.ok(app.includes("data-delete-maintenance-media="));
   assert.ok(app.includes('mediaFor("MAINTENANCE", logId)'));
   assert.ok(index.includes('id="maintenanceExistingImagePreview"'));
   assert.ok(styles.includes(".maintenance-edit-gallery"));

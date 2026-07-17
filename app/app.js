@@ -1092,6 +1092,7 @@ const state = {
             <span>Đang tải ảnh...</span>
             <img data-existing-maintenance-image="${escapeHtml(item.media_id)}" alt="Ảnh kết quả bảo trì" hidden />
           </button>
+          ${hasPermission("maintenance.manage") ? `<button class="profile-image-delete" type="button" data-delete-maintenance-media="${escapeHtml(item.media_id)}" aria-label="Xóa ảnh">×</button>` : ""}
         </div>`).join("")}</div>
     </div>`;
     await Promise.all([...container.querySelectorAll("[data-existing-maintenance-image]")].map(async (image) => {
@@ -1105,6 +1106,22 @@ const state = {
       }
     }));
     container.querySelectorAll("[data-media-id]").forEach((button) => button.addEventListener("click", () => openMediaLightbox(button)));
+    container.querySelectorAll("[data-delete-maintenance-media]").forEach((button) => button.addEventListener("click", () => deleteMaintenanceMedia(button.dataset.deleteMaintenanceMedia, logId)));
+  }
+
+  async function deleteMaintenanceMedia(mediaId, logId) {
+    if (!await showConfirmModal("XÓA ẢNH", "Xóa ảnh này khỏi lịch sử bảo trì?", "Xóa")) return;
+    try {
+      await callServer("deleteMediaFile", mediaId);
+      const cachedUrl = state.mediaObjectUrls.get(mediaId);
+      if (cachedUrl) URL.revokeObjectURL(cachedUrl);
+      state.mediaObjectUrls.delete(mediaId);
+      state.mediaFiles = state.mediaFiles.filter((item) => item.media_id !== mediaId);
+      await renderMaintenanceExistingImages(logId);
+      showToast("Đã xóa ảnh", "Lịch sử bảo trì đã được cập nhật");
+    } catch (error) {
+      showMessageModal("Không thể xóa ảnh", error.message);
+    }
   }
 
   function assetDeepLink(assetId) {
