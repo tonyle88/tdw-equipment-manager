@@ -85,6 +85,8 @@ async function run() {
   assert.ok(appsScript.includes("function ensureMaintenancePlansSheet_(sheet)"));
   assert.ok(appsScript.includes("function sendMaintenancePlanReminders(token)"));
   assert.ok(appsScript.includes("function saveMaintenancePlans(plans, token)"));
+  assert.ok(appsScript.includes("function nextMaintenanceDueDate_(currentDueDate, frequency, completionDate)"));
+  assert.ok(appsScript.includes("function ensureMaintenanceLogsSheet_(sheet)"));
   assert.ok(appsScript.includes("plans.length > 200"));
   assert.ok(appsScript.includes("function runMaintenancePlanReminders()"));
   assert.ok(appsScript.includes("function installMaintenancePlanReminderTrigger()"));
@@ -129,7 +131,14 @@ async function run() {
   assert.equal(vm.runInContext('isNotificationReadyUser_({ active: "FALSE", email: "notice@example.com" })', permissions), false);
   vm.runInContext('readActiveAssets_ = () => [{ asset_id: "asset-id" }];', permissions);
   assert.equal(vm.runInContext('normalizeMaintenancePlan_({ plan_id: "plan-id", asset_id: "asset-id", title: "Kiểm tra định kỳ", frequency: "monthly", next_due_date: "2026-08-01" }).frequency', permissions), "MONTHLY");
+  assert.equal(vm.runInContext('normalizeMaintenancePlan_({ plan_id: "plan-id", asset_id: "asset-id", title: "Kiểm tra định kỳ", frequency: "monthly", next_due_date: "2026-08-01" }).repeat_enabled', permissions), "TRUE");
+  assert.equal(vm.runInContext('normalizeMaintenancePlan_({ plan_id: "plan-id", asset_id: "asset-id", title: "Kiểm tra định kỳ", frequency: "monthly", next_due_date: "2026-08-01", repeat_enabled: "FALSE" }).repeat_enabled', permissions), "FALSE");
   assert.throws(() => vm.runInContext('normalizeMaintenancePlan_({ plan_id: "plan-id", asset_id: "asset-id", title: "Kiểm tra", frequency: "weekly", next_due_date: "2026-08-01" })', permissions), /Chu kỳ bảo trì không hợp lệ/);
+  assert.equal(vm.runInContext('nextMaintenanceDueDate_("2026-01-31", "MONTHLY", "2026-01-31")', permissions), "2026-02-28");
+  assert.equal(vm.runInContext('nextMaintenanceDueDate_("2026-01-31", "MONTHLY", "2026-03-05")', permissions), "2026-03-31");
+  vm.runInContext('upsertObject_ = (_sheet, _key, object) => object;', permissions);
+  assert.equal(vm.runInContext('(() => { const plan = { plan_id: "p1", next_due_date: "2026-07-17", frequency: "MONTHLY", repeat_enabled: "TRUE", active: "TRUE" }; completeMaintenancePlan_(plan, "2026-07-17"); return plan.next_due_date; })()', permissions), "2026-08-17");
+  assert.equal(vm.runInContext('(() => { const plan = { plan_id: "p2", next_due_date: "2026-07-17", frequency: "MONTHLY", repeat_enabled: "FALSE", active: "TRUE" }; completeMaintenancePlan_(plan, "2026-07-17"); return plan.active; })()', permissions), "FALSE");
   assert.equal(vm.runInContext('maintenanceReminderType_("2026-07-17", "2026-07-10")', permissions), "DUE_7");
   assert.equal(vm.runInContext('maintenanceReminderType_("2026-07-03", "2026-07-10")', permissions), "OVERDUE_7");
   assert.equal(vm.runInContext('maintenanceReminderType_("2026-07-15", "2026-07-10")', permissions), "");
@@ -155,6 +164,8 @@ async function run() {
   assert.ok(index.includes('name="scope_type"'));
   assert.ok(index.includes('id="maintenancePlanGroupField"'));
   assert.ok(index.includes('id="maintenancePlanTypeField"'));
+  assert.ok(index.includes('name="repeat_enabled"'));
+  assert.ok(index.includes('name="plan_id"'));
   assert.ok(app.includes('callServer("saveMaintenancePlans", plans)'));
   assert.ok(index.includes('id="assetProfileModal"'));
   assert.ok(index.includes('src="assets/qrcode.js"'));

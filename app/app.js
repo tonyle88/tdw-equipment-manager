@@ -1550,7 +1550,8 @@ const state = {
     const byStatus = countBy(watchList, "status", "status");
     const planRows = (state.maintenancePlans || []).map((plan) => {
       const asset = state.assets.find((item) => item.asset_id === plan.asset_id);
-      const frequency = { MONTHLY: "Hàng tháng", QUARTERLY: "Hàng quý", YEARLY: "Hàng năm" }[plan.frequency] || plan.frequency;
+      const frequencyLabel = { MONTHLY: "Hàng tháng", QUARTERLY: "Hàng quý", YEARLY: "Hàng năm" }[plan.frequency] || plan.frequency;
+      const frequency = `${frequencyLabel} · ${plan.repeat_enabled === "FALSE" ? "Một lần" : "Lặp lại"}`;
       const dueState = plan.active === "FALSE" ? "Tạm dừng" : plan.next_due_date < today ? "Quá hạn" : "Đang áp dụng";
       const dueColor = plan.active === "FALSE" ? "var(--text-secondary)" : plan.next_due_date < today ? "#ef4444" : "#22c55e";
       return `
@@ -2360,6 +2361,7 @@ const state = {
   function openMaintenanceLogModal(assetId = null, logId = null) {
     els.maintenanceLogForm.reset();
     const assetSelect = els.maintenanceLogForm.querySelector('[name="asset_id"]');
+    const planSelect = els.maintenanceLogForm.querySelector('[name="plan_id"]');
     
     // Populate Group Filter
     const groups = settingOptions("asset_group");
@@ -2373,13 +2375,21 @@ const state = {
       actionSelect.innerHTML = `<option value="">-- Chọn loại bảo trì --</option>` + actions.map(([val, label]) => `<option value="${escapeHtml(val)}">${escapeHtml(label)}</option>`).join('');
     }
     
+    const populatePlans = (selectedAssetId, selectedPlanId = "") => {
+      const plans = state.maintenancePlans.filter((plan) => plan.asset_id === selectedAssetId);
+      planSelect.innerHTML = `<option value="">-- Không liên kết kế hoạch --</option>` + plans.map((plan) => `<option value="${escapeHtml(plan.plan_id)}">${escapeHtml(plan.title)} · ${escapeHtml(formatDate(plan.next_due_date))}${plan.active === "FALSE" ? " · Tạm dừng" : ""}</option>`).join("");
+      planSelect.value = selectedPlanId;
+    };
+
     const populateAssets = (groupFilter) => {
       const filteredAssets = groupFilter ? state.assets.filter(a => a.asset_group === groupFilter) : state.assets;
       assetSelect.innerHTML = `<option value="">-- Chọn thiết bị --</option>` + filteredAssets.map(a => `<option value="${escapeHtml(a.asset_id)}">${escapeHtml(a.asset_name)} (${escapeHtml(a.asset_code)})</option>`).join('');
+      populatePlans("");
     };
     
     // Bind filter change
     els.maintenanceLogGroupFilter.onchange = (e) => populateAssets(e.target.value);
+    assetSelect.onchange = () => populatePlans(assetSelect.value);
     
     let isEditing = false;
     if (logId && typeof logId === "string") {
@@ -2397,6 +2407,7 @@ const state = {
           const input = els.maintenanceLogForm.querySelector(`[name="${key}"]`);
           if (input) input.value = log[key];
         });
+        populatePlans(log.asset_id, log.plan_id || "");
         els.maintenanceLogForm.querySelector('[name="log_id"]').value = logId;
       }
     }
@@ -2409,6 +2420,7 @@ const state = {
           els.maintenanceLogGroupFilter.value = asset.asset_group;
           populateAssets(asset.asset_group);
           assetSelect.value = assetId;
+          populatePlans(assetId);
         } else {
           populateAssets("");
         }
@@ -2510,12 +2522,14 @@ const state = {
         const input = form.querySelector(`[name="${key}"]`);
         if (input) input.value = plan[key];
       });
+      form.elements.repeat_enabled.checked = plan.repeat_enabled !== "FALSE";
     } else {
       scopeField.hidden = false;
       form.elements.scope_type.value = "ASSET";
       form.elements.plan_id.value = "";
       form.elements.next_due_date.value = new Date().toISOString().slice(0, 10);
       form.elements.active.value = "TRUE";
+      form.elements.repeat_enabled.checked = true;
     }
     updateScope();
     markFormClean(form);
@@ -2530,6 +2544,7 @@ const state = {
   async function handleMaintenancePlanSubmit(event) {
     event.preventDefault();
     const plan = Object.fromEntries(new FormData(event.target).entries());
+    plan.repeat_enabled = event.target.elements.repeat_enabled.checked ? "TRUE" : "FALSE";
     const scope = plan.scope_type;
     delete plan.scope_type;
     delete plan.asset_group;

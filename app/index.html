@@ -329,6 +329,11 @@
             <label class="span-2">Thiết bị
               <select name="asset_id" required></select>
             </label>
+            <label class="span-2">Kế hoạch liên quan
+              <select name="plan_id">
+                <option value="">-- Không liên kết kế hoạch --</option>
+              </select>
+            </label>
             <label>Ngày thực hiện<input name="date" type="date" required /></label>
             <label>Loại bảo trì
               <select name="action_type" required></select>
@@ -386,6 +391,10 @@
             <label class="span-2">Ghi chú<textarea name="note" rows="2"></textarea></label>
             <label>Trạng thái
               <select name="active"><option value="TRUE">Đang áp dụng</option><option value="FALSE">Tạm dừng</option></select>
+            </label>
+            <label class="repeat-plan-toggle">
+              <input name="repeat_enabled" type="checkbox" value="TRUE" checked />
+              <span><strong>Lặp lại định kỳ</strong><small>Tự chuyển sang kỳ tiếp theo sau khi hoàn thành bảo trì.</small></span>
             </label>
           </div>
           <div class="modal-actions">

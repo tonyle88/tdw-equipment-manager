@@ -554,9 +554,12 @@ function normalizeSetting_(setting) {
 function saveMaintenanceLog(log, token) {
   try {
     const actor = requirePermission_(token || "", "maintenance.manage");
-    const action = log && log.log_id ? "MAINTENANCE_UPDATED" : "MAINTENANCE_CREATED";
+    const isNew = !(log && log.log_id);
+    const action = isNew ? "MAINTENANCE_CREATED" : "MAINTENANCE_UPDATED";
     const normalized = normalizeMaintenanceLog_(log || {});
+    const linkedPlan = normalized.plan_id ? findMaintenancePlanForLog_(normalized, !isNew) : null;
     const saved = upsertObject_(SHEET_NAMES.maintenanceLogs, "log_id", normalized);
+    if (isNew && linkedPlan) completeMaintenancePlan_(linkedPlan, saved.date);
     logAudit_(actor, action, "maintenance_log", saved.log_id, saved.action_type || saved.asset_id);
     return { ok: true, data: saved, updated_at: new Date().toISOString() };
   } catch (error) {
@@ -569,6 +572,7 @@ function normalizeMaintenanceLog_(log) {
   const normalized = Object.assign({}, log);
   normalized.log_id = normalized.log_id || Utilities.getUuid();
   normalized.asset_id = String(normalized.asset_id || "").trim();
+  normalized.plan_id = String(normalized.plan_id || "").trim();
   if (!normalized.asset_id) throw new Error("Thiếu asset_id cho log bảo trì");
   if (!normalized.action_type) throw new Error("Thiếu action_type cho log bảo trì");
   
@@ -582,6 +586,46 @@ function normalizeMaintenanceLog_(log) {
   normalized.note = normalized.note || "";
   normalized.created_at = normalized.created_at || now;
   return normalized;
+}
+
+function findMaintenancePlanForLog_(log, allowInactive) {
+  const plan = readSheetAsObjects_(SHEET_NAMES.maintenancePlans).find((item) => item.plan_id === log.plan_id);
+  if (!plan) throw new Error("Kế hoạch bảo trì liên kết không tồn tại");
+  if (plan.asset_id !== log.asset_id) throw new Error("Kế hoạch bảo trì không thuộc thiết bị đã chọn");
+  if (!allowInactive && plan.active === "FALSE") throw new Error("Kế hoạch bảo trì liên kết đang tạm dừng");
+  return plan;
+}
+
+function completeMaintenancePlan_(plan, completionDate) {
+  if (plan.repeat_enabled === "FALSE") {
+    plan.active = "FALSE";
+  } else {
+    plan.next_due_date = nextMaintenanceDueDate_(plan.next_due_date, plan.frequency, completionDate);
+  }
+  upsertObject_(SHEET_NAMES.maintenancePlans, "plan_id", plan);
+}
+
+function nextMaintenanceDueDate_(currentDueDate, frequency, completionDate) {
+  const months = { MONTHLY: 1, QUARTERLY: 3, YEARLY: 12 }[String(frequency || "").toUpperCase()];
+  if (!months) throw new Error("Chu kỳ bảo trì không hợp lệ");
+  const dueDate = normalizeIsoDate_(currentDueDate);
+  const completed = normalizeIsoDate_(completionDate);
+  let elapsedMonths = months;
+  let nextDate;
+  do {
+    nextDate = addMonthsToIsoDate_(dueDate, elapsedMonths);
+    elapsedMonths += months;
+  } while (nextDate <= completed);
+  return nextDate;
+}
+
+function addMonthsToIsoDate_(isoDate, months) {
+  const parts = normalizeIsoDate_(isoDate).split("-").map(Number);
+  const targetMonth = parts[1] - 1 + months;
+  const targetYear = parts[0] + Math.floor(targetMonth / 12);
+  const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+  const lastDay = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0)).getUTCDate();
+  return `${targetYear}-${String(normalizedMonth + 1).padStart(2, "0")}-${String(Math.min(parts[2], lastDay)).padStart(2, "0")}`;
 }
 
 function deleteMaintenanceLog(logId, token) {
@@ -652,6 +696,7 @@ function normalizeMaintenancePlan_(plan, activeAssets) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized.next_due_date)) throw new Error("Ngày đến hạn phải có định dạng YYYY-MM-DD");
   normalized.note = String(normalized.note || "").trim();
   normalized.active = String(normalized.active || "TRUE").toUpperCase() === "FALSE" ? "FALSE" : "TRUE";
+  normalized.repeat_enabled = String(normalized.repeat_enabled || "TRUE").toUpperCase() === "FALSE" ? "FALSE" : "TRUE";
   normalized.created_at = normalized.created_at || now;
   return normalized;
 }
@@ -1120,7 +1165,7 @@ function nextAssetCode_(groupCode, year) {
 function getSheet_(sheetName) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = spreadsheet.getSheetByName(sheetName);
-  if (!sheet && [SHEET_NAMES.users, SHEET_NAMES.assetResponsibles, SHEET_NAMES.maintenancePlans, SHEET_NAMES.maintenanceNotificationLogs, SHEET_NAMES.mediaFiles].indexOf(sheetName) !== -1) {
+  if (!sheet && [SHEET_NAMES.users, SHEET_NAMES.assetResponsibles, SHEET_NAMES.maintenanceLogs, SHEET_NAMES.maintenancePlans, SHEET_NAMES.maintenanceNotificationLogs, SHEET_NAMES.mediaFiles].indexOf(sheetName) !== -1) {
     sheet = spreadsheet.insertSheet(sheetName);
   }
   if (!sheet) throw new Error(`Sheet not found: ${sheetName}`);
@@ -1168,6 +1213,10 @@ function ensureSheetHeaders_(sheetName, sheet) {
   }
   if (sheetName === SHEET_NAMES.assetResponsibles) {
     ensureAssetResponsiblesSheet_(sheet);
+    return;
+  }
+  if (sheetName === SHEET_NAMES.maintenanceLogs) {
+    ensureMaintenanceLogsSheet_(sheet);
     return;
   }
   if (sheetName === SHEET_NAMES.maintenancePlans) {
@@ -1234,8 +1283,23 @@ function ensureAssetResponsiblesSheet_(sheet) {
   });
 }
 
+function ensureMaintenanceLogsSheet_(sheet) {
+  const desired = ["log_id", "asset_id", "plan_id", "date", "action_type", "description", "cost", "vendor", "warranty_months", "performed_by", "note", "created_at", "updated_at"];
+  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim()).filter(Boolean);
+  if (!headers.length) {
+    sheet.getRange(1, 1, 1, desired.length).setValues([desired]);
+    return;
+  }
+  desired.forEach((header) => {
+    if (headers.indexOf(header) === -1) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+      headers.push(header);
+    }
+  });
+}
+
 function ensureMaintenancePlansSheet_(sheet) {
-  const desired = ["plan_id", "asset_id", "title", "frequency", "next_due_date", "note", "active", "created_at", "updated_at"];
+  const desired = ["plan_id", "asset_id", "title", "frequency", "next_due_date", "note", "active", "repeat_enabled", "created_at", "updated_at"];
   const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim()).filter(Boolean);
   if (!headers.length) {
     sheet.getRange(1, 1, 1, desired.length).setValues([desired]);

@@ -948,6 +948,27 @@
   .permission-module label { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--text-primary); font-size: 13px; font-weight: 700; }
   .permission-module input { width: 16px; height: 16px; accent-color: var(--tdw-blue); }
   .permission-admin-note { margin: 12px 0 0; color: var(--text-secondary); font-size: 12px; font-weight: 700; }
+  .repeat-plan-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 58px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-hover);
+  }
+  .repeat-plan-toggle input {
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+    min-height: 20px;
+    margin: 0;
+    accent-color: var(--tdw-blue);
+  }
+  .repeat-plan-toggle span { display: grid; gap: 2px; }
+  .repeat-plan-toggle strong { color: var(--text-primary); }
+  .repeat-plan-toggle small { color: var(--text-secondary); font-weight: 600; }
 
   /* ── Custom Asset Picker ── */
   .asset-picker-wrapper { display: flex; flex-direction: column; gap: 8px; }
