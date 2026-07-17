@@ -108,21 +108,30 @@ const state = {
     });
   }
 
-  async function uploadMediaFiles(files, ownerType, ownerId, assetId) {
+  async function uploadMediaFiles(files, ownerType, ownerId, assetId, onProgress = () => {}) {
     if (!files.length) return [];
     const existingCount = state.mediaFiles.filter((item) => item.owner_type === ownerType && item.owner_id === ownerId).length;
     if (existingCount + files.length > 4) throw new Error("Mỗi mục chỉ được lưu tối đa 4 ảnh");
     const uploaded = [];
-    for (const file of files) {
-      const webp = await convertImageToWebp(file);
-      const response = await callServer("saveMediaFile", {
-        owner_type: ownerType,
-        owner_id: ownerId,
-        asset_id: assetId,
-        mime_type: "image/webp",
-        data_base64: await blobToBase64(webp),
-      });
-      uploaded.push(response.data);
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index];
+      try {
+        onProgress(index, `Đang chuyển WebP`, "processing");
+        const webp = await convertImageToWebp(file);
+        onProgress(index, `Đang tải ảnh ${index + 1}/${files.length}`, "uploading");
+        const response = await callServer("saveMediaFile", {
+          owner_type: ownerType,
+          owner_id: ownerId,
+          asset_id: assetId,
+          mime_type: "image/webp",
+          data_base64: await blobToBase64(webp),
+        });
+        uploaded.push(response.data);
+        onProgress(index, "Hoàn tất", "done");
+      } catch (error) {
+        onProgress(index, "Lỗi tải ảnh", "error");
+        throw error;
+      }
     }
     return uploaded;
   }
@@ -130,8 +139,19 @@ const state = {
   function previewSelectedImages(input, container) {
     if (!container) return;
     const files = selectedImageFiles(input);
-    container.innerHTML = files.map((file) => `<span>${escapeHtml(file.name)}</span>`).join("");
+    container.innerHTML = files.map((file, index) => `
+      <div class="upload-progress-item" data-upload-index="${index}">
+        <span title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>
+        <strong>Chờ tải</strong>
+      </div>`).join("");
     if (files.length > 4) showMessageModal("Quá số lượng ảnh", "Mỗi mục chỉ được chọn tối đa 4 ảnh.");
+  }
+
+  function updateImageUploadProgress(container, index, status, tone) {
+    const item = container?.querySelector(`[data-upload-index="${index}"]`);
+    if (!item) return;
+    item.dataset.uploadState = tone;
+    item.querySelector("strong").textContent = status;
   }
 
   async function mediaObjectUrl(media) {
@@ -1288,7 +1308,10 @@ const state = {
       const savedAsset = response.data;
       let imageWarning = "";
       try {
-        const uploaded = await uploadMediaFiles(imageFiles, "ASSET", savedAsset.asset_id, savedAsset.asset_id);
+        const uploaded = await uploadMediaFiles(imageFiles, "ASSET", savedAsset.asset_id, savedAsset.asset_id, (index, status, tone) => {
+          updateImageUploadProgress(els.assetImagePreview, index, status, tone);
+          if (tone === "uploading") saveBtn.textContent = status;
+        });
         state.mediaFiles.push(...uploaded);
       } catch (error) {
         imageWarning = error.message;
@@ -2298,7 +2321,10 @@ const state = {
       const response = await callServer("saveMaintenanceLog", log);
       let imageWarning = "";
       try {
-        const uploaded = await uploadMediaFiles(imageFiles, "MAINTENANCE", response.data.log_id, response.data.asset_id);
+        const uploaded = await uploadMediaFiles(imageFiles, "MAINTENANCE", response.data.log_id, response.data.asset_id, (index, status, tone) => {
+          updateImageUploadProgress(els.maintenanceImagePreview, index, status, tone);
+          if (tone === "uploading" && submitBtn) submitBtn.textContent = status;
+        });
         state.mediaFiles.push(...uploaded);
       } catch (error) {
         imageWarning = error.message;
@@ -2313,7 +2339,7 @@ const state = {
     } catch (error) {
       showMessageModal("Không thể lưu", error.message);
     } finally {
-      if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; }
+      if (submitBtn) { submitBtn.classList.remove("is-loading"); submitBtn.disabled = false; submitBtn.textContent = "Lưu lịch sử"; }
     }
   }
 

@@ -971,8 +971,13 @@
   textarea { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 10px; color: var(--ink); background: #fff; font: inherit; resize: vertical; }
   .modal-actions { justify-content: flex-end; gap: 10px; margin-top: 18px; }
   .field-help { color: var(--text-secondary); font-size: 12px; font-weight: 600; }
-  .upload-preview { display: flex; flex-wrap: wrap; gap: 6px; }
-  .upload-preview span { max-width: 220px; overflow: hidden; padding: 5px 8px; border-radius: 6px; background: #eaf2f8; color: var(--tdw-blue); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+  .upload-preview { display: grid; gap: 6px; }
+  .upload-progress-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; background: #f8fafc; }
+  .upload-progress-item span { overflow: hidden; color: var(--text-primary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+  .upload-progress-item strong { color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
+  .upload-progress-item[data-upload-state="processing"] strong, .upload-progress-item[data-upload-state="uploading"] strong { color: var(--tdw-blue); }
+  .upload-progress-item[data-upload-state="done"] strong { color: #15803d; }
+  .upload-progress-item[data-upload-state="error"] strong { color: #b91c1c; }
 
   .asset-profile-backdrop { z-index: 30; }
   .asset-profile-modal {

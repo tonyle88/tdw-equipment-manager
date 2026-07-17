@@ -143,6 +143,8 @@ async function run() {
   assert.ok(index.includes('src="assets/qrcode.js"'));
   assert.ok(app.includes('data-download-qr='));
   assert.ok(app.includes('event.key === "ArrowLeft"'));
+  assert.ok(app.includes('data-upload-index='));
+  assert.ok(app.includes('"Hoàn tất", "done"'));
   assert.ok(app.includes("async function convertImageToWebp(file)"));
   assert.ok(app.includes('url.searchParams.set("asset", assetId)'));
   assert.ok(!app.includes("function exportMaintenanceCsv()"));
