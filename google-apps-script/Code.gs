@@ -705,9 +705,13 @@ function deleteMediaFile(mediaId, token) {
 
 function getMediaFolder_() {
   const properties = PropertiesService.getScriptProperties();
-  const folderId = properties.getProperty("TDW_MEDIA_FOLDER_ID");
+  const folderId = String(properties.getProperty("TDW_MEDIA_FOLDER_ID") || "").trim();
   if (folderId) {
-    try { return DriveApp.getFolderById(folderId); } catch (error) { console.warn(error.message); }
+    try {
+      return DriveApp.getFolderById(folderId);
+    } catch (error) {
+      throw new Error("TDW_MEDIA_FOLDER_ID không hợp lệ hoặc tài khoản Apps Script không có quyền truy cập thư mục");
+    }
   }
   const folder = DriveApp.createFolder("TDW Equipment Manager Media");
   properties.setProperty("TDW_MEDIA_FOLDER_ID", folder.getId());

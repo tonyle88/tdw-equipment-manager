@@ -864,9 +864,10 @@ const state = {
 
   function renderRows() {
     if (!els.rows) return;
+    const showActions = canEditAssets();
     const visibleRows = getVisibleRows();
     if (!visibleRows.length) {
-      els.rows.innerHTML = `<tr><td colspan="7" class="muted">Không có thiết bị phù hợp bộ lọc.</td></tr>`;
+      els.rows.innerHTML = `<tr><td colspan="${showActions ? 8 : 7}" class="muted">Không có thiết bị phù hợp bộ lọc.</td></tr>`;
       return;
     }
     els.rows.innerHTML = visibleRows.map((asset) => `
@@ -878,6 +879,7 @@ const state = {
         <td>${escapeHtml([primaryResponsibleName(asset), departmentLabel(asset.department)].filter(Boolean).join(" / "))}</td>
         <td>${escapeHtml(asset.software_license || "")}</td>
         <td><span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status) || "Chưa rõ")}</span></td>
+        ${showActions ? `<td class="asset-row-actions"><button class="row-edit-button" data-row-edit="${escapeHtml(asset.asset_id)}" type="button" aria-label="Sửa ${escapeHtml(asset.asset_name || asset.asset_code)}">Sửa</button></td>` : ""}
       </tr>
     `).join("");
   }
@@ -1344,12 +1346,16 @@ const state = {
   }
 
   function renderDeviceView(view) {
+    const showActions = canEditAssets();
     els.content.innerHTML = `
       <div class="list-panel">
-        <div class="panel-head"><h2>${view === "devices" ? "Quản lý thiết bị" : "Danh sách thiết bị"}</h2><span id="resultCount">0 thiết bị</span></div>
+        <div class="panel-head asset-list-head">
+          <div><h2>${view === "devices" ? "QUẢN LÝ THIẾT BỊ" : "DANH SÁCH THIẾT BỊ"}</h2><span id="resultCount">0 thiết bị</span></div>
+          ${showActions ? `<button class="primary-button asset-list-add" id="openAddAssetFromList" type="button">+ Thêm thiết bị</button>` : ""}
+        </div>
         <div class="table-wrap">
           <table class="assets-table">
-            <thead><tr><th>Mã tài sản</th><th>Thiết bị</th><th>Nhóm</th><th>Năm</th><th>Phụ trách/Bộ phận</th><th>Phần mềm</th><th>Tình trạng</th></tr></thead>
+            <thead><tr><th>Mã tài sản</th><th>Thiết bị</th><th>Nhóm</th><th>Năm</th><th>Phụ trách/Bộ phận</th><th>Phần mềm</th><th>Tình trạng</th>${showActions ? "<th>Thao tác</th>" : ""}</tr></thead>
             <tbody id="assetRows"></tbody>
           </table>
         </div>
@@ -2986,9 +2992,15 @@ const state = {
   }
 
   function bindDynamicEvents() {
+    document.querySelector("#openAddAssetFromList")?.addEventListener("click", () => openAssetModal());
     els.rows?.addEventListener("click", (event) => {
       const row = event.target.closest("tr[data-id]");
       if (!row) return;
+      const editButton = event.target.closest("[data-row-edit]");
+      if (editButton) {
+        openAssetModal(state.assets.find((asset) => asset.asset_id === editButton.dataset.rowEdit));
+        return;
+      }
       state.selectedId = row.dataset.id;
       renderRows();
       renderDetail(state.assets.find((asset) => asset.asset_id === state.selectedId));
