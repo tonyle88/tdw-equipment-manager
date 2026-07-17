@@ -249,6 +249,7 @@ const state = {
       cancelUserForm: document.querySelector("#cancelUserForm"),
       maintenanceLogModal: document.querySelector("#maintenanceLogModal"),
       maintenanceLogForm: document.querySelector("#maintenanceLogForm"),
+      maintenanceLogFormTitle: document.querySelector("#maintenanceLogFormTitle"),
       maintenanceLogGroupFilter: document.querySelector("#maintenanceLogGroupFilter"),
       closeMaintenanceLogModal: document.querySelector("#closeMaintenanceLogModal"),
       cancelMaintenanceLogForm: document.querySelector("#cancelMaintenanceLogForm"),
@@ -1106,7 +1107,7 @@ const state = {
           <div>
             <strong>MÃ QR THIẾT BỊ</strong>
             <span>Quét để mở hồ sơ, bảo hành và bảo trì.</span>
-            ${qrUrl ? `<button class="secondary-button profile-qr-download" type="button" data-download-qr="${escapeHtml(asset.asset_code || asset.asset_id)}">Tải mã QR</button>` : ""}
+            ${qrUrl ? `<div class="profile-qr-actions"><button class="secondary-button profile-qr-download" type="button" data-download-qr="${escapeHtml(asset.asset_code || asset.asset_id)}">Tải mã QR</button><button class="secondary-button profile-qr-download" type="button" data-print-qr>In tem QR</button></div>` : ""}
           </div>
         </div>
       </section>
@@ -1119,7 +1120,7 @@ const state = {
         <div class="profile-section-head"><h3>BẢO TRÌ & BẢO DƯỠNG</h3><span>${maintenanceLogs.length} LẦN</span></div>
         ${hasPermission("maintenance.view") ? `
           ${maintenancePlans.length ? `<div class="profile-plans">${maintenancePlans.map((plan) => `<article><strong>${escapeHtml(plan.title)}</strong><span>Đến hạn ${escapeHtml(formatDate(plan.next_due_date))} · ${escapeHtml(plan.frequency)}</span></article>`).join("")}</div>` : ""}
-          ${maintenanceLogs.length ? `<div class="profile-maintenance-list">${maintenanceLogs.map((log) => `<article><div class="maintenance-entry-head"><time>${escapeHtml(formatDate(log.date))}</time><strong>${escapeHtml(labelFor("maintenance_type", log.action_type) || log.action_type)}</strong></div><h4>${escapeHtml(log.description || "Không có nội dung")}</h4><p>${escapeHtml(log.vendor || "Nội bộ")} · ${escapeHtml(formatMoney(log.cost) || "Không ghi chi phí")}</p>${renderMediaGallery(mediaFor("MAINTENANCE", log.log_id), "Chưa có ảnh kết quả")}</article>`).join("")}</div>` : `<p class="profile-empty">Chưa có lịch sử bảo trì.</p>`}
+          ${maintenanceLogs.length ? `<div class="profile-maintenance-list">${maintenanceLogs.map((log) => `<article><div class="maintenance-entry-head"><time>${escapeHtml(formatDate(log.date))}</time><div><strong>${escapeHtml(labelFor("maintenance_type", log.action_type) || log.action_type)}</strong>${hasPermission("maintenance.manage") ? `<button class="secondary-button maintenance-entry-edit" type="button" data-edit-maintenance="${escapeHtml(log.log_id)}">Sửa</button>` : ""}</div></div><h4>${escapeHtml(log.description || "Không có nội dung")}</h4><p>${escapeHtml(log.vendor || "Nội bộ")} · ${escapeHtml(formatMoney(log.cost) || "Không ghi chi phí")}</p>${renderMediaGallery(mediaFor("MAINTENANCE", log.log_id), "Chưa có ảnh kết quả")}</article>`).join("")}</div>` : `<p class="profile-empty">Chưa có lịch sử bảo trì.</p>`}
         ` : `<p class="profile-empty">Tài khoản chưa có quyền xem bảo trì.</p>`}
       </section>`;
     els.assetProfileActions.innerHTML = `
@@ -1168,6 +1169,27 @@ const state = {
       link.download = `${safeClass(event.currentTarget.dataset.downloadQr) || "TDW-THIET-BI"}-QR.gif`;
       link.click();
     });
+    els.assetProfileBody.querySelector("[data-print-qr]")?.addEventListener("click", () => printAssetQrLabel(asset));
+    els.assetProfileBody.querySelectorAll("[data-edit-maintenance]").forEach((button) => {
+      button.addEventListener("click", () => {
+        closeAssetProfile();
+        openMaintenanceLogModal(asset.asset_id, button.dataset.editMaintenance);
+      });
+    });
+  }
+
+  function printAssetQrLabel(asset) {
+    const qrUrl = qrDataUrl(asset.asset_id);
+    if (!qrUrl) {
+      showMessageModal("Không thể in QR", "Thư viện tạo mã QR chưa sẵn sàng.");
+      return;
+    }
+    const el = document.getElementById("printReport");
+    el.innerHTML = `<div class="qr-label-sheet"><article class="qr-label"><img class="qr-label-logo" src="assets/tdw-logo.webp" alt="TDW" /><img class="qr-label-code" src="${qrUrl}" alt="Mã QR ${escapeHtml(asset.asset_code)}" /><div><strong>${escapeHtml(asset.asset_code || "THIẾT BỊ TDW")}</strong><span>${escapeHtml(asset.asset_name || "Thiết bị chưa đặt tên")}</span><small>Hết bảo hành: ${escapeHtml(formatDate(asset.warranty_end_date) || "Chưa có")}</small><small>Quét QR để xem hồ sơ thiết bị</small></div></article></div>`;
+    el.hidden = false;
+    window.print();
+    el.hidden = true;
+    el.innerHTML = "";
   }
 
   async function hydrateProfileImages() {
@@ -2294,6 +2316,7 @@ const state = {
       }
       els.maintenanceLogForm.querySelector('[name="date"]').value = new Date().toISOString().split('T')[0];
     }
+    if (els.maintenanceLogFormTitle) els.maintenanceLogFormTitle.textContent = isEditing ? "SỬA LỊCH SỬ BẢO TRÌ" : "GHI NHẬN LỊCH SỬ BẢO TRÌ";
     
     markFormClean(els.maintenanceLogForm);
     if (els.maintenanceImagePreview) els.maintenanceImagePreview.innerHTML = "";

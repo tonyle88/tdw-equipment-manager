@@ -145,6 +145,9 @@ async function run() {
   assert.ok(app.includes('event.key === "ArrowLeft"'));
   assert.ok(app.includes('data-upload-index='));
   assert.ok(app.includes('"Hoàn tất", "done"'));
+  assert.ok(index.includes('capture="environment"'));
+  assert.ok(app.includes("function printAssetQrLabel(asset)"));
+  assert.ok(app.includes('data-edit-maintenance='));
   assert.ok(app.includes("async function convertImageToWebp(file)"));
   assert.ok(app.includes('url.searchParams.set("asset", assetId)'));
   assert.ok(!app.includes("function exportMaintenanceCsv()"));

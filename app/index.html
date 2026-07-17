@@ -315,7 +315,7 @@
           <div class="modal-head">
             <div>
               <p class="eyebrow">BẢO TRÌ</p>
-              <h2>GHI NHẬN LỊCH SỬ BẢO TRÌ</h2>
+              <h2 id="maintenanceLogFormTitle">GHI NHẬN LỊCH SỬ BẢO TRÌ</h2>
             </div>
             <button class="icon-button" type="button" id="closeMaintenanceLogModal" aria-label="Đóng">×</button>
           </div>
@@ -340,7 +340,7 @@
             <label>Người phụ trách<input name="performed_by" placeholder="VD: Nguyễn Văn A" /></label>
             <label class="span-2">Ghi chú thêm<textarea name="note" rows="2"></textarea></label>
             <label class="span-2 media-upload-field">Ảnh kết quả bảo trì (tối đa 4 ảnh)
-              <input id="maintenanceImageInput" name="pending_images" type="file" accept="image/jpeg,image/png,image/webp" multiple />
+              <input id="maintenanceImageInput" name="pending_images" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" multiple />
               <span class="field-help">Ảnh sẽ tự chuyển sang WebP trước khi tải lên.</span>
             </label>
             <div class="span-2 upload-preview" id="maintenanceImagePreview"></div>

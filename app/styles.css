@@ -1020,7 +1020,8 @@
   .profile-qr img { width: 108px; height: 108px; image-rendering: pixelated; }
   .profile-qr div { display: grid; gap: 4px; }
   .profile-qr span { color: var(--text-secondary); font-size: 12px; }
-  .profile-qr-download { min-height: 32px; margin-top: 4px; padding: 6px 10px; font-size: 12px; }
+  .profile-qr .profile-qr-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .profile-qr-download { min-height: 32px; padding: 6px 10px; font-size: 12px; }
   .profile-timeline, .profile-maintenance-list, .profile-plans { display: grid; gap: 10px; }
   .profile-timeline article, .profile-maintenance-list article, .profile-plans article { padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: #f8fafc; }
   .profile-timeline time, .maintenance-entry-head time { color: var(--tdw-blue); font-size: 12px; font-weight: 900; }
@@ -1031,6 +1032,8 @@
   .profile-plans article { display: grid; gap: 4px; border-left: 4px solid #f59e0b; }
   .profile-plans span { color: var(--text-secondary); font-size: 12px; }
   .maintenance-entry-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .maintenance-entry-head > div { display: flex; align-items: center; gap: 6px; }
+  .maintenance-entry-edit { min-height: 28px; padding: 4px 8px; font-size: 11px; }
   .profile-maintenance-list .profile-gallery { grid-template-columns: repeat(4, minmax(0, 90px)); margin: 10px 0 0; }
   .profile-maintenance-list .profile-image-button { max-width: 90px; aspect-ratio: 3 / 4; }
   .profile-empty { padding: 16px; border: 1px dashed var(--border); border-radius: 8px; color: var(--text-secondary); text-align: center; }
@@ -1115,6 +1118,14 @@
       padding: 0;
       margin: 0;
     }
+    .qr-label-sheet { display: grid; place-items: start center; padding-top: 12mm; }
+    .qr-label { display: grid; grid-template-columns: 28mm 1fr; align-items: center; gap: 4mm; width: 90mm; min-height: 52mm; padding: 5mm; border: .4mm solid #176da5; border-radius: 3mm; background: #fff; }
+    .qr-label-logo { grid-column: 1 / -1; width: 25mm; height: auto; }
+    .qr-label-code { width: 28mm; height: 28mm; image-rendering: pixelated; }
+    .qr-label > div { display: grid; gap: 1.5mm; min-width: 0; }
+    .qr-label strong { color: #176da5; font-size: 12pt; overflow-wrap: anywhere; }
+    .qr-label span { color: #111; font-size: 9pt; font-weight: 700; overflow-wrap: anywhere; }
+    .qr-label small { color: #555; font-size: 7.5pt; }
 
     /* Header công ty */
     .pr-header {
