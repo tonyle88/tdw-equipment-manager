@@ -26,6 +26,7 @@ Thuc hien checklist nay truoc moi lan deploy TDW Equipment Manager.
 2. Vao `CAU HINH` va chay `Kiem tra ket noi`.
 3. Kiem tra Dashboard tai du lieu.
 4. Thuc hien mot thao tac mau phu hop, sau do xem tab `AuditLogs` co dong nhat ky moi va khong co du lieu nhay cam.
+5. Neu release co anh thiet bi, tai mot anh thu va xac nhan file nam trong thu muc Drive rieng, tab `MediaFiles` co metadata va QR mo dung thiet bi.
 
 ## Rollback
 

@@ -16,6 +16,9 @@ const ALLOWED_FUNCTIONS = new Set([
   "saveMaintenanceLog",
   "saveMaintenancePlan",
   "sendMaintenancePlanReminders",
+  "saveMediaFile",
+  "getMediaFile",
+  "deleteMediaFile",
   "saveMovementLog",
   "saveSoftwareLicense",
   "deleteSoftwareLicense",
@@ -26,6 +29,7 @@ const ALLOWED_FUNCTIONS = new Set([
 ]);
 
 const SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL;
+const MAX_REQUEST_BYTES = 3500000;
 
 function send(res, statusCode, payload) {
   res.statusCode = statusCode;
@@ -36,7 +40,12 @@ function send(res, statusCode, payload) {
 
 async function readBody(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let totalBytes = 0;
+  for await (const chunk of req) {
+    totalBytes += Buffer.byteLength(chunk);
+    if (totalBytes > MAX_REQUEST_BYTES) throw new Error("Dữ liệu gửi lên vượt quá giới hạn cho phép.");
+    chunks.push(chunk);
+  }
   return Buffer.concat(chunks.map((chunk) => (Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))).toString("utf8");
 }
 

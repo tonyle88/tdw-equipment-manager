@@ -8,6 +8,7 @@ const SHEET_NAMES = {
   softwareLicenses: "SoftwareLicenses",
   inventoryMovements: "InventoryMovements",
   assetResponsibles: "AssetResponsibles",
+  mediaFiles: "MediaFiles",
   settings: "Settings",
   auditLogs: "AuditLogs",
 };
@@ -17,8 +18,8 @@ const MAINTENANCE_REMINDER_DAYS = [7, 3, 1, 0];
 const MAINTENANCE_OVERDUE_REMINDER_INTERVAL_DAYS = 7;
 
 const LEGACY_PERMISSION_PRESETS = {
-  view: ["overview.view", "assets.view", "maintenance.view", "software.view", "reports.view", "settings.view"],
-  edit: ["overview.view", "assets.view", "assets.manage", "assets.delete", "maintenance.view", "maintenance.manage", "movement.manage", "software.view", "software.manage", "reports.view"],
+  view: ["overview.view", "assets.view", "maintenance.view", "movement.view", "software.view", "reports.view", "settings.view"],
+  edit: ["overview.view", "assets.view", "assets.manage", "assets.delete", "maintenance.view", "maintenance.manage", "movement.view", "movement.manage", "software.view", "software.manage", "reports.view"],
   report: ["overview.view", "assets.view", "reports.view", "reports.assets.export"],
   "reports.export": ["reports.assets.export"],
 };
@@ -26,7 +27,7 @@ const LEGACY_PERMISSION_PRESETS = {
 const MODULE_PERMISSION_CODES = [
   "assets.view", "assets.manage", "assets.delete",
   "maintenance.view", "maintenance.manage", "maintenance.delete",
-  "movement.manage",
+  "movement.view", "movement.manage",
   "software.view", "software.manage", "software.delete",
   "reports.view", "reports.assets.export", "reports.maintenance.export", "reports.software.export", "reports.movement.export",
 ];
@@ -40,6 +41,7 @@ const HEALTH_CHECK_HEADERS = {
   SoftwareLicenses: ["license_id", "software_name"],
   InventoryMovements: ["movement_id", "asset_id", "movement_date"],
   AssetResponsibles: ["responsibility_id", "asset_id", "user_id", "responsibility_role"],
+  MediaFiles: ["media_id", "owner_type", "owner_id", "asset_id", "drive_file_id"],
   Settings: ["setting_id", "setting_type", "setting_value", "display_name"],
 };
 
@@ -72,7 +74,7 @@ function getReadableSheetRows_(user, sheetName) {
   if (sheetName === SHEET_NAMES.assetResponsibles && hasPermission_(user, "assets.view")) return readActiveAssetResponsibles_();
   if (sheetName === SHEET_NAMES.maintenanceLogs && hasPermission_(user, "maintenance.view")) return readSheetAsObjects_(SHEET_NAMES.maintenanceLogs);
   if (sheetName === SHEET_NAMES.maintenancePlans && hasPermission_(user, "maintenance.view")) return readSheetAsObjects_(SHEET_NAMES.maintenancePlans);
-  if (sheetName === SHEET_NAMES.inventoryMovements && hasPermission_(user, "movement.manage")) return readSheetAsObjects_(SHEET_NAMES.inventoryMovements);
+  if (sheetName === SHEET_NAMES.inventoryMovements && hasPermission_(user, "movement.view")) return readSheetAsObjects_(SHEET_NAMES.inventoryMovements);
   if (sheetName === SHEET_NAMES.softwareLicenses && hasPermission_(user, "software.view")) return readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_);
   if ([SHEET_NAMES.settings, SHEET_NAMES.departments].indexOf(sheetName) !== -1) return readSheetAsObjects_(sheetName);
   throw new Error("Không có quyền đọc sheet này");
@@ -111,10 +113,32 @@ function getAppData(token) {
     responsibleUsers: hasPermission_(user, "assets.view") ? readUsers_().filter(isNotificationReadyUser_).map(publicResponsibleUser_) : [],
     maintenanceLogs: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenanceLogs) : [],
     maintenancePlans: hasPermission_(user, "maintenance.view") ? readSheetAsObjects_(SHEET_NAMES.maintenancePlans) : [],
-    inventoryMovements: hasPermission_(user, "movement.manage") ? readSheetAsObjects_(SHEET_NAMES.inventoryMovements) : [],
+    inventoryMovements: hasPermission_(user, "movement.view") ? readSheetAsObjects_(SHEET_NAMES.inventoryMovements) : [],
     softwareLicenses: hasPermission_(user, "software.view") ? readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_) : [],
+    mediaFiles: readableMediaFiles_(user),
     currentUser: publicUser_(user),
     updated_at: new Date().toISOString(),
+  };
+}
+
+function readableMediaFiles_(user) {
+  const activeAssetIds = new Set(readActiveAssets_().map((asset) => asset.asset_id));
+  return readSheetAsObjects_(SHEET_NAMES.mediaFiles)
+    .filter((item) => activeAssetIds.has(item.asset_id))
+    .filter((item) => (item.owner_type === "ASSET" && hasPermission_(user, "assets.view")) || (item.owner_type === "MAINTENANCE" && hasPermission_(user, "maintenance.view")))
+    .map(publicMediaFile_);
+}
+
+function publicMediaFile_(item) {
+  return {
+    media_id: item.media_id,
+    owner_type: item.owner_type,
+    owner_id: item.owner_id,
+    asset_id: item.asset_id,
+    file_name: item.file_name,
+    mime_type: item.mime_type,
+    sort_order: item.sort_order,
+    created_at: item.created_at,
   };
 }
 
@@ -319,6 +343,15 @@ function doPost(event) {
     if (action === "deleteMaintenancePlan") {
       const planId = args[0] && typeof args[0] === "object" ? args[0].planId : args[0] || body.planId || "";
       return jsonResponse_(deleteMaintenancePlan(planId, args[1] || body.token || ""));
+    }
+    if (action === "saveMediaFile") {
+      return jsonResponse_(saveMediaFile(args[0] || body.media || {}, args[1] || body.token || ""));
+    }
+    if (action === "getMediaFile") {
+      return jsonResponse_(getMediaFile(args[0] || body.media_id || "", args[1] || body.token || ""));
+    }
+    if (action === "deleteMediaFile") {
+      return jsonResponse_(deleteMediaFile(args[0] || body.media_id || "", args[1] || body.token || ""));
     }
     if (action === "sendMaintenancePlanReminders") {
       return jsonResponse_(sendMaintenancePlanReminders(args[0] || body.token || ""));
@@ -546,6 +579,7 @@ function deleteMaintenanceLog(logId, token) {
   try {
     const actor = requirePermission_(token || "", "maintenance.delete");
     const deleted = deleteObject_(SHEET_NAMES.maintenanceLogs, "log_id", logId);
+    if (deleted) deleteMediaForOwner_("MAINTENANCE", logId);
     if (deleted) logAudit_(actor, "MAINTENANCE_DELETED", "maintenance_log", logId, logId);
     return { ok: deleted, deleted_id: logId, updated_at: new Date().toISOString() };
   } catch (error) {
@@ -595,6 +629,98 @@ function deleteMaintenancePlan(planId, token) {
   } catch (error) {
     return { ok: false, error: error.message };
   }
+}
+
+function saveMediaFile(payload, token) {
+  try {
+    const media = payload || {};
+    const ownerType = String(media.owner_type || "").trim().toUpperCase();
+    const permission = ownerType === "ASSET" ? "assets.manage" : ownerType === "MAINTENANCE" ? "maintenance.manage" : "";
+    if (!permission) throw new Error("Loại ảnh không hợp lệ");
+    const actor = requirePermission_(token || "", permission);
+    const ownerId = String(media.owner_id || "").trim();
+    const assetId = String(media.asset_id || "").trim();
+    if (!ownerId || !assetId) throw new Error("Thiếu thông tin liên kết ảnh");
+    if (ownerType === "ASSET" && ownerId !== assetId) throw new Error("Liên kết ảnh thiết bị không hợp lệ");
+    if (!readActiveAssets_().some((asset) => asset.asset_id === assetId)) throw new Error("Thiết bị không tồn tại hoặc đã bị xóa");
+    if (ownerType === "MAINTENANCE" && !readSheetAsObjects_(SHEET_NAMES.maintenanceLogs).some((log) => log.log_id === ownerId && log.asset_id === assetId)) {
+      throw new Error("Lịch sử bảo trì không hợp lệ");
+    }
+    const existing = readSheetAsObjects_(SHEET_NAMES.mediaFiles).filter((item) => item.owner_type === ownerType && item.owner_id === ownerId);
+    if (existing.length >= 4) throw new Error("Mỗi mục chỉ được lưu tối đa 4 ảnh");
+    if (String(media.mime_type || "") !== "image/webp") throw new Error("Ảnh phải được chuyển sang WebP trước khi tải lên");
+    const bytes = Utilities.base64Decode(String(media.data_base64 || ""));
+    if (!bytes.length || bytes.length > 2 * 1024 * 1024) throw new Error("Ảnh WebP phải nhỏ hơn 2 MB");
+
+    const mediaId = Utilities.getUuid();
+    const fileName = `${ownerType.toLowerCase()}-${ownerId}-${mediaId}.webp`;
+    const file = getMediaFolder_().createFile(Utilities.newBlob(bytes, "image/webp", fileName));
+    const saved = upsertObject_(SHEET_NAMES.mediaFiles, "media_id", {
+      media_id: mediaId,
+      owner_type: ownerType,
+      owner_id: ownerId,
+      asset_id: assetId,
+      drive_file_id: file.getId(),
+      file_name: fileName,
+      mime_type: "image/webp",
+      sort_order: String(existing.length + 1),
+      created_by: actor.username,
+      created_at: new Date().toISOString(),
+    });
+    logAudit_(actor, "MEDIA_CREATED", "media_file", saved.media_id, fileName);
+    return { ok: true, data: publicMediaFile_(saved) };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function getMediaFile(mediaId, token) {
+  try {
+    const user = requireAuth_(token || "");
+    const media = readSheetAsObjects_(SHEET_NAMES.mediaFiles).find((item) => item.media_id === mediaId);
+    if (!media) throw new Error("Không tìm thấy ảnh");
+    const permission = media.owner_type === "MAINTENANCE" ? "maintenance.view" : "assets.view";
+    if (!hasPermission_(user, permission)) throw new Error("Không có quyền xem ảnh này");
+    const blob = DriveApp.getFileById(media.drive_file_id).getBlob();
+    return { ok: true, media_id: mediaId, mime_type: "image/webp", data_base64: Utilities.base64Encode(blob.getBytes()) };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function deleteMediaFile(mediaId, token) {
+  try {
+    const media = readSheetAsObjects_(SHEET_NAMES.mediaFiles).find((item) => item.media_id === mediaId);
+    if (!media) throw new Error("Không tìm thấy ảnh");
+    const permission = media.owner_type === "MAINTENANCE" ? "maintenance.manage" : "assets.manage";
+    const actor = requirePermission_(token || "", permission);
+    DriveApp.getFileById(media.drive_file_id).setTrashed(true);
+    deleteObject_(SHEET_NAMES.mediaFiles, "media_id", mediaId);
+    logAudit_(actor, "MEDIA_DELETED", "media_file", mediaId, media.file_name || mediaId);
+    return { ok: true, deleted_id: mediaId };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function getMediaFolder_() {
+  const properties = PropertiesService.getScriptProperties();
+  const folderId = properties.getProperty("TDW_MEDIA_FOLDER_ID");
+  if (folderId) {
+    try { return DriveApp.getFolderById(folderId); } catch (error) { console.warn(error.message); }
+  }
+  const folder = DriveApp.createFolder("TDW Equipment Manager Media");
+  properties.setProperty("TDW_MEDIA_FOLDER_ID", folder.getId());
+  return folder;
+}
+
+function deleteMediaForOwner_(ownerType, ownerId) {
+  readSheetAsObjects_(SHEET_NAMES.mediaFiles)
+    .filter((item) => item.owner_type === ownerType && item.owner_id === ownerId)
+    .forEach((item) => {
+      try { DriveApp.getFileById(item.drive_file_id).setTrashed(true); } catch (error) { console.warn(error.message); }
+      deleteObject_(SHEET_NAMES.mediaFiles, "media_id", item.media_id);
+    });
 }
 
 function sendMaintenancePlanReminders(token) {
@@ -924,7 +1050,7 @@ function nextAssetCode_(groupCode, year) {
 function getSheet_(sheetName) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = spreadsheet.getSheetByName(sheetName);
-  if (!sheet && [SHEET_NAMES.users, SHEET_NAMES.assetResponsibles, SHEET_NAMES.maintenancePlans, SHEET_NAMES.maintenanceNotificationLogs].indexOf(sheetName) !== -1) {
+  if (!sheet && [SHEET_NAMES.users, SHEET_NAMES.assetResponsibles, SHEET_NAMES.maintenancePlans, SHEET_NAMES.maintenanceNotificationLogs, SHEET_NAMES.mediaFiles].indexOf(sheetName) !== -1) {
     sheet = spreadsheet.insertSheet(sheetName);
   }
   if (!sheet) throw new Error(`Sheet not found: ${sheetName}`);
@@ -980,6 +1106,10 @@ function ensureSheetHeaders_(sheetName, sheet) {
   }
   if (sheetName === SHEET_NAMES.maintenanceNotificationLogs) {
     ensureMaintenanceNotificationLogsSheet_(sheet);
+    return;
+  }
+  if (sheetName === SHEET_NAMES.mediaFiles) {
+    ensureMediaFilesSheet_(sheet);
     return;
   }
   if (sheetName !== SHEET_NAMES.settings) return;
@@ -1048,6 +1178,21 @@ function ensureMaintenancePlansSheet_(sheet) {
 
 function ensureMaintenanceNotificationLogsSheet_(sheet) {
   const desired = ["notification_id", "plan_id", "asset_id", "recipient_email", "notification_type", "due_date", "sent_at", "status", "error", "created_at", "updated_at"];
+  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim()).filter(Boolean);
+  if (!headers.length) {
+    sheet.getRange(1, 1, 1, desired.length).setValues([desired]);
+    return;
+  }
+  desired.forEach((header) => {
+    if (headers.indexOf(header) === -1) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+      headers.push(header);
+    }
+  });
+}
+
+function ensureMediaFilesSheet_(sheet) {
+  const desired = ["media_id", "owner_type", "owner_id", "asset_id", "drive_file_id", "file_name", "mime_type", "sort_order", "created_by", "created_at", "updated_at"];
   const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map((header) => String(header).trim()).filter(Boolean);
   if (!headers.length) {
     sheet.getRange(1, 1, 1, desired.length).setValues([desired]);

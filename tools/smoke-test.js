@@ -63,6 +63,7 @@ async function invokeProxy(body) {
 
 async function run() {
   assertSyntax("app/app.js");
+  assertSyntax("app/assets/qrcode.js");
   assertSyntax("google-apps-script/Code.gs");
   assertSyntax("api/google-script.js");
 
@@ -77,6 +78,9 @@ async function run() {
   assert.ok(appsScript.includes("function sendMaintenancePlanReminders(token)"));
   assert.ok(appsScript.includes("function runMaintenancePlanReminders()"));
   assert.ok(appsScript.includes("function installMaintenancePlanReminderTrigger()"));
+  assert.ok(appsScript.includes("function saveMediaFile(payload, token)"));
+  assert.ok(appsScript.includes("function getMediaFile(mediaId, token)"));
+  assert.ok(appsScript.includes("function ensureMediaFilesSheet_(sheet)"));
   assert.ok(appsScript.includes("function getSoftwareLicenseKey(licenseId, token)"));
   assert.ok(appsScript.includes("function requirePermission_(token, permission)"));
   assert.ok(appsScript.includes("Object.assign({}, existing, user || {})"));
@@ -96,6 +100,7 @@ async function run() {
   assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "assets.manage,reports.assets.export" }, "assets.manage")', permissions), true);
   assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "assets.manage,reports.assets.export" }, "maintenance.manage")', permissions), false);
   assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "maintenance.manage" }, "maintenance.view")', permissions), true);
+  assert.equal(vm.runInContext('hasPermission_({ role: "manager", permissions: "movement.manage" }, "movement.view")', permissions), true);
   assert.equal(vm.runInContext('hasPermission_({ role: "user", permissions: "view" }, "assets.view")', permissions), true);
   assert.equal(vm.runInContext('hasPermission_({ role: "user", permissions: "view" }, "reports.assets.export")', permissions), false);
   assert.equal(vm.runInContext('hasPermission_({ role: "admin", permissions: "all" }, "settings.manage")', permissions), true);
@@ -111,8 +116,12 @@ async function run() {
   assert.equal(vm.runInContext('maintenanceReminderType_("2026-07-03", "2026-07-10")', permissions), "OVERDUE_7");
   assert.equal(vm.runInContext('maintenanceReminderType_("2026-07-15", "2026-07-10")', permissions), "");
   assert.equal(vm.runInContext('normalizeIsoDate_("01/08/2026")', permissions), "2026-08-01");
+  vm.runInContext('requirePermission_ = () => ({ username: "tester" }); readActiveAssets_ = () => [{ asset_id: "asset-id" }];', permissions);
+  assert.equal(vm.runInContext('saveMediaFile({ owner_type: "ASSET", owner_id: "wrong-id", asset_id: "asset-id" }, "token").ok', permissions), false);
+  assert.match(vm.runInContext('saveMediaFile({ owner_type: "ASSET", owner_id: "wrong-id", asset_id: "asset-id" }, "token").error', permissions), /Liên kết ảnh thiết bị không hợp lệ/);
   assert.ok(index.includes('name="permission_code" value="assets.manage"'));
   assert.ok(index.includes('name="permission_code" value="reports.maintenance.export"'));
+  assert.ok(index.includes('name="permission_code" value="movement.view"'));
   assert.ok(index.includes('name="primary_responsible_id"'));
   assert.ok(index.includes('name="email" type="email"'));
   assert.ok(app.includes('function setUserPermissionCodes(rawPermissions, role)'));
@@ -125,7 +134,16 @@ async function run() {
   assert.ok(app.includes('"BỎ NỘI DUNG ĐANG SOẠN?"'));
   assert.ok((app.match(/bindModalCloseGuard\(/g) || []).length >= 9);
   assert.ok(index.includes('id="maintenancePlanModal"'));
+  assert.ok(index.includes('id="assetProfileModal"'));
+  assert.ok(index.includes('src="assets/qrcode.js"'));
+  assert.ok(app.includes("async function convertImageToWebp(file)"));
+  assert.ok(app.includes('url.searchParams.set("asset", assetId)'));
   assert.ok(!app.includes("function exportMaintenanceCsv()"));
+
+  const qrContext = vm.createContext({});
+  vm.runInContext(read("app/assets/qrcode.js"), qrContext, { filename: "app/assets/qrcode.js" });
+  const qrDataUrl = vm.runInContext('(() => { const code = qrcode(0, "M"); code.addData("https://example.test/?asset=asset-id"); code.make(); return code.createDataURL(4, 2); })()', qrContext);
+  assert.ok(qrDataUrl.startsWith("data:image/gif;base64,"));
 
   const vercel = JSON.parse(read("vercel.json"));
   assert.equal(vercel.version, 2);
@@ -159,6 +177,13 @@ async function run() {
   assert.deepEqual(JSON.parse(reminders.requestToAppsScript.options.body), {
     action: "sendMaintenancePlanReminders",
     args: ["session-token"],
+  });
+
+  const media = await invokeProxy({ fn: "saveMediaFile", args: [{ owner_type: "ASSET" }, "session-token"] });
+  assert.equal(media.res.statusCode, 200);
+  assert.deepEqual(JSON.parse(media.requestToAppsScript.options.body), {
+    action: "saveMediaFile",
+    args: [{ owner_type: "ASSET" }, "session-token"],
   });
 
   const denied = await invokeProxy({ fn: "notAllowed", args: [] });

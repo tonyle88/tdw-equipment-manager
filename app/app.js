@@ -8,6 +8,12 @@ const state = {
     softwareLicenses: [],
     assetResponsibles: [],
     responsibleUsers: [],
+    mediaFiles: [],
+    mediaObjectUrls: new Map(),
+    profileAssetId: "",
+    profileTab: "info",
+    lightboxItems: [],
+    lightboxIndex: 0,
     filtered: [],
     selectedId: null,
     page: 1,
@@ -30,13 +36,13 @@ const state = {
   const USER_PERMISSION_CODES = [
     "assets.view", "assets.manage", "assets.delete",
     "maintenance.view", "maintenance.manage", "maintenance.delete",
-    "movement.manage",
+    "movement.view", "movement.manage",
     "software.view", "software.manage", "software.delete",
     "reports.view", "reports.assets.export", "reports.maintenance.export", "reports.software.export", "reports.movement.export",
   ];
   const LEGACY_PERMISSION_PRESETS = {
-    view: ["assets.view", "maintenance.view", "software.view", "reports.view"],
-    edit: ["assets.view", "assets.manage", "assets.delete", "maintenance.view", "maintenance.manage", "movement.manage", "software.view", "software.manage", "reports.view"],
+    view: ["assets.view", "maintenance.view", "movement.view", "software.view", "reports.view"],
+    edit: ["assets.view", "assets.manage", "assets.delete", "maintenance.view", "maintenance.manage", "movement.view", "movement.manage", "software.view", "software.manage", "reports.view"],
     report: ["assets.view", "reports.view", "reports.assets.export"],
     "reports.export": ["reports.assets.export"],
   };
@@ -72,6 +78,69 @@ const state = {
     const amount = Number(text.replace(/[^\d.-]/g, ""));
     if (Number.isNaN(amount)) return text;
     return `${amount.toLocaleString("en-US")} VND`;
+  }
+
+  function selectedImageFiles(input) {
+    return [...(input?.files || [])];
+  }
+
+  async function convertImageToWebp(file) {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error(`File "${file.name}" không phải JPEG, PNG hoặc WebP`);
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
+    if (!blob) throw new Error(`Không thể chuyển "${file.name}" sang WebP`);
+    if (blob.size > 2 * 1024 * 1024) throw new Error(`Ảnh "${file.name}" sau khi nén vẫn lớn hơn 2 MB`);
+    return blob;
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+      reader.onerror = () => reject(new Error("Không thể đọc file ảnh"));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function uploadMediaFiles(files, ownerType, ownerId, assetId) {
+    if (!files.length) return [];
+    const existingCount = state.mediaFiles.filter((item) => item.owner_type === ownerType && item.owner_id === ownerId).length;
+    if (existingCount + files.length > 4) throw new Error("Mỗi mục chỉ được lưu tối đa 4 ảnh");
+    const uploaded = [];
+    for (const file of files) {
+      const webp = await convertImageToWebp(file);
+      const response = await callServer("saveMediaFile", {
+        owner_type: ownerType,
+        owner_id: ownerId,
+        asset_id: assetId,
+        mime_type: "image/webp",
+        data_base64: await blobToBase64(webp),
+      });
+      uploaded.push(response.data);
+    }
+    return uploaded;
+  }
+
+  function previewSelectedImages(input, container) {
+    if (!container) return;
+    const files = selectedImageFiles(input);
+    container.innerHTML = files.map((file) => `<span>${escapeHtml(file.name)}</span>`).join("");
+    if (files.length > 4) showMessageModal("Quá số lượng ảnh", "Mỗi mục chỉ được chọn tối đa 4 ảnh.");
+  }
+
+  async function mediaObjectUrl(media) {
+    if (state.mediaObjectUrls.has(media.media_id)) return state.mediaObjectUrls.get(media.media_id);
+    const response = await callServer("getMediaFile", media.media_id);
+    const bytes = Uint8Array.from(atob(response.data_base64), (char) => char.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: response.mime_type || "image/webp" }));
+    state.mediaObjectUrls.set(media.media_id, url);
+    return url;
   }
 
   const fallbackLabels = {
@@ -148,6 +217,8 @@ const state = {
       closeModal: document.querySelector("#closeAssetModal"),
       cancelForm: document.querySelector("#cancelAssetForm"),
       saveButton: document.querySelector("#saveAssetButton"),
+      assetImageInput: document.querySelector("#assetImageInput"),
+      assetImagePreview: document.querySelector("#assetImagePreview"),
       settingModal: document.querySelector("#settingModal"),
       settingForm: document.querySelector("#settingForm"),
       settingFormTitle: document.querySelector("#settingFormTitle"),
@@ -163,6 +234,8 @@ const state = {
       maintenanceLogGroupFilter: document.querySelector("#maintenanceLogGroupFilter"),
       closeMaintenanceLogModal: document.querySelector("#closeMaintenanceLogModal"),
       cancelMaintenanceLogForm: document.querySelector("#cancelMaintenanceLogForm"),
+      maintenanceImageInput: document.querySelector("#maintenanceImageInput"),
+      maintenanceImagePreview: document.querySelector("#maintenanceImagePreview"),
       maintenancePlanModal: document.querySelector("#maintenancePlanModal"),
       maintenancePlanForm: document.querySelector("#maintenancePlanForm"),
       closeMaintenancePlanModal: document.querySelector("#closeMaintenancePlanModal"),
@@ -190,6 +263,19 @@ const state = {
       systemModalInput: document.querySelector("#systemModalInput"),
       systemModalCancel: document.querySelector("#systemModalCancel"),
       systemModalConfirm: document.querySelector("#systemModalConfirm"),
+      assetProfileModal: document.querySelector("#assetProfileModal"),
+      assetProfileTitle: document.querySelector("#assetProfileTitle"),
+      assetProfileSubtitle: document.querySelector("#assetProfileSubtitle"),
+      assetProfileBody: document.querySelector("#assetProfileBody"),
+      assetProfileActions: document.querySelector("#assetProfileActions"),
+      assetProfileTabs: document.querySelector("#assetProfileTabs"),
+      closeAssetProfileModal: document.querySelector("#closeAssetProfileModal"),
+      mediaLightbox: document.querySelector("#mediaLightbox"),
+      mediaLightboxImage: document.querySelector("#mediaLightboxImage"),
+      mediaLightboxCount: document.querySelector("#mediaLightboxCount"),
+      mediaLightboxPrev: document.querySelector("#mediaLightboxPrev"),
+      mediaLightboxNext: document.querySelector("#mediaLightboxNext"),
+      closeMediaLightbox: document.querySelector("#closeMediaLightbox"),
       navLinks: [...document.querySelectorAll(".nav-pills [data-view]")],
     });
     if (els.loginLogo && els.brandLogo) els.loginLogo.src = els.brandLogo.src;
@@ -225,6 +311,7 @@ const state = {
     state.softwareLicenses = payload.softwareLicenses || [];
     state.assetResponsibles = payload.assetResponsibles || [];
     state.responsibleUsers = payload.responsibleUsers || [];
+    state.mediaFiles = payload.mediaFiles || [];
   }
 
   function isAdmin() {
@@ -300,7 +387,8 @@ const state = {
       "maintenance.view": ["assets.view"],
       "maintenance.manage": ["assets.view", "maintenance.view"],
       "maintenance.delete": ["assets.view", "maintenance.view", "maintenance.manage"],
-      "movement.manage": ["assets.view"],
+      "movement.view": ["assets.view"],
+      "movement.manage": ["assets.view", "movement.view"],
       "software.view": ["assets.view"],
       "software.manage": ["assets.view", "software.view"],
       "software.delete": ["assets.view", "software.view", "software.manage"],
@@ -308,7 +396,7 @@ const state = {
       "reports.assets.export": ["assets.view", "reports.view"],
       "reports.maintenance.export": ["assets.view", "maintenance.view", "reports.view"],
       "reports.software.export": ["assets.view", "software.view", "reports.view"],
-      "reports.movement.export": ["assets.view", "movement.manage", "reports.view"],
+      "reports.movement.export": ["assets.view", "movement.view", "reports.view"],
     };
     (dependencies[input.value] || []).forEach((code) => {
       const dependent = els.userForm.querySelector(`[name="permission_code"][value="${code}"]`);
@@ -555,6 +643,8 @@ const state = {
     renderMetrics();
     showApp();
     renderDeviceView("overview");
+    const linkedAssetId = new URLSearchParams(window.location.search).get("asset");
+    if (linkedAssetId && state.assets.some((asset) => asset.asset_id === linkedAssetId)) openAssetProfile(linkedAssetId);
     if (isAdmin()) preloadUsers().catch(() => null);
   }
 
@@ -928,6 +1018,186 @@ const state = {
     `;
   }
 
+  function mediaFor(ownerType, ownerId) {
+    return state.mediaFiles
+      .filter((item) => item.owner_type === ownerType && item.owner_id === ownerId)
+      .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  }
+
+  function renderMediaGallery(items, emptyText = "Chưa có hình ảnh") {
+    if (!items.length) return `<p class="profile-empty">${escapeHtml(emptyText)}</p>`;
+    return `<div class="profile-gallery">${items.map((item) => `
+      <div class="profile-image-item">
+        <button class="profile-image-button" type="button" data-media-id="${escapeHtml(item.media_id)}" aria-label="Phóng to ảnh">
+          <span>Đang tải ảnh...</span>
+          <img data-media-image="${escapeHtml(item.media_id)}" alt="Ảnh thiết bị" hidden />
+        </button>
+        ${hasPermission(item.owner_type === "MAINTENANCE" ? "maintenance.manage" : "assets.manage") ? `<button class="profile-image-delete" type="button" data-delete-media="${escapeHtml(item.media_id)}" aria-label="Xóa ảnh">×</button>` : ""}
+      </div>`).join("")}</div>`;
+  }
+
+  function assetDeepLink(assetId) {
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.hash = "";
+    url.searchParams.set("asset", assetId);
+    return url.toString();
+  }
+
+  function qrDataUrl(assetId) {
+    if (typeof window.qrcode !== "function") return "";
+    const code = window.qrcode(0, "M");
+    code.addData(assetDeepLink(assetId));
+    code.make();
+    return code.createDataURL(6, 4);
+  }
+
+  function renderAssetProfile(asset) {
+    const movements = state.inventoryMovements.filter((item) => item.asset_id === asset.asset_id);
+    const maintenanceLogs = state.maintenanceLogs.filter((item) => item.asset_id === asset.asset_id);
+    const maintenancePlans = state.maintenancePlans.filter((item) => item.asset_id === asset.asset_id);
+    const assetImages = mediaFor("ASSET", asset.asset_id);
+    const qrUrl = qrDataUrl(asset.asset_id);
+    els.assetProfileTitle.textContent = asset.asset_name || "Thiết bị chưa đặt tên";
+    els.assetProfileSubtitle.innerHTML = `${escapeHtml(asset.asset_code || "Chưa có mã")} · <span class="badge ${safeClass(asset.status)}">${escapeHtml(labelFor("status", asset.status) || "Chưa rõ")}</span>`;
+    els.assetProfileBody.innerHTML = `
+      <section class="asset-profile-panel active" data-profile-panel="info">
+        <h3>CHI TIẾT THIẾT BỊ</h3>
+        ${renderMediaGallery(assetImages, "Chưa có ảnh thiết bị")}
+        <div class="profile-facts">
+          <div><span>Nhóm</span><strong>${escapeHtml(asset.asset_group_label || "Chưa có")}</strong></div>
+          <div><span>Loại</span><strong>${escapeHtml(asset.asset_type || "Chưa có")}</strong></div>
+          <div><span>Hãng</span><strong>${escapeHtml(asset.brand || "Chưa có")}</strong></div>
+          <div><span>Serial</span><strong>${escapeHtml(asset.serial_number || "Chưa có")}</strong></div>
+          <div><span>Năm</span><strong>${escapeHtml(asset.purchase_year || "Chưa có")}</strong></div>
+          <div><span>Đơn giá</span><strong>${escapeHtml(formatMoney(asset.unit_price) || "Chưa có")}</strong></div>
+          <div><span>Hết bảo hành</span><strong>${escapeHtml(formatDate(asset.warranty_end_date) || "Chưa có")}</strong></div>
+          <div><span>Bảo trì gần nhất</span><strong>${escapeHtml(formatDate(asset.last_maintenance_date) || "Chưa có")}</strong></div>
+        </div>
+        <dl class="profile-description">
+          <div><dt>Vị trí</dt><dd>${escapeHtml(asset.location || "Chưa có")}</dd></div>
+          <div><dt>Người dùng</dt><dd>${escapeHtml(asset.assigned_to || "Chưa có")}</dd></div>
+          <div><dt>Phòng ban</dt><dd>${escapeHtml(departmentLabel(asset.department) || "Chưa có")}</dd></div>
+          <div><dt>Phụ trách chính</dt><dd>${escapeHtml(primaryResponsibleName(asset) || "Chưa có")}</dd></div>
+          <div><dt>Phụ trách phụ</dt><dd>${escapeHtml(secondaryResponsibleNames(asset.asset_id).join(", ") || "Chưa có")}</dd></div>
+          <div><dt>Phần mềm</dt><dd>${escapeHtml(asset.software_license || "Chưa có")}</dd></div>
+          <div><dt>Ghi chú</dt><dd>${escapeHtml(asset.note || "Không có ghi chú")}</dd></div>
+        </dl>
+        <div class="profile-qr">
+          ${qrUrl ? `<img src="${qrUrl}" alt="Mã QR thiết bị ${escapeHtml(asset.asset_code)}" />` : ""}
+          <div><strong>MÃ QR THIẾT BỊ</strong><span>Quét để mở hồ sơ, bảo hành và bảo trì.</span></div>
+        </div>
+      </section>
+      <section class="asset-profile-panel" data-profile-panel="movement">
+        <div class="profile-section-head"><h3>LỊCH SỬ ĐIỀU CHUYỂN</h3><span>${movements.length} LẦN</span></div>
+        ${hasPermission("movement.view") ? (movements.length ? `<div class="profile-timeline">${movements.map((item) => `
+          <article><time>${escapeHtml(formatDate(item.movement_date))}</time><h4>${escapeHtml(item.from_location || "Chưa rõ")} → ${escapeHtml(item.to_location || "Chưa rõ")}</h4><p>${escapeHtml(item.from_user || "Chưa rõ")} → ${escapeHtml(item.to_user || "Chưa rõ")}</p><small>${escapeHtml(item.reason || "Không ghi lý do")}</small></article>`).join("")}</div>` : `<p class="profile-empty">Chưa có lịch sử điều chuyển.</p>`) : `<p class="profile-empty">Tài khoản chưa có quyền xem điều chuyển.</p>`}
+      </section>
+      <section class="asset-profile-panel" data-profile-panel="maintenance">
+        <div class="profile-section-head"><h3>BẢO TRÌ & BẢO DƯỠNG</h3><span>${maintenanceLogs.length} LẦN</span></div>
+        ${hasPermission("maintenance.view") ? `
+          ${maintenancePlans.length ? `<div class="profile-plans">${maintenancePlans.map((plan) => `<article><strong>${escapeHtml(plan.title)}</strong><span>Đến hạn ${escapeHtml(formatDate(plan.next_due_date))} · ${escapeHtml(plan.frequency)}</span></article>`).join("")}</div>` : ""}
+          ${maintenanceLogs.length ? `<div class="profile-maintenance-list">${maintenanceLogs.map((log) => `<article><div class="maintenance-entry-head"><time>${escapeHtml(formatDate(log.date))}</time><strong>${escapeHtml(labelFor("maintenance_type", log.action_type) || log.action_type)}</strong></div><h4>${escapeHtml(log.description || "Không có nội dung")}</h4><p>${escapeHtml(log.vendor || "Nội bộ")} · ${escapeHtml(formatMoney(log.cost) || "Không ghi chi phí")}</p>${renderMediaGallery(mediaFor("MAINTENANCE", log.log_id), "Chưa có ảnh kết quả")}</article>`).join("")}</div>` : `<p class="profile-empty">Chưa có lịch sử bảo trì.</p>`}
+        ` : `<p class="profile-empty">Tài khoản chưa có quyền xem bảo trì.</p>`}
+      </section>`;
+    els.assetProfileActions.innerHTML = `
+      ${hasPermission("assets.manage") ? `<button class="secondary-button" type="button" data-profile-edit>✎ Sửa thiết bị</button>` : ""}
+      ${hasPermission("movement.manage") ? `<button class="secondary-button" type="button" data-profile-movement>↔ Điều chuyển</button>` : ""}
+      ${hasPermission("maintenance.manage") ? `<button class="primary-button" type="button" data-profile-maintenance>+ Ghi nhận bảo trì</button>` : ""}
+      <button class="secondary-button" type="button" data-profile-close>Đóng</button>`;
+    applyProfileTab();
+    bindProfileActions(asset);
+    hydrateProfileImages();
+  }
+
+  function openAssetProfile(assetId) {
+    const asset = state.assets.find((item) => item.asset_id === assetId);
+    if (!asset) return;
+    state.profileAssetId = assetId;
+    state.profileTab = "info";
+    renderAssetProfile(asset);
+    els.assetProfileModal.hidden = false;
+    history.replaceState(null, "", assetDeepLink(assetId));
+  }
+
+  function closeAssetProfile() {
+    els.assetProfileModal.hidden = true;
+    state.profileAssetId = "";
+    const url = new URL(window.location.href);
+    url.searchParams.delete("asset");
+    history.replaceState(null, "", url.toString());
+  }
+
+  function applyProfileTab() {
+    els.assetProfileTabs?.querySelectorAll("[data-profile-tab]").forEach((button) => button.classList.toggle("active", button.dataset.profileTab === state.profileTab));
+    els.assetProfileBody?.querySelectorAll("[data-profile-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.profilePanel === state.profileTab));
+  }
+
+  function bindProfileActions(asset) {
+    els.assetProfileActions.querySelector("[data-profile-close]")?.addEventListener("click", closeAssetProfile);
+    els.assetProfileActions.querySelector("[data-profile-edit]")?.addEventListener("click", () => { closeAssetProfile(); openAssetModal(asset); });
+    els.assetProfileActions.querySelector("[data-profile-movement]")?.addEventListener("click", () => { closeAssetProfile(); openMovementLogModal(asset.asset_id); });
+    els.assetProfileActions.querySelector("[data-profile-maintenance]")?.addEventListener("click", () => { closeAssetProfile(); openMaintenanceLogModal(asset.asset_id); });
+  }
+
+  async function hydrateProfileImages() {
+    const images = [...els.assetProfileBody.querySelectorAll("[data-media-image]")];
+    await Promise.all(images.map(async (image) => {
+      const media = state.mediaFiles.find((item) => item.media_id === image.dataset.mediaImage);
+      if (!media) return;
+      try {
+        image.src = await mediaObjectUrl(media);
+        image.hidden = false;
+        image.previousElementSibling.hidden = true;
+      } catch (error) {
+        image.previousElementSibling.textContent = "Không tải được ảnh";
+      }
+    }));
+    els.assetProfileBody.querySelectorAll("[data-media-id]").forEach((button) => button.addEventListener("click", () => openMediaLightbox(button)));
+    els.assetProfileBody.querySelectorAll("[data-delete-media]").forEach((button) => button.addEventListener("click", () => deleteProfileMedia(button.dataset.deleteMedia)));
+  }
+
+  async function deleteProfileMedia(mediaId) {
+    if (!await showConfirmModal("XÓA ẢNH", "Xóa ảnh này khỏi hồ sơ thiết bị?", "Xóa")) return;
+    try {
+      await callServer("deleteMediaFile", mediaId);
+      const cachedUrl = state.mediaObjectUrls.get(mediaId);
+      if (cachedUrl) URL.revokeObjectURL(cachedUrl);
+      state.mediaObjectUrls.delete(mediaId);
+      state.mediaFiles = state.mediaFiles.filter((item) => item.media_id !== mediaId);
+      const asset = state.assets.find((item) => item.asset_id === state.profileAssetId);
+      if (asset) renderAssetProfile(asset);
+      showToast("Đã xóa ảnh", "Hồ sơ thiết bị đã được cập nhật");
+    } catch (error) {
+      showMessageModal("Không thể xóa ảnh", error.message);
+    }
+  }
+
+  async function openMediaLightbox(button) {
+    const visibleIds = [...button.closest(".profile-gallery").querySelectorAll("[data-media-id]")].map((item) => item.dataset.mediaId);
+    state.lightboxItems = visibleIds;
+    state.lightboxIndex = Math.max(0, visibleIds.indexOf(button.dataset.mediaId));
+    await renderLightboxImage();
+    els.mediaLightbox.hidden = false;
+  }
+
+  async function renderLightboxImage() {
+    const mediaId = state.lightboxItems[state.lightboxIndex];
+    const media = state.mediaFiles.find((item) => item.media_id === mediaId);
+    if (!media) return;
+    els.mediaLightboxImage.src = await mediaObjectUrl(media);
+    els.mediaLightboxCount.textContent = `${state.lightboxIndex + 1} / ${state.lightboxItems.length}`;
+    const hasMultiple = state.lightboxItems.length > 1;
+    els.mediaLightboxPrev.hidden = !hasMultiple;
+    els.mediaLightboxNext.hidden = !hasMultiple;
+  }
+
+  function moveLightbox(direction) {
+    if (state.lightboxItems.length < 2) return;
+    state.lightboxIndex = (state.lightboxIndex + direction + state.lightboxItems.length) % state.lightboxItems.length;
+    renderLightboxImage();
+  }
+
   function openAssetModal(asset = null) {
     fillFormSelects();
     els.form.reset();
@@ -944,6 +1214,7 @@ const state = {
       option.selected = secondaryIds.has(option.value);
     });
     markFormClean(els.form);
+    if (els.assetImagePreview) els.assetImagePreview.innerHTML = "";
     els.modal.hidden = false;
   }
 
@@ -964,6 +1235,7 @@ const state = {
     ];
     delete data.primary_responsible_id;
     delete data.secondary_responsible_ids;
+    delete data.pending_images;
     data.asset_group_label = labelFor("asset_group", data.asset_group);
     return data;
   }
@@ -983,6 +1255,12 @@ const state = {
       showMessageModal("Thiếu thông tin", "Vui lòng nhập Tên thiết bị");
       return;
     }
+    const imageFiles = selectedImageFiles(els.assetImageInput);
+    const existingImageCount = asset.asset_id ? mediaFor("ASSET", asset.asset_id).length : 0;
+    if (existingImageCount + imageFiles.length > 4) {
+      showMessageModal("Quá số lượng ảnh", "Mỗi thiết bị chỉ được chọn tối đa 4 ảnh.");
+      return;
+    }
     state.isSaving = true;
     const saveBtn = els.saveButton;
     const originalText = saveBtn.textContent;
@@ -990,10 +1268,19 @@ const state = {
     saveBtn.disabled = true;
     try {
       const isEdit = Boolean(asset.asset_id);
-      await callServer("saveAsset", asset);
+      const response = await callServer("saveAsset", asset);
+      const savedAsset = response.data;
+      let imageWarning = "";
+      try {
+        const uploaded = await uploadMediaFiles(imageFiles, "ASSET", savedAsset.asset_id, savedAsset.asset_id);
+        state.mediaFiles.push(...uploaded);
+      } catch (error) {
+        imageWarning = error.message;
+      }
       showToast(isEdit ? "Đã cập nhật thiết bị" : "Đã thêm thiết bị", asset.asset_name || "Thiết bị TDW");
       closeAssetModal();
       await refreshAppData({ resetPage: !isEdit });
+      if (imageWarning) showMessageModal("Thiết bị đã lưu, ảnh chưa tải đủ", imageWarning);
     } catch (error) {
       showMessageModal("Không thể lưu thiết bị", error.message);
     } finally {
@@ -1966,6 +2253,7 @@ const state = {
     }
     
     markFormClean(els.maintenanceLogForm);
+    if (els.maintenanceImagePreview) els.maintenanceImagePreview.innerHTML = "";
     els.maintenanceLogModal.hidden = false;
   }
 
@@ -1977,17 +2265,31 @@ const state = {
   async function handleMaintenanceLogSubmit(event) {
     event.preventDefault();
     const log = Object.fromEntries(new FormData(event.target).entries());
+    delete log.pending_images;
+    const imageFiles = selectedImageFiles(els.maintenanceImageInput);
+    const existingImageCount = log.log_id ? mediaFor("MAINTENANCE", log.log_id).length : 0;
+    if (existingImageCount + imageFiles.length > 4) {
+      showMessageModal("Quá số lượng ảnh", "Mỗi lần bảo trì chỉ được chọn tối đa 4 ảnh.");
+      return;
+    }
     const submitBtn = event.target.querySelector("[type=submit]");
     if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
     try {
-      await callServer("saveMaintenanceLog", log);
+      const response = await callServer("saveMaintenanceLog", log);
+      let imageWarning = "";
+      try {
+        const uploaded = await uploadMediaFiles(imageFiles, "MAINTENANCE", response.data.log_id, response.data.asset_id);
+        state.mediaFiles.push(...uploaded);
+      } catch (error) {
+        imageWarning = error.message;
+      }
       showToast("Đã lưu lịch sử bảo trì", log.action_type);
       closeMaintenanceLogModal();
       await loadAppData();
-      if (state.activeView === "overview") renderOverviewView();
-      if (state.activeView === "assets") renderAssetsView();
+      if (state.activeView === "overview" || state.activeView === "devices") renderDeviceView(state.activeView);
       if (state.activeView === "maintenance") renderMaintenanceView();
       if (state.selectedId) renderDetail(state.assets.find((a) => a.asset_id === state.selectedId));
+      if (imageWarning) showMessageModal("Lịch sử đã lưu, ảnh chưa tải đủ", imageWarning);
     } catch (error) {
       showMessageModal("Không thể lưu", error.message);
     } finally {
@@ -2690,6 +2992,7 @@ const state = {
       state.selectedId = row.dataset.id;
       renderRows();
       renderDetail(state.assets.find((asset) => asset.asset_id === state.selectedId));
+      openAssetProfile(state.selectedId);
     });
     els.pagination?.addEventListener("click", (event) => {
       const button = event.target.closest("button");
@@ -2734,6 +3037,7 @@ const state = {
     els.addButton.addEventListener("click", () => openAssetModal());
     bindModalCloseGuard(els.modal, els.form, closeAssetModal, [els.closeModal, els.cancelForm]);
     els.form.addEventListener("submit", handleAssetSubmit);
+    els.assetImageInput?.addEventListener("change", () => previewSelectedImages(els.assetImageInput, els.assetImagePreview));
     els.settingForm.addEventListener("submit", handleSettingSubmit);
     els.settingForm.elements.setting_type.addEventListener("change", () => {
       if (!state.editingSettingId) els.settingForm.elements.sort_order.value = nextSettingOrder(els.settingForm.elements.setting_type.value);
@@ -2749,6 +3053,7 @@ const state = {
     }));
     bindModalCloseGuard(els.userModal, els.userForm, closeUserModal, [els.closeUserModal, els.cancelUserForm]);
     els.maintenanceLogForm.addEventListener("submit", handleMaintenanceLogSubmit);
+    els.maintenanceImageInput?.addEventListener("change", () => previewSelectedImages(els.maintenanceImageInput, els.maintenanceImagePreview));
     bindModalCloseGuard(els.maintenanceLogModal, els.maintenanceLogForm, closeMaintenanceLogModal, [els.closeMaintenanceLogModal, els.cancelMaintenanceLogForm]);
     els.maintenancePlanForm.addEventListener("submit", handleMaintenancePlanSubmit);
     bindModalCloseGuard(els.maintenancePlanModal, els.maintenancePlanForm, closeMaintenancePlanModal, [els.closeMaintenancePlanModal, els.cancelMaintenancePlanForm]);
@@ -2773,6 +3078,22 @@ const state = {
     els.systemModal?.addEventListener("click", (event) => {
       if (event.target === els.systemModal) closeSystemModal(false);
     });
+    els.closeAssetProfileModal?.addEventListener("click", closeAssetProfile);
+    els.assetProfileModal?.addEventListener("click", (event) => {
+      if (event.target === els.assetProfileModal) closeAssetProfile();
+    });
+    els.assetProfileTabs?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-profile-tab]");
+      if (!button) return;
+      state.profileTab = button.dataset.profileTab;
+      applyProfileTab();
+    });
+    els.closeMediaLightbox?.addEventListener("click", () => { els.mediaLightbox.hidden = true; });
+    els.mediaLightbox?.addEventListener("click", (event) => {
+      if (event.target === els.mediaLightbox) els.mediaLightbox.hidden = true;
+    });
+    els.mediaLightboxPrev?.addEventListener("click", () => moveLightbox(-1));
+    els.mediaLightboxNext?.addEventListener("click", () => moveLightbox(1));
     els.navLinks.forEach((link) => {
       link.addEventListener("click", (event) => {
         event.preventDefault();

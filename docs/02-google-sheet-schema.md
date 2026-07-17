@@ -103,7 +103,7 @@ Ma quyen dang dung:
 ```text
 assets.view, assets.manage, assets.delete
 maintenance.view, maintenance.manage, maintenance.delete
-movement.manage
+movement.view, movement.manage
 software.view, software.manage, software.delete
 reports.view
 reports.assets.export
@@ -189,6 +189,24 @@ due_date
 sent_at
 status
 error
+created_at
+updated_at
+```
+
+## MediaFiles
+
+Tab nay duoc Apps Script tu tao khi tai anh dau tien. File anh WebP duoc luu rieng tu trong Google Drive; Google Sheet chi luu metadata. `owner_type` nhan `ASSET` hoac `MAINTENANCE`, moi `owner_id` toi da 4 anh.
+
+```text
+media_id
+owner_type
+owner_id
+asset_id
+drive_file_id
+file_name
+mime_type
+sort_order
+created_by
 created_at
 updated_at
 ```

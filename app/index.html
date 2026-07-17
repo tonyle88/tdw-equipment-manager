@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" defer></script>
+    <script src="assets/qrcode.js" defer></script>
     <script src="config.js" defer></script>
     <script src="app.js" defer></script>
   </head>
@@ -200,6 +201,11 @@
             <label>Tình trạng<select name="status" required></select></label>
             <label>Phần mềm<select name="software_license"></select></label>
             <label class="span-2">Ghi chú<textarea name="note" rows="3"></textarea></label>
+            <label class="span-2 media-upload-field">Ảnh thiết bị (tối đa 4 ảnh)
+              <input id="assetImageInput" name="pending_images" type="file" accept="image/jpeg,image/png,image/webp" multiple />
+              <span class="field-help">Ảnh sẽ tự chuyển sang WebP trước khi tải lên.</span>
+            </label>
+            <div class="span-2 upload-preview" id="assetImagePreview"></div>
           </div>
           <div class="modal-actions">
             <button class="secondary-button" type="button" id="cancelAssetForm">Hủy</button>
@@ -277,6 +283,7 @@
                 </section>
                 <section class="permission-module">
                   <h3>LUÂN CHUYỂN</h3>
+                  <label><input type="checkbox" name="permission_code" value="movement.view" /> Xem</label>
                   <label><input type="checkbox" name="permission_code" value="movement.manage" /> Ghi nhận</label>
                 </section>
                 <section class="permission-module">
@@ -334,6 +341,11 @@
             <label>Bảo hành (Tháng)<input name="warranty_months" type="number" placeholder="VD: 12" /></label>
             <label>Người phụ trách<input name="performed_by" placeholder="VD: Nguyễn Văn A" /></label>
             <label class="span-2">Ghi chú thêm<textarea name="note" rows="2"></textarea></label>
+            <label class="span-2 media-upload-field">Ảnh kết quả bảo trì (tối đa 4 ảnh)
+              <input id="maintenanceImageInput" name="pending_images" type="file" accept="image/jpeg,image/png,image/webp" multiple />
+              <span class="field-help">Ảnh sẽ tự chuyển sang WebP trước khi tải lên.</span>
+            </label>
+            <div class="span-2 upload-preview" id="maintenanceImagePreview"></div>
           </div>
           <div class="modal-actions">
             <button class="secondary-button" type="button" id="cancelMaintenanceLogForm">Hủy</button>
@@ -488,6 +500,36 @@
             <button class="primary-button" type="submit" id="systemModalConfirm">Đồng ý</button>
           </div>
         </form>
+      </div>
+
+      <div class="modal-backdrop asset-profile-backdrop" id="assetProfileModal" hidden>
+        <section class="asset-profile-modal" role="dialog" aria-modal="true" aria-labelledby="assetProfileTitle">
+          <header class="asset-profile-head">
+            <div>
+              <p class="eyebrow">HỒ SƠ THIẾT BỊ</p>
+              <h2 id="assetProfileTitle">THÔNG TIN THIẾT BỊ</h2>
+              <p id="assetProfileSubtitle"></p>
+            </div>
+            <button class="icon-button" type="button" id="closeAssetProfileModal" aria-label="Đóng">×</button>
+          </header>
+          <nav class="asset-profile-tabs" id="assetProfileTabs" aria-label="Nội dung hồ sơ">
+            <button class="active" type="button" data-profile-tab="info">Thông tin</button>
+            <button type="button" data-profile-tab="movement">Điều chuyển</button>
+            <button type="button" data-profile-tab="maintenance">Bảo trì</button>
+          </nav>
+          <div class="asset-profile-body" id="assetProfileBody"></div>
+          <footer class="asset-profile-actions" id="assetProfileActions"></footer>
+        </section>
+      </div>
+
+      <div class="modal-backdrop media-lightbox" id="mediaLightbox" hidden>
+        <section class="media-lightbox-dialog" role="dialog" aria-modal="true" aria-label="Xem ảnh thiết bị">
+          <button class="icon-button media-lightbox-close" type="button" id="closeMediaLightbox" aria-label="Đóng">×</button>
+          <button class="media-lightbox-nav prev" type="button" id="mediaLightboxPrev" aria-label="Ảnh trước">‹</button>
+          <img id="mediaLightboxImage" alt="Ảnh thiết bị" />
+          <button class="media-lightbox-nav next" type="button" id="mediaLightboxNext" aria-label="Ảnh sau">›</button>
+          <span id="mediaLightboxCount"></span>
+        </section>
       </div>
     </main>
     <div id="printReport" hidden></div>
