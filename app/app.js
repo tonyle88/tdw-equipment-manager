@@ -87,15 +87,15 @@ const state = {
   async function convertImageToWebp(file) {
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error(`File "${file.name}" không phải JPEG, PNG hoặc WebP`);
     const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(1, 1280 / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
     canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.72));
     if (!blob) throw new Error(`Không thể chuyển "${file.name}" sang WebP`);
-    if (blob.size > 2 * 1024 * 1024) throw new Error(`Ảnh "${file.name}" sau khi nén vẫn lớn hơn 2 MB`);
+    if (blob.size > 1024 * 1024) throw new Error(`Ảnh "${file.name}" sau khi nén vẫn lớn hơn 1 MB`);
     return blob;
   }
 

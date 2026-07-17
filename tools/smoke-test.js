@@ -200,6 +200,9 @@ async function run() {
   assert.ok(styles.includes('.maintenance-history-scroll'));
   assert.ok(styles.includes('.maintenance-history-actions-col'));
   assert.ok(app.includes("async function convertImageToWebp(file)"));
+  assert.ok(app.includes("1280 / Math.max(bitmap.width, bitmap.height)"));
+  assert.ok(app.includes('canvas.toBlob(resolve, "image/webp", 0.72)'));
+  assert.ok(app.includes("blob.size > 1024 * 1024"));
   assert.ok(app.includes("async function renderMaintenanceExistingImages(logId)"));
   assert.ok(app.includes("async function deleteMaintenanceMedia(mediaId, logId)"));
   assert.ok(app.includes("data-delete-maintenance-media="));
