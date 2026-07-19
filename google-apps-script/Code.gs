@@ -186,7 +186,7 @@ function migrateSchema() {
   return { ok: true, schema_version: TDW_SCHEMA_VERSION, migrated_at: new Date().toISOString() };
 }
 
-function backupSystemData() {
+function backupSystemData(options) {
   const properties = PropertiesService.getScriptProperties();
   const rawBackupFolderId = properties.getProperty("TDW_BACKUP_FOLDER_ID") || "";
   if (!rawBackupFolderId) throw new Error("Thiếu Script Property TDW_BACKUP_FOLDER_ID");
@@ -198,10 +198,101 @@ function backupSystemData() {
   DriveApp.getFileById(spreadsheet.getId()).makeCopy(`TDW-data-${timestamp}`, snapshotFolder);
 
   const rawMediaFolderId = properties.getProperty("TDW_MEDIA_FOLDER_ID") || "";
-  if (rawMediaFolderId) copyDriveFolder_(DriveApp.getFolderById(normalizeMediaFolderId_(rawMediaFolderId)), snapshotFolder.createFolder("media"));
+  const includeMedia = !options || options.includeMedia !== false;
+  if (includeMedia && rawMediaFolderId) copyDriveFolder_(DriveApp.getFolderById(normalizeMediaFolderId_(rawMediaFolderId)), snapshotFolder.createFolder("media"));
   properties.setProperty("TDW_LAST_BACKUP_AT", new Date().toISOString());
   properties.setProperty("TDW_LAST_BACKUP_FOLDER_ID", snapshotFolder.getId());
-  return { ok: true, folder_id: snapshotFolder.getId(), created_at: new Date().toISOString() };
+  return { ok: true, folder_id: snapshotFolder.getId(), folder_name: snapshotFolder.getName(), media_included: includeMedia, created_at: new Date().toISOString() };
+}
+
+function createBackup(token) {
+  const actor = requireAdmin_(token);
+  const result = backupSystemData();
+  logAudit_(actor, "SYSTEM_BACKUP_CREATED", "backup", result.folder_id, result.folder_name);
+  return result;
+}
+
+function listBackups(token) {
+  requireAdmin_(token);
+  const folders = getBackupRoot_().getFolders();
+  const backups = [];
+  while (folders.hasNext()) {
+    const folder = folders.next();
+    if (!/^TDW-backup-\d{8}-\d{6}$/.test(folder.getName())) continue;
+    const spreadsheetFile = findBackupSpreadsheetFile_(folder);
+    if (!spreadsheetFile) continue;
+    backups.push({ folder_id: folder.getId(), name: folder.getName(), created_at: folder.getDateCreated().toISOString() });
+  }
+  backups.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  return { ok: true, backups: backups.slice(0, 30) };
+}
+
+function restoreBackup(folderId, token) {
+  const actor = requireAdmin_(token);
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) throw new Error("Hệ thống đang có tác vụ dữ liệu khác. Vui lòng thử lại sau.");
+  try {
+    const backupFolder = findBackupFolder_(folderId);
+    const spreadsheetFile = findBackupSpreadsheetFile_(backupFolder);
+    if (!spreadsheetFile) throw new Error("Bản backup không chứa file dữ liệu Google Sheet.");
+    const source = SpreadsheetApp.openById(spreadsheetFile.getId());
+    if (!source.getSheetByName(SHEET_NAMES.assets)) throw new Error("Bản backup không có sheet Assets nên không thể khôi phục.");
+    const safetyBackup = backupSystemData({ includeMedia: false });
+    const target = SpreadsheetApp.getActiveSpreadsheet();
+    const protectedSheets = [SHEET_NAMES.users, SHEET_NAMES.auditLogs];
+    let restoredSheets = 0;
+    source.getSheets().forEach((sourceSheet) => {
+      if (protectedSheets.indexOf(sourceSheet.getName()) !== -1) return;
+      const targetSheet = target.getSheetByName(sourceSheet.getName());
+      if (!targetSheet) return;
+      const rows = Math.max(sourceSheet.getLastRow(), 1);
+      const columns = Math.max(sourceSheet.getLastColumn(), 1);
+      ensureSheetSize_(targetSheet, rows, columns);
+      const sourceRange = sourceSheet.getRange(1, 1, rows, columns);
+      const values = sourceRange.getValues();
+      const formulas = sourceRange.getFormulas();
+      const restoredValues = values.map((row, rowIndex) => row.map((value, columnIndex) => formulas[rowIndex][columnIndex] || value));
+      targetSheet.clearContents();
+      targetSheet.getRange(1, 1, rows, columns).setValues(restoredValues);
+      restoredSheets += 1;
+    });
+    SpreadsheetApp.flush();
+    PropertiesService.getScriptProperties().setProperty("TDW_LAST_RESTORE_AT", new Date().toISOString());
+    logAudit_(actor, "SYSTEM_BACKUP_RESTORED", "backup", backupFolder.getId(), backupFolder.getName());
+    return { ok: true, restored_sheets: restoredSheets, restored_from: backupFolder.getName(), safety_backup_folder_id: safetyBackup.folder_id, restored_at: new Date().toISOString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getBackupRoot_() {
+  const rawId = PropertiesService.getScriptProperties().getProperty("TDW_BACKUP_FOLDER_ID") || "";
+  if (!rawId) throw new Error("Thiếu Script Property TDW_BACKUP_FOLDER_ID");
+  return DriveApp.getFolderById(normalizeMediaFolderId_(rawId));
+}
+
+function findBackupFolder_(folderId) {
+  const normalizedId = normalizeMediaFolderId_(folderId);
+  const folders = getBackupRoot_().getFolders();
+  while (folders.hasNext()) {
+    const folder = folders.next();
+    if (folder.getId() === normalizedId && /^TDW-backup-\d{8}-\d{6}$/.test(folder.getName())) return folder;
+  }
+  throw new Error("Không tìm thấy bản backup trong thư mục sao lưu đã cấu hình.");
+}
+
+function findBackupSpreadsheetFile_(folder) {
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const file = files.next();
+    if (file.getMimeType() === MimeType.GOOGLE_SHEETS && /^TDW-data-/.test(file.getName())) return file;
+  }
+  return null;
+}
+
+function ensureSheetSize_(sheet, rows, columns) {
+  if (sheet.getMaxRows() < rows) sheet.insertRowsAfter(sheet.getMaxRows(), rows - sheet.getMaxRows());
+  if (sheet.getMaxColumns() < columns) sheet.insertColumnsAfter(sheet.getMaxColumns(), columns - sheet.getMaxColumns());
 }
 
 function copyDriveFolder_(source, destination) {
@@ -359,6 +450,15 @@ function doPost(event) {
     }
     if (action === "healthCheck") {
       return jsonResponse_(healthCheck(args[0] || body.token || ""));
+    }
+    if (action === "createBackup") {
+      return jsonResponse_(createBackup(args[0] || body.token || ""));
+    }
+    if (action === "listBackups") {
+      return jsonResponse_(listBackups(args[0] || body.token || ""));
+    }
+    if (action === "restoreBackup") {
+      return jsonResponse_(restoreBackup(args[0] || body.folder_id || "", args[1] || body.token || ""));
     }
     if (action === "saveAsset" || action === "upsertAsset") {
       return jsonResponse_(saveAsset(args[0] || body.asset || {}, args[1] || body.token || ""));

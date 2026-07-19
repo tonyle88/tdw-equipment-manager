@@ -2132,6 +2132,14 @@ const state = {
           </div>
         </div>
         <div class="settings-layout full-settings-layout">
+          ${isAdmin() ? `<section class="module-card backup-management">
+            <div class="backup-management-head">
+              <div><h3>SAO LƯU & KHÔI PHỤC</h3><p>Khôi phục dữ liệu nghiệp vụ từ bản backup. Tài khoản, nhật ký kiểm toán và ảnh Drive hiện tại được giữ nguyên.</p></div>
+              <button class="secondary-button" type="button" id="createBackupButton">Tạo backup</button>
+            </div>
+            <div id="backupList"><p>Nhấn tải danh sách để xem các bản backup gần nhất.</p></div>
+            <button class="secondary-button" type="button" id="loadBackupsButton">Tải danh sách backup</button>
+          </section>` : ""}
           <div class="module-card settings-list">
             <h3>DANH MỤC HIỆN CÓ</h3>
             <div class="settings-groups-grid">
@@ -2163,6 +2171,8 @@ const state = {
     `;
     els.content.querySelector("#openSettingModal")?.addEventListener("click", () => openSettingModal());
     els.content.querySelector("#healthCheckButton")?.addEventListener("click", handleHealthCheck);
+    els.content.querySelector("#createBackupButton")?.addEventListener("click", handleCreateBackup);
+    els.content.querySelector("#loadBackupsButton")?.addEventListener("click", handleLoadBackups);
     els.content.querySelectorAll("[data-edit-setting]").forEach((button) => {
       button.addEventListener("click", () => openSettingModal(state.settings.find((item) => item.setting_id === button.dataset.editSetting)));
     });
@@ -2172,6 +2182,67 @@ const state = {
     els.content.querySelectorAll("[data-delete-setting]").forEach((button) => {
       button.addEventListener("click", () => handleDeleteSetting(button.dataset.deleteSetting));
     });
+  }
+
+  async function handleCreateBackup(event) {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.classList.add("is-loading");
+    try {
+      await callServer("createBackup");
+      showToast("Đã tạo backup", "Dữ liệu Sheet và thư mục ảnh đã được sao lưu.");
+      await handleLoadBackups();
+    } catch (error) {
+      showMessageModal("Không thể tạo backup", error.message);
+    } finally {
+      button.disabled = false;
+      button.classList.remove("is-loading");
+    }
+  }
+
+  async function handleLoadBackups(event) {
+    const button = event?.currentTarget || els.content.querySelector("#loadBackupsButton");
+    const container = els.content.querySelector("#backupList");
+    if (!container) return;
+    if (button) button.disabled = true;
+    container.innerHTML = "<p>Đang tải danh sách backup...</p>";
+    try {
+      const result = await callServer("listBackups");
+      container.innerHTML = result.backups?.length ? `<div class="backup-list">${result.backups.map((backup) => `
+        <div class="backup-row">
+          <div><strong>${escapeHtml(backup.name)}</strong><small>${escapeHtml(new Date(backup.created_at).toLocaleString("vi-VN"))}</small></div>
+          <button class="danger-button" type="button" data-restore-backup="${escapeHtml(backup.folder_id)}" data-backup-name="${escapeHtml(backup.name)}">Khôi phục</button>
+        </div>`).join("")}</div>` : "<p>Chưa có bản backup hợp lệ.</p>";
+      container.querySelectorAll("[data-restore-backup]").forEach((restoreButton) => {
+        restoreButton.addEventListener("click", () => handleRestoreBackup(restoreButton));
+      });
+    } catch (error) {
+      container.innerHTML = `<p class="backup-error">${escapeHtml(error.message)}</p>`;
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function handleRestoreBackup(button) {
+    const backupName = button.dataset.backupName;
+    const confirmed = await showConfirmModal(
+      "KHÔI PHỤC DỮ LIỆU",
+      `Hệ thống sẽ tạo một bản backup an toàn rồi khôi phục dữ liệu nghiệp vụ từ ${backupName}. Tài khoản, nhật ký kiểm toán và ảnh Drive hiện tại không bị thay đổi. Tiếp tục?`,
+      "Khôi phục",
+    );
+    if (!confirmed) return;
+    button.disabled = true;
+    button.classList.add("is-loading");
+    try {
+      const result = await callServer("restoreBackup", button.dataset.restoreBackup);
+      showToast("Khôi phục thành công", `${result.restored_sheets || 0} sheet đã được phục hồi.`);
+      await loadAppData();
+      renderSettingsView();
+    } catch (error) {
+      showMessageModal("Không thể khôi phục", error.message);
+      button.disabled = false;
+      button.classList.remove("is-loading");
+    }
   }
 
   async function handleHealthCheck(event) {

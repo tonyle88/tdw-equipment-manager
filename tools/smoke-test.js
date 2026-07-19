@@ -126,7 +126,13 @@ async function run() {
   assert.ok(appsScript.includes("function revokeUserSessions_"));
   assert.ok(appsScript.includes("function logoutAllSessions(token)"));
   assert.ok(appsScript.includes("function migrateSchema()"));
-  assert.ok(appsScript.includes("function backupSystemData()"));
+  assert.ok(appsScript.includes("function backupSystemData(options)"));
+  assert.ok(appsScript.includes("function createBackup(token)"));
+  assert.ok(appsScript.includes("function listBackups(token)"));
+  assert.ok(appsScript.includes("function restoreBackup(folderId, token)"));
+  assert.ok(appsScript.includes("const safetyBackup = backupSystemData({ includeMedia: false })"));
+  assert.ok(appsScript.includes("const protectedSheets = [SHEET_NAMES.users, SHEET_NAMES.auditLogs]"));
+  assert.ok(app.includes('callServer("restoreBackup"'));
   assert.ok(appsScript.includes("function installDailyBackupTrigger()"));
   assert.ok(appsScript.includes('const LICENSE_SECRET_MARKER = "SCRIPT_PROPERTY_V1"'));
   assert.ok(!appsScript.includes('return "ENC:"'));
@@ -269,6 +275,22 @@ async function run() {
   assert.deepEqual(JSON.parse(allowed.requestToAppsScript.options.body), {
     action: "healthCheck",
     args: ["session-token"],
+    proxy_secret: "proxy-secret",
+  });
+
+  const backupList = await invokeProxy({ fn: "listBackups", args: [] }, { cookie: "tdw_session=session-token" });
+  assert.equal(backupList.res.statusCode, 200);
+  assert.deepEqual(JSON.parse(backupList.requestToAppsScript.options.body), {
+    action: "listBackups",
+    args: ["session-token"],
+    proxy_secret: "proxy-secret",
+  });
+
+  const restore = await invokeProxy({ fn: "restoreBackup", args: ["backup-folder-id"] }, { cookie: "tdw_session=session-token" });
+  assert.equal(restore.res.statusCode, 200);
+  assert.deepEqual(JSON.parse(restore.requestToAppsScript.options.body), {
+    action: "restoreBackup",
+    args: ["backup-folder-id", "session-token"],
     proxy_secret: "proxy-secret",
   });
 

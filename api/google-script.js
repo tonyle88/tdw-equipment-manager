@@ -2,6 +2,9 @@ const ALLOWED_FUNCTIONS = new Set([
   "getAppData",
   "getSoftwareLicenseKey",
   "healthCheck",
+  "createBackup",
+  "listBackups",
+  "restoreBackup",
   "loginUser",
   "logoutUser",
   "logoutAllSessions",
@@ -36,7 +39,8 @@ const MAX_REQUEST_BYTES = 3500000;
 const SESSION_COOKIE = "tdw_session";
 const SESSION_MAX_AGE = 21600;
 const USER_ARG_COUNTS = {
-  getAppData: 0, getSoftwareLicenseKey: 1, healthCheck: 0, loginUser: 1, logoutUser: 0, logoutAllSessions: 0,
+  getAppData: 0, getSoftwareLicenseKey: 1, healthCheck: 0, createBackup: 0, listBackups: 0, restoreBackup: 1,
+  loginUser: 1, logoutUser: 0, logoutAllSessions: 0,
   saveAsset: 1, deleteAsset: 1, saveSetting: 1, deleteSetting: 1, listUsers: 0,
   saveUser: 1, deleteUser: 1, resetUserPassword: 2, changeOwnPassword: 1,
   saveMaintenanceLog: 1, saveMaintenancePlan: 1, saveMaintenancePlans: 1,
@@ -83,7 +87,8 @@ async function callGoogleScript(fn, args = []) {
   if (!SCRIPT_PROXY_SECRET) throw new Error("Thiếu biến môi trường APPS_SCRIPT_PROXY_SECRET trên Vercel.");
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  const timeoutMs = fn === "createBackup" || fn === "restoreBackup" ? 120000 : 25000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   let response;
   try {
     response = await fetch(SCRIPT_URL, {
