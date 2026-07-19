@@ -1354,6 +1354,74 @@
     .insight-card .bar-row strong { font-size: 11px; text-align: right; }
     .shell[data-active-view="overview"] .toolbar,
     .shell[data-active-view="overview"] .content { display: none; }
+    .view-only-panel,
+    .users-panel,
+    .list-panel { min-width: 0; padding: 14px; border-radius: 14px; overflow: hidden; }
+    .panel-head {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .panel-head h2 { font-size: 18px; line-height: 1.2; overflow-wrap: anywhere; }
+    .panel-head > span { font-size: 11px; }
+    .panel-head .primary-button { width: 100%; min-height: 40px; padding: 0 12px; }
+    .module-card { min-width: 0; padding: 14px; border-radius: 12px; overflow: hidden; }
+    .module-card h2 { font-size: 19px; line-height: 1.2; }
+    .module-card h3 { font-size: 17px; line-height: 1.25; }
+    .module-card p { font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+    .table-wrap,
+    .maintenance-history-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
+
+    .users-panel { gap: 12px; }
+    .users-list { gap: 8px; }
+    .user-row {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px 10px;
+      padding: 12px;
+      border-radius: 12px;
+    }
+    .user-row > div:first-child { min-width: 0; }
+    .user-row strong { font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; }
+    .user-row small { font-size: 10px; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
+    .role-pill { justify-self: end; min-width: 72px; padding: 6px 9px; font-size: 10px; }
+    .user-status { grid-column: 1 / -1; font-size: 11px; }
+    .user-row-actions {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .user-row-actions .secondary-button,
+    .user-row-actions .danger-button { width: 100%; min-width: 0; min-height: 34px; padding: 0 7px; font-size: 10px; }
+    .user-row-actions .danger-button:last-child { grid-column: 1 / -1; }
+
+    .settings-title-row { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 14px 0; }
+    .settings-title-row h2 { font-size: 23px; line-height: 1; white-space: nowrap; }
+    .settings-header-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+    .settings-header-actions button { min-width: 0; min-height: 38px; padding: 0 8px; font-size: 10px; }
+    .settings-layout { grid-template-columns: 1fr; gap: 12px; padding: 14px; }
+    .backup-management-head { gap: 10px; }
+    .backup-management-head h3 { font-size: 18px; }
+    .backup-management-head .secondary-button,
+    #loadBackupsButton { width: 100%; min-height: 38px; }
+    .backup-health { gap: 6px; margin: 12px 0; padding: 11px; }
+    .backup-health strong,
+    .backup-health span { font-size: 11px; line-height: 1.35; }
+    .backup-list { margin: 12px 0; }
+    .backup-row { gap: 9px; padding: 10px 0; }
+    .backup-row > div:first-child { min-width: 0; }
+    .backup-row strong { display: block; font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+    .backup-row small { font-size: 10px; }
+    .backup-row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+    .backup-row-actions button { width: 100%; min-width: 0; padding: 0 6px; font-size: 10px; }
+    .settings-groups-grid { grid-template-columns: 1fr; gap: 10px; }
+    .setting-group { min-width: 0; padding: 12px; }
+    .setting-row { grid-template-columns: minmax(0, 1fr); gap: 8px; align-items: stretch; }
+    .setting-row > div:first-child { min-width: 0; }
+    .setting-actions { justify-content: flex-start; flex-wrap: wrap; white-space: normal; }
+
     .detail .detail-grid { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
     .form-grid .span-2 { grid-column: auto; }
@@ -1362,9 +1430,28 @@
     .report-group-filter { width: 100%; }
     .report-group-filter select { flex: 1; width: auto; }
     .report-actions--toolbar .secondary-button { flex: 1 1 calc(50% - 4px); }
-    .report-export-zones { grid-template-columns: 1fr; margin: 0 0 16px; }
-    .report-export-zone .report-actions { align-items: stretch; }
-    .report-export-zone .secondary-button { flex: 1 1 calc(50% - 5px); }
+    .report-title-row h2 { font-size: 23px; line-height: 1; }
+    .report-export-zones { grid-template-columns: 1fr; gap: 8px; margin: 0 0 12px; }
+    .report-export-zone { padding: 11px; }
+    .report-export-zone .report-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 7px; }
+    .report-export-zone .secondary-button { width: 100%; min-width: 0; min-height: 36px; padding: 0 7px; font-size: 10px; white-space: normal; line-height: 1.2; }
+    .report-export-zone .report-group-filter { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0, 1fr); }
+    .report-export-zone #reportGroupSelect,
+    .report-export-zone #maintenanceReportYear,
+    .report-export-zone #maintenanceReportMonth { width: 100%; min-width: 0; }
+    .report-dashboard,
+    .report-grid { grid-template-columns: 1fr; gap: 10px; padding: 12px 0 0; }
+    .report-main-card,
+    .report-pie-card,
+    .report-list-card { min-height: 0; }
+    .report-dashboard .bar-row { grid-template-columns: 1fr; gap: 5px; }
+    .report-dashboard .bar-row strong { text-align: left; }
+    .report-dashboard .pie-wrap { grid-template-columns: 1fr; justify-items: center; gap: 14px; }
+    .report-dashboard .pie-chart { width: 170px; height: 170px; }
+    .report-dashboard .pie-center { width: 96px; height: 96px; }
+    .report-item { gap: 8px; padding: 10px; }
+    .report-item-main span { font-size: 11px; overflow-wrap: anywhere; }
+    .report-item-stat { gap: 5px; }
     .qr-label-options { grid-template-columns: 1fr; }
     .qr-label-selection-count { flex-basis: 100%; }
     .asset-profile-backdrop { padding: 0; }
