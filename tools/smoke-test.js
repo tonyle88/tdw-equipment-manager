@@ -138,6 +138,7 @@ async function run() {
   assert.ok(!app.includes("setAuthToken("));
   assert.ok(app.includes('credentials: "same-origin"'));
   const chartRenderer = app.match(/function colorClassForLabel[\s\S]*?function renderReportCard/)?.[0] || "";
+  assert.ok(chartRenderer.includes("function colorForLabel"));
   assert.ok(chartRenderer.includes('class="pie-segment ${colorClassForLabel(label, index)}"'));
   assert.ok(chartRenderer.includes('class="bar-fill ${colorClassForLabel(label, index)}"'));
   assert.ok(!chartRenderer.includes('style="'));

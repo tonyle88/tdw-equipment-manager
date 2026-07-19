@@ -3008,6 +3008,13 @@ const state = {
     return `chart-color-${colorIndex}`;
   }
 
+  function colorForLabel(label, index) {
+    const colors = ["#38bdf8", "#22c55e", "#f59e0b", "#ef4444", "#a78bfa", "#14b8a6", "#f97316", "#e879f9"];
+    const colorClass = colorClassForLabel(label, index);
+    const colorIndex = Number(colorClass.replace("chart-color-", ""));
+    return colors[colorIndex] || colors[0];
+  }
+
   function renderBarChart(data) {
     const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
     const max = Math.max(1, ...entries.map(([, count]) => count));
