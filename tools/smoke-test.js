@@ -116,6 +116,11 @@ async function run() {
   assert.ok(!app.includes("state.authToken"));
   assert.ok(!app.includes("setAuthToken("));
   assert.ok(app.includes('credentials: "same-origin"'));
+  const chartRenderer = app.match(/function colorClassForLabel[\s\S]*?function renderReportCard/)?.[0] || "";
+  assert.ok(chartRenderer.includes('class="pie-segment ${colorClassForLabel(label, index)}"'));
+  assert.ok(chartRenderer.includes('class="bar-fill ${colorClassForLabel(label, index)}"'));
+  assert.ok(!chartRenderer.includes('style="'));
+  assert.ok(styles.includes(".chart-color-7"));
   assert.ok(!appsScript.includes("HtmlService.createTemplateFromFile"));
   assert.ok(!appsScript.includes("function getAssets()"));
   assert.ok(!appsScript.includes("function getSettings()"));

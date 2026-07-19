@@ -783,16 +783,15 @@
   .bar-row { display: grid; grid-template-columns: 220px minmax(160px, 1fr) 42px; gap: 12px; }
   .bar-label { color: rgba(255,255,255,.82); font-weight: 800; }
   .bar-track {
+    display: block;
+    width: 100%;
     height: 14px;
     border-radius: 999px;
-    background: rgba(255,255,255,.12);
-    background: color-mix(in srgb, var(--bar-color, #38bdf8) 20%, rgba(255,255,255,.12));
     overflow: hidden;
   }
+  .bar-track-bg { fill: rgba(255,255,255,.14); }
   .bar-fill {
-    height: 100%;
-    border-radius: 999px;
-    box-shadow: 0 0 18px color-mix(in srgb, var(--bar-color, #38bdf8) 58%, transparent);
+    transition: width .25s ease;
   }
   .pie-wrap {
     display: grid;
@@ -801,14 +800,21 @@
     gap: 24px;
   }
   .pie-chart {
+    position: relative;
     display: grid;
     place-items: center;
     width: 240px;
     height: 240px;
     border-radius: 50%;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.1), 0 18px 38px rgba(0,0,0,.18);
+    box-shadow: 0 18px 38px rgba(0,0,0,.18);
   }
+  .pie-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .pie-track, .pie-segment { fill: none; stroke-width: 16; }
+  .pie-track { stroke: rgba(255,255,255,.1); }
+  .pie-segment { stroke-linecap: butt; }
   .pie-center {
+    position: relative;
+    z-index: 1;
     display: grid;
     place-items: center;
     width: 138px;
@@ -833,6 +839,14 @@
     border-radius: 999px;
     flex: 0 0 auto;
   }
+  .chart-color-0 { background-color: #38bdf8; fill: #38bdf8; stroke: #38bdf8; }
+  .chart-color-1 { background-color: #22c55e; fill: #22c55e; stroke: #22c55e; }
+  .chart-color-2 { background-color: #f59e0b; fill: #f59e0b; stroke: #f59e0b; }
+  .chart-color-3 { background-color: #ef4444; fill: #ef4444; stroke: #ef4444; }
+  .chart-color-4 { background-color: #a78bfa; fill: #a78bfa; stroke: #a78bfa; }
+  .chart-color-5 { background-color: #14b8a6; fill: #14b8a6; stroke: #14b8a6; }
+  .chart-color-6 { background-color: #f97316; fill: #f97316; stroke: #f97316; }
+  .chart-color-7 { background-color: #e879f9; fill: #e879f9; stroke: #e879f9; }
   .legend-row span { flex: 1; }
   .report-list { display: grid; gap: 10px; }
   .report-item {

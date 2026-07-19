@@ -2953,20 +2953,19 @@ const state = {
     }, {});
   }
 
-  function palette(index) {
-    return ["#38bdf8", "#22c55e", "#f59e0b", "#ef4444", "#a78bfa", "#14b8a6", "#f97316", "#e879f9"][index % 8];
-  }
-
-  function colorForLabel(label, index) {
-    const statusColors = {
-      "Còn sử dụng": "#38bdf8",
-      "Kém phẩm chất": "#22c55e",
-      "Không sử dụng": "#f59e0b",
-      "Mới 100%": "#ef4444",
-      "Lưu kho/thanh lý": "#a78bfa",
-      "Cần kiểm tra": "#f97316",
+  function colorClassForLabel(label, index) {
+    const statusColorIndexes = {
+      "Còn sử dụng": 0,
+      "Kém phẩm chất": 1,
+      "Không sử dụng": 2,
+      "Mới 100%": 3,
+      "Lưu kho/thanh lý": 4,
+      "Cần kiểm tra": 6,
     };
-    return statusColors[label] || palette(index);
+    const colorIndex = Object.prototype.hasOwnProperty.call(statusColorIndexes, label)
+      ? statusColorIndexes[label]
+      : index % 8;
+    return `chart-color-${colorIndex}`;
   }
 
   function renderBarChart(data) {
@@ -2975,9 +2974,10 @@ const state = {
     return `<div class="bar-chart">${entries.map(([label, count], index) => `
       <div class="bar-row">
         <div class="bar-label">${escapeHtml(label)}</div>
-        <div class="bar-track" style="--bar-color:${colorForLabel(label, index)};">
-          <div class="bar-fill" style="width:${Math.max(8, (count / max) * 100)}%; background:${colorForLabel(label, index)};"></div>
-        </div>
+        <svg class="bar-track" viewBox="0 0 100 14" preserveAspectRatio="none" aria-hidden="true">
+          <rect class="bar-track-bg" width="100" height="14" rx="7"></rect>
+          <rect class="bar-fill ${colorClassForLabel(label, index)}" width="${Math.max(8, (count / max) * 100)}" height="14" rx="7"></rect>
+        </svg>
         <strong>${count}</strong>
       </div>
     `).join("")}</div>`;
@@ -2987,22 +2987,23 @@ const state = {
     const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
     const total = entries.reduce((sum, [, count]) => sum + count, 0) || 1;
     let cursor = 0;
-    const stops = entries.map(([label, count], index) => {
-      const start = cursor;
+    const segments = entries.map(([label, count], index) => {
       const size = (count / total) * 100;
+      const segment = `<circle class="pie-segment ${colorClassForLabel(label, index)}" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="${size} ${100 - size}" stroke-dashoffset="${-cursor}"></circle>`;
       cursor += size;
-      return `${colorForLabel(label, index)} ${start}% ${cursor}%`;
-    }).join(", ");
+      return segment;
+    }).join("");
     const top = entries[0] || ["Chưa có dữ liệu", 0];
     return `
       <div class="pie-wrap">
-        <div class="pie-chart" style="background: conic-gradient(${stops});">
+        <div class="pie-chart">
+          <svg class="pie-svg" viewBox="0 0 100 100" aria-hidden="true"><circle class="pie-track" cx="50" cy="50" r="42"></circle>${segments}</svg>
           <div class="pie-center"><strong>${Math.round((top[1] / total) * 100)}%</strong><span>${escapeHtml(top[0])}</span></div>
         </div>
         <div class="pie-legend">
           ${entries.map(([label, count], index) => `
             <div class="legend-row">
-              <i style="background:${colorForLabel(label, index)}"></i>
+              <i class="${colorClassForLabel(label, index)}"></i>
               <span>${escapeHtml(label)}</span>
               <strong>${Math.round((count / total) * 100)}%</strong>
             </div>
@@ -3022,7 +3023,7 @@ const state = {
           ${entries.map(([label, count], index) => `
             <div class="report-item">
               <div class="report-item-main">
-                <i style="background:${colorForLabel(label, index)}"></i>
+                <i class="${colorClassForLabel(label, index)}"></i>
                 <span>${escapeHtml(label)}</span>
               </div>
               <div class="report-item-stat">
