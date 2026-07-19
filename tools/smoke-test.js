@@ -151,6 +151,8 @@ async function run() {
   assert.ok(appsScript.includes('"auth_provider"'));
   assert.ok(appsScript.includes('"supabase_user_id"'));
   assert.ok(appsScript.includes("function loginSupabaseUser(email)"));
+  const supabaseLoginFunction = appsScript.match(/function loginSupabaseUser\(email\)[\s\S]*?\n}/)?.[0] || "";
+  assert.ok(!supabaseLoginFunction.includes("ensureUsersReady_()"));
   assert.ok(appsScript.includes("function markSupabaseMigration(email, supabaseUserId, token)"));
   assert.ok(appsScript.includes("function getCurrentAuthLink(token)"));
   assert.ok(appsScript.includes("function getUserAuthLink(userId, token)"));
@@ -224,6 +226,12 @@ async function run() {
   assert.ok(index.includes('name="primary_responsible_id"'));
   assert.ok(index.includes('name="email" type="email"'));
   assert.ok(index.includes('id="loginUsername" type="email"'));
+  assert.ok(index.includes('class="user-menu"'));
+  assert.ok(index.includes('assets/tdw-icons.svg#logout'));
+  assert.ok(index.includes('assets/tdw-icons.svg#logout-all'));
+  assert.ok(styles.includes(".tdw-icon"));
+  assert.ok(styles.includes(".user-menu-popover"));
+  assert.ok(app.includes('document.querySelector(".user-menu[open]")'));
   assert.ok(app.includes('function setUserPermissionCodes(rawPermissions, role)'));
   assert.ok(app.includes("function canAccessView(view)"));
   assert.ok(app.includes("async function exportTabularExcel(kind, filters = {})"));

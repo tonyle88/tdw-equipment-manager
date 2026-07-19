@@ -1589,7 +1589,6 @@ function loginUser(credentials) {
 
 function loginSupabaseUser(email) {
   try {
-    ensureUsersReady_();
     const normalizedEmail = normalizeEmail_(email);
     const user = findUserByEmail_(normalizedEmail);
     if (!user || String(user.active || "TRUE").toUpperCase() === "FALSE") throw new Error("Tài khoản không tồn tại hoặc đã bị khóa");

@@ -91,7 +91,9 @@ async function callGoogleScript(fn, args = []) {
   if (!SCRIPT_PROXY_SECRET) throw new Error("Thiếu biến môi trường APPS_SCRIPT_PROXY_SECRET trên Vercel.");
 
   const controller = new AbortController();
-  const timeoutMs = fn === "createBackup" || fn === "restoreBackup" ? 120000 : 25000;
+  const timeoutMs = fn === "createBackup" || fn === "restoreBackup"
+    ? 120000
+    : ["loginUser", "loginSupabaseUser", "markSupabaseMigration"].includes(fn) ? 60000 : 25000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   let response;
   try {

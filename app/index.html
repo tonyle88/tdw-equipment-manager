@@ -93,9 +93,23 @@
           <a href="#" data-view="users" data-admin-only>Người dùng</a>
         </nav>
         <div class="top-actions">
-          <span class="user-chip" id="currentUserChip"></span>
-          <button class="icon-button" id="logoutAllButton" type="button" aria-label="Đăng xuất mọi thiết bị" title="Đăng xuất mọi thiết bị">⎋×</button>
-          <button class="icon-button" id="logoutButton" type="button" aria-label="Đăng xuất">⎋</button>
+          <details class="user-menu">
+            <summary class="user-menu-trigger" aria-label="Mở menu tài khoản">
+              <svg class="tdw-icon user-menu-avatar" aria-hidden="true"><use href="assets/tdw-icons.svg#user"></use></svg>
+              <span class="user-chip" id="currentUserChip"></span>
+              <svg class="tdw-icon user-menu-chevron" aria-hidden="true"><use href="assets/tdw-icons.svg#chevron-down"></use></svg>
+            </summary>
+            <div class="user-menu-popover">
+              <button class="user-menu-action" id="logoutButton" type="button">
+                <svg class="tdw-icon" aria-hidden="true"><use href="assets/tdw-icons.svg#logout"></use></svg>
+                <span><strong>Đăng xuất</strong><small>Thoát phiên trên thiết bị này</small></span>
+              </button>
+              <button class="user-menu-action user-menu-action-danger" id="logoutAllButton" type="button">
+                <svg class="tdw-icon" aria-hidden="true"><use href="assets/tdw-icons.svg#logout-all"></use></svg>
+                <span><strong>Đăng xuất mọi thiết bị</strong><small>Thu hồi tất cả phiên đang mở</small></span>
+              </button>
+            </div>
+          </details>
         </div>
       </header>
 

@@ -607,6 +607,7 @@ const state = {
   }
 
   async function handleLogout() {
+    els.logoutButton?.closest("details")?.removeAttribute("open");
     try {
       await callServer("logoutUser");
     } catch (error) {
@@ -621,6 +622,7 @@ const state = {
   }
 
   async function handleLogoutAll() {
+    els.logoutAllButton?.closest("details")?.removeAttribute("open");
     if (!await showConfirmModal("ĐĂNG XUẤT MỌI THIẾT BỊ", "Tất cả phiên đăng nhập của tài khoản này sẽ bị thu hồi. Tiếp tục?", "Đăng xuất tất cả")) return;
     try {
       await callServer("logoutAllSessions");
@@ -3495,6 +3497,10 @@ const state = {
     });
     els.logoutButton?.addEventListener("click", handleLogout);
     els.logoutAllButton?.addEventListener("click", handleLogoutAll);
+    document.addEventListener("click", (event) => {
+      const menu = document.querySelector(".user-menu[open]");
+      if (menu && !menu.contains(event.target)) menu.removeAttribute("open");
+    });
     [els.search, els.group, els.year, els.department, els.status]
       .filter(Boolean)
       .forEach((el) => el.addEventListener("input", () => applyFilters({ resetPage: true })));
