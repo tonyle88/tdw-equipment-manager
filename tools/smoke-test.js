@@ -229,6 +229,10 @@ async function run() {
   assert.ok(index.includes('class="user-menu"'));
   assert.ok(index.includes('assets/tdw-icons.svg#logout'));
   assert.ok(index.includes('assets/tdw-icons.svg#logout-all'));
+  assert.ok(index.includes('assets/tdw-icons.svg#overview'));
+  assert.ok(index.includes('assets/tdw-icons.svg#software'));
+  assert.ok(index.includes('assets/tdw-icons.svg#department'));
+  assert.ok(index.includes('assets/tdw-icons.svg#users'));
   assert.ok(styles.includes(".tdw-icon"));
   assert.ok(styles.includes(".user-menu-popover"));
   assert.ok(app.includes('document.querySelector(".user-menu[open]")'));
