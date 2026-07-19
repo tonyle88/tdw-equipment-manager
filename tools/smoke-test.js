@@ -35,11 +35,26 @@ async function invokeProxy(body, options = {}) {
   const originalFetch = global.fetch;
   const originalUrl = process.env.GOOGLE_SCRIPT_URL;
   const originalSecret = process.env.APPS_SCRIPT_PROXY_SECRET;
+  const originalSupabaseUrl = process.env.SUPABASE_URL;
+  const originalSupabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  const originalSupabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   let requestToAppsScript = null;
+  const requests = [];
   process.env.GOOGLE_SCRIPT_URL = "https://example.test/apps-script";
   process.env.APPS_SCRIPT_PROXY_SECRET = "proxy-secret";
+  if (options.supabase) {
+    process.env.SUPABASE_URL = "https://supabase.example.test";
+    process.env.SUPABASE_ANON_KEY = "anon-key";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+  } else {
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_ANON_KEY;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  }
   delete require.cache[require.resolve(proxyPath)];
   global.fetch = async (url, fetchOptions) => {
+    requests.push({ url, options: fetchOptions });
+    if (options.fetchHandler) return options.fetchHandler(url, fetchOptions, requests);
     requestToAppsScript = { url, options: fetchOptions };
     return {
       ok: true,
@@ -55,13 +70,19 @@ async function invokeProxy(body, options = {}) {
     req.headers = options.cookie ? { cookie: options.cookie } : {};
     const res = createResponse();
     await handler(req, res);
-    return { res, requestToAppsScript };
+    return { res, requestToAppsScript, requests };
   } finally {
     global.fetch = originalFetch;
     if (originalUrl === undefined) delete process.env.GOOGLE_SCRIPT_URL;
     else process.env.GOOGLE_SCRIPT_URL = originalUrl;
     if (originalSecret === undefined) delete process.env.APPS_SCRIPT_PROXY_SECRET;
     else process.env.APPS_SCRIPT_PROXY_SECRET = originalSecret;
+    if (originalSupabaseUrl === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = originalSupabaseUrl;
+    if (originalSupabaseAnonKey === undefined) delete process.env.SUPABASE_ANON_KEY;
+    else process.env.SUPABASE_ANON_KEY = originalSupabaseAnonKey;
+    if (originalSupabaseServiceKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = originalSupabaseServiceKey;
     delete require.cache[require.resolve(proxyPath)];
   }
 }
@@ -127,6 +148,13 @@ async function run() {
   assert.ok(!appsScript.includes("event.parameter.token"));
   assert.ok(appsScript.includes('"password_hash_version"'));
   assert.ok(appsScript.includes('"session_version"'));
+  assert.ok(appsScript.includes('"auth_provider"'));
+  assert.ok(appsScript.includes('"supabase_user_id"'));
+  assert.ok(appsScript.includes("function loginSupabaseUser(email)"));
+  assert.ok(appsScript.includes("function markSupabaseMigration(email, supabaseUserId, token)"));
+  assert.ok(appsScript.includes("function getCurrentAuthLink(token)"));
+  assert.ok(appsScript.includes("function getUserAuthLink(userId, token)"));
+  assert.ok(appsScript.includes("function authLinkFor_(user)"));
   assert.ok(appsScript.includes("function issueSession_"));
   assert.ok(appsScript.includes("function revokeUserSessions_"));
   assert.ok(appsScript.includes("function logoutAllSessions(token)"));
@@ -166,6 +194,7 @@ async function run() {
   assert.equal(vm.runInContext('normalizeUser_({ user_id: "user-id", username: "user", role: "user", password_salt: "salt", password_hash: "hash" }).password_hash', permissions), "hash");
   assert.equal(vm.runInContext('normalizeUser_({ user_id: "user-id", username: "user", role: "user", password_salt: "salt", password_hash: "hash" }).password_hash_version', permissions), "v1");
   assert.equal(vm.runInContext('normalizeUser_({ user_id: "user-id", username: "user", role: "user", password_salt: "salt", password_hash: "hash" }).session_version', permissions), 1);
+  assert.equal(vm.runInContext('normalizeUser_({ user_id: "user-id", username: "user", role: "user", password_salt: "salt", password_hash: "hash" }).auth_provider', permissions), "LEGACY");
   assert.equal(vm.runInContext('constantTimeEqual_("same", "same")', permissions), true);
   assert.equal(vm.runInContext('constantTimeEqual_("same", "diff")', permissions), false);
   assert.equal(vm.runInContext('normalizeUser_({ user_id: "user-id", username: "user", email: "TDW@Example.com", role: "user", password_salt: "salt", password_hash: "hash" }).email', permissions), "tdw@example.com");
@@ -194,6 +223,7 @@ async function run() {
   assert.ok(index.includes('name="permission_code" value="movement.view"'));
   assert.ok(index.includes('name="primary_responsible_id"'));
   assert.ok(index.includes('name="email" type="email"'));
+  assert.ok(index.includes('id="loginUsername" type="email"'));
   assert.ok(app.includes('function setUserPermissionCodes(rawPermissions, role)'));
   assert.ok(app.includes("function canAccessView(view)"));
   assert.ok(app.includes("async function exportTabularExcel(kind, filters = {})"));
@@ -360,12 +390,99 @@ async function run() {
   assert.match(String(login.res.headers["Set-Cookie"]), /HttpOnly; Secure; SameSite=Strict/);
   assert.equal(JSON.parse(login.res.body).token, undefined);
 
+  const supabaseLogin = await invokeProxy(
+    { fn: "loginUser", args: [{ username: "admin@example.com", password: "secret" }] },
+    {
+      supabase: true,
+      fetchHandler: async (url, fetchOptions) => {
+        if (String(url).includes("/auth/v1/token")) {
+          return { ok: true, status: 200, json: async () => ({ user: { id: "supabase-user" } }) };
+        }
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ ok: true, token: "supabase-session", user: { username: "admin", email: "admin@example.com" } }),
+        };
+      },
+    },
+  );
+  assert.equal(supabaseLogin.res.statusCode, 200);
+  assert.match(String(supabaseLogin.res.headers["Set-Cookie"]), /^tdw_session=supabase-session;/);
+  assert.equal(supabaseLogin.requests.length, 2);
+  assert.deepEqual(JSON.parse(supabaseLogin.requests[1].options.body), {
+    action: "loginSupabaseUser",
+    args: ["admin@example.com"],
+    proxy_secret: "proxy-secret",
+  });
+
+  let legacyMigrationStep = 0;
+  const legacyMigration = await invokeProxy(
+    { fn: "loginUser", args: [{ username: "legacy@example.com", password: "old-secret" }] },
+    {
+      supabase: true,
+      fetchHandler: async (url, fetchOptions) => {
+        legacyMigrationStep += 1;
+        if (legacyMigrationStep === 1) {
+          return { ok: false, status: 400, json: async () => ({ error_description: "Invalid login" }) };
+        }
+        if (legacyMigrationStep === 2) {
+          return {
+            ok: true,
+            status: 200,
+            text: async () => JSON.stringify({ ok: true, token: "legacy-session", user: { username: "legacy", email: "legacy@example.com" } }),
+          };
+        }
+        if (legacyMigrationStep === 3) {
+          return { ok: false, status: 400, json: async () => ({ error_description: "Invalid login" }) };
+        }
+        if (legacyMigrationStep === 4) {
+          return { ok: true, status: 200, json: async () => ({ id: "migrated-user" }) };
+        }
+        if (legacyMigrationStep === 5) {
+          return { ok: true, status: 200, json: async () => ({ user: { id: "migrated-user" } }) };
+        }
+        return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true }) };
+      },
+    },
+  );
+  assert.equal(legacyMigration.res.statusCode, 200);
+  assert.match(String(legacyMigration.res.headers["Set-Cookie"]), /^tdw_session=legacy-session;/);
+  assert.equal(legacyMigrationStep, 6);
+  assert.deepEqual(JSON.parse(legacyMigration.requests[5].options.body), {
+    action: "markSupabaseMigration",
+    args: ["legacy@example.com", "migrated-user", "legacy-session"],
+    proxy_secret: "proxy-secret",
+  });
+
   const changedPassword = await invokeProxy(
     { fn: "changeOwnPassword", args: ["new-password"] },
     { cookie: "tdw_session=old-session", upstreamPayload: { ok: true, token: "rotated-session", user: { username: "admin" } } },
   );
   assert.equal(changedPassword.res.statusCode, 200);
   assert.match(String(changedPassword.res.headers["Set-Cookie"]), /^tdw_session=rotated-session;/);
+
+  const supabasePasswordChange = await invokeProxy(
+    { fn: "changeOwnPassword", args: ["new-supabase-password"] },
+    {
+      cookie: "tdw_session=current-session",
+      supabase: true,
+      fetchHandler: async (url, fetchOptions) => {
+        if (String(url).includes("/auth/v1/admin/users/")) {
+          assert.equal(fetchOptions.method, "PUT");
+          assert.deepEqual(JSON.parse(fetchOptions.body), { password: "new-supabase-password" });
+          return { ok: true, status: 200, json: async () => ({ id: "supabase-user" }) };
+        }
+        const request = JSON.parse(fetchOptions.body);
+        if (request.action === "getCurrentAuthLink") {
+          return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, auth: { auth_provider: "SUPABASE", supabase_user_id: "supabase-user" } }) };
+        }
+        return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, token: "new-app-session", user: { username: "admin" } }) };
+      },
+    },
+  );
+  assert.equal(supabasePasswordChange.res.statusCode, 200);
+  assert.equal(supabasePasswordChange.requests.length, 3);
+  assert.match(String(supabasePasswordChange.res.headers["Set-Cookie"]), /^tdw_session=new-app-session;/);
 
   const logout = await invokeProxy({ fn: "logoutUser", args: [] }, { cookie: "tdw_session=session-token" });
   assert.equal(logout.res.statusCode, 200);

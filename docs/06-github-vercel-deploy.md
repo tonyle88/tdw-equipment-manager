@@ -72,11 +72,18 @@ Thêm:
 ```text
 GOOGLE_SCRIPT_URL=https://script.google.com/macros/s/.../exec
 APPS_SCRIPT_PROXY_SECRET=<dung-chinh-xac-gia-tri-TDW_API_PROXY_SECRET>
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_ANON_KEY=<Supabase anon key>
+SUPABASE_SERVICE_ROLE_KEY=<Supabase service role key>
 ```
 
 Chọn môi trường `Production and Preview`, lưu lại rồi `Redeploy`.
 
-Nếu thiếu một trong hai biến, app Vercel sẽ từ chối gọi backend.
+Nếu thiếu `GOOGLE_SCRIPT_URL` hoặc `APPS_SCRIPT_PROXY_SECRET`, app Vercel sẽ từ chối gọi Apps Script. Ba biến Supabase phải được cấu hình cùng nhau trước khi bắt đầu chuyển đổi tài khoản.
+
+`SUPABASE_SERVICE_ROLE_KEY` chỉ được đặt trong Environment Variables của Vercel. Không đưa khóa này vào `app/`, GitHub, ảnh chụp hoặc tin nhắn. Trước khi bật giao diện đăng nhập email, bảo đảm mọi user đang hoạt động trong Sheet `Users` có email hợp lệ và không trùng nhau.
+
+Trong giai đoạn chuyển đổi, user giữ nguyên mật khẩu cũ. Lần đăng nhập email đầu tiên sẽ xác minh hash cũ, tạo Supabase Auth user và ghi `auth_provider`, `supabase_user_id`, `auth_migrated_at` vào Sheet. Chỉ khi Supabase xác minh lại thành công, tài khoản mới được đánh dấu đã chuyển đổi.
 
 Nên cấu hình URL/secret khác nhau cho `Preview` và `Production` để Preview dùng Apps Script + Google Sheet staging riêng.
 
@@ -95,8 +102,10 @@ Nên cấu hình URL/secret khác nhau cho `Preview` và `Production` để Prev
 4. Thêm thử một cấu hình hoặc thiết bị test, sau đó xóa nếu không cần.
 5. Kiểm tra lại dữ liệu trong Google Sheet.
 6. Trong Apps Script editor, chạy `migrateSchema()` một lần sau khi deploy backend mới.
-7. Chạy `backupSystemData()` và mở thư mục backup để xác nhận có bản sao Sheet + thư mục `media`.
-8. Sau khi kiểm tra backup thủ công, chạy `installDailyBackupTrigger()` để tạo lịch hàng ngày.
+7. Kiểm tra Sheet `Users` đã có các cột `auth_provider`, `supabase_user_id`, `auth_migrated_at`.
+8. Đăng nhập thử một user bằng email, xác nhận `auth_provider` chuyển thành `SUPABASE`, đăng xuất rồi đăng nhập lại.
+9. Chạy `backupSystemData()` và mở thư mục backup để xác nhận có bản sao Sheet + thư mục `media`.
+10. Sau khi kiểm tra backup thủ công, chạy `installDailyBackupTrigger()` để tạo lịch hàng ngày.
 
 Nếu frontend đã đổi nhưng Vercel chưa cập nhật, kiểm tra `Deployments` trong Vercel và hard refresh trình duyệt.
 

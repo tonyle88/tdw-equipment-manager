@@ -479,6 +479,18 @@ function doPost(event) {
     if (action === "loginUser") {
       return jsonResponse_(loginUser(args[0] || body.credentials || {}));
     }
+    if (action === "loginSupabaseUser") {
+      return jsonResponse_(loginSupabaseUser(args[0] || body.email || ""));
+    }
+    if (action === "markSupabaseMigration") {
+      return jsonResponse_(markSupabaseMigration(args[0] || body.email || "", args[1] || body.supabase_user_id || "", args[2] || body.token || ""));
+    }
+    if (action === "getCurrentAuthLink") {
+      return jsonResponse_(getCurrentAuthLink(args[0] || body.token || ""));
+    }
+    if (action === "getUserAuthLink") {
+      return jsonResponse_(getUserAuthLink(args[0] || body.user_id || "", args[1] || body.token || ""));
+    }
     if (action === "currentUser") {
       return jsonResponse_(currentUser(args[0] || body.token || ""));
     }
@@ -1557,8 +1569,9 @@ function loginUser(credentials) {
     enforceLoginThrottle_(username);
 
     ensureUsersReady_();
-    const user = findUserByUsername_(username);
+    const user = username.indexOf("@") !== -1 ? findUserByEmail_(username) : findUserByUsername_(username);
     if (!user || String(user.active || "TRUE").toUpperCase() === "FALSE") throwInvalidLogin_(username);
+    if (String(user.auth_provider || "").toUpperCase() === "SUPABASE") throw new Error("Tài khoản này sử dụng đăng nhập Supabase");
     if (!verifyPassword_(password, user)) throwInvalidLogin_(username);
 
     if (String(user.password_hash_version || "v1") !== PASSWORD_HASH_VERSION) setPassword_(user, password);
@@ -1572,6 +1585,64 @@ function loginUser(credentials) {
   } catch (error) {
     return { ok: false, error: error.message };
   }
+}
+
+function loginSupabaseUser(email) {
+  try {
+    ensureUsersReady_();
+    const normalizedEmail = normalizeEmail_(email);
+    const user = findUserByEmail_(normalizedEmail);
+    if (!user || String(user.active || "TRUE").toUpperCase() === "FALSE") throw new Error("Tài khoản không tồn tại hoặc đã bị khóa");
+    if (String(user.auth_provider || "").toUpperCase() !== "SUPABASE" || !user.supabase_user_id) throw new Error("Tài khoản chưa hoàn tất chuyển đổi đăng nhập");
+    user.last_login_at = new Date().toISOString();
+    upsertObject_(SHEET_NAMES.users, "user_id", user);
+    return { ok: true, token: issueSession_(user), user: publicUser_(user), updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function markSupabaseMigration(email, supabaseUserId, token) {
+  try {
+    const user = requireAuth_(token);
+    const normalizedEmail = normalizeEmail_(email);
+    if (!normalizedEmail || normalizedEmail !== String(user.email || "").trim().toLowerCase()) throw new Error("Email chuyển đổi không khớp tài khoản đăng nhập");
+    if (!supabaseUserId) throw new Error("Thiếu Supabase user ID");
+    user.auth_provider = "SUPABASE";
+    user.supabase_user_id = String(supabaseUserId);
+    user.auth_migrated_at = new Date().toISOString();
+    const saved = upsertObject_(SHEET_NAMES.users, "user_id", user);
+    logAudit_(user, "AUTH_MIGRATED_TO_SUPABASE", "user", saved.user_id, saved.username);
+    return { ok: true, user: publicUser_(saved), updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function getCurrentAuthLink(token) {
+  try {
+    return { ok: true, auth: authLinkFor_(requireAuth_(token)) };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function getUserAuthLink(userId, token) {
+  try {
+    requireAdmin_(token);
+    const user = findUserById_(userId);
+    if (!user) throw new Error("Không tìm thấy user");
+    return { ok: true, auth: authLinkFor_(user) };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function authLinkFor_(user) {
+  return {
+    auth_provider: String(user.auth_provider || "LEGACY").toUpperCase(),
+    supabase_user_id: String(user.supabase_user_id || ""),
+  };
 }
 
 function logoutUser(token) {
@@ -1781,7 +1852,7 @@ function ensureUsersReady_() {
 }
 
 function ensureUsersSheet_(sheet) {
-  const desired = ["user_id", "username", "full_name", "email", "role", "permissions", "active", "password_salt", "password_hash", "password_hash_version", "session_version", "must_change_password", "created_at", "updated_at", "last_login_at"];
+  const desired = ["user_id", "username", "full_name", "email", "role", "permissions", "active", "password_salt", "password_hash", "password_hash_version", "session_version", "must_change_password", "auth_provider", "supabase_user_id", "auth_migrated_at", "created_at", "updated_at", "last_login_at"];
   const firstRow = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
   const headers = firstRow.map((header) => String(header).trim()).filter(Boolean);
   if (!headers.length) {
@@ -1845,6 +1916,9 @@ function normalizeUser_(user) {
   normalized.password_hash_version = String(normalized.password_hash_version || "v1");
   normalized.session_version = Number(normalized.session_version || 1);
   normalized.must_change_password = String(normalized.must_change_password || "FALSE").toUpperCase() === "TRUE" ? "TRUE" : "FALSE";
+  normalized.auth_provider = String(normalized.auth_provider || "LEGACY").toUpperCase() === "SUPABASE" ? "SUPABASE" : "LEGACY";
+  normalized.supabase_user_id = String(normalized.supabase_user_id || "");
+  normalized.auth_migrated_at = String(normalized.auth_migrated_at || "");
   normalized.created_at = normalized.created_at || now;
   normalized.updated_at = now;
   if (normalized.password) {
@@ -1858,6 +1932,11 @@ function normalizeUser_(user) {
 
 function readUsers_() {
   return readSheetAsObjects_(SHEET_NAMES.users);
+}
+
+function findUserByEmail_(email) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  return readUsers_().find((user) => String(user.email || "").trim().toLowerCase() === normalizedEmail) || null;
 }
 
 function normalizeEmail_(email) {
@@ -1944,6 +2023,7 @@ function publicUser_(user) {
     permissions: user.permissions,
     active: String(user.active || "TRUE").toUpperCase() !== "FALSE",
     must_change_password: String(user.must_change_password || "FALSE").toUpperCase() === "TRUE",
+    auth_provider: String(user.auth_provider || "LEGACY").toUpperCase(),
     created_at: user.created_at || "",
     updated_at: user.updated_at || "",
     last_login_at: user.last_login_at || "",

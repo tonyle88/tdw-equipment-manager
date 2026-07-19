@@ -12,8 +12,11 @@ Apps Script không còn phục vụ HTML và không đọc token từ URL. Verce
 
 - Reset/đổi mật khẩu tăng `session_version`, làm mọi phiên cũ mất hiệu lực.
 - Đổi mật khẩu của chính user phát hành lại cookie phiên mới.
-- Hash cũ được nâng cấp tự động khi đăng nhập thành công.
-- KDF hiện tại là giải pháp chuyển tiếp phù hợp giới hạn Apps Script, chưa thay thế Argon2id/PBKDF2 của một dịch vụ xác thực chuyên dụng. Khi chuyển dữ liệu sang backend PostgreSQL/Supabase/Cloud SQL, ưu tiên dùng managed authentication hoặc Argon2id.
+- Supabase Auth xác thực mật khẩu; Vercel không gửi access token Supabase xuống frontend mà tiếp tục dùng cookie phiên ứng dụng `HttpOnly`.
+- User legacy được chuyển đổi khi đăng nhập thành công. Hash cũ không bị xóa trước khi Supabase tạo user và xác minh lại cùng mật khẩu.
+- Sau khi `auth_provider=SUPABASE`, Apps Script từ chối đăng nhập bằng hash cũ để tránh hạ cấp xác thực.
+- Reset/đổi mật khẩu của user đã chuyển đổi cập nhật Supabase trước, sau đó mới cập nhật trạng thái phiên Apps Script.
+- `SUPABASE_SERVICE_ROLE_KEY` chỉ tồn tại trong Vercel Environment Variables và không được đưa vào frontend/Git.
 
 ## License key
 

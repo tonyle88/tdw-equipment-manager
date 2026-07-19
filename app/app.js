@@ -30,7 +30,7 @@ const state = {
     dialogResolve: null,
   };
 
-  const REMEMBER_USERNAME_KEY = "tdw_equipment_remember_username";
+  const REMEMBER_USERNAME_KEY = "tdw_equipment_remember_email";
   const USER_PERMISSION_CODES = [
     "assets.view", "assets.manage", "assets.delete",
     "maintenance.view", "maintenance.manage", "maintenance.delete",

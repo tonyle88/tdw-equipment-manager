@@ -39,6 +39,9 @@ const SCRIPT_PROXY_SECRET = process.env.APPS_SCRIPT_PROXY_SECRET;
 const MAX_REQUEST_BYTES = 3500000;
 const SESSION_COOKIE = "tdw_session";
 const SESSION_MAX_AGE = 21600;
+const SUPABASE_URL = String(process.env.SUPABASE_URL || "").replace(/\/$/, "");
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const USER_ARG_COUNTS = {
   getAppData: 0, getSoftwareLicenseKey: 1, healthCheck: 0, createBackup: 0, listBackups: 0, verifyBackup: 1, restoreBackup: 1,
   loginUser: 1, logoutUser: 0, logoutAllSessions: 0,
@@ -113,10 +116,100 @@ async function callGoogleScript(fn, args = []) {
 
   if (!response.ok || payload.ok === false) {
     const error = new Error(payload.error || `Apps Script lỗi ${response.status}`);
-    if (/Phiên đăng nhập|Tài khoản không còn|đã bị thu hồi|mật khẩu không đúng/i.test(error.message)) error.statusCode = 401;
+    if (/Phiên đăng nhập|Tài khoản không còn|đã bị thu hồi|mật khẩu không đúng|sử dụng đăng nhập Supabase/i.test(error.message)) error.statusCode = 401;
     throw error;
   }
   return payload;
+}
+
+function supabaseConfigured() {
+  return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_SERVICE_ROLE_KEY);
+}
+
+async function supabaseRequest(path, options = {}) {
+  const response = await fetch(`${SUPABASE_URL}${path}`, {
+    method: options.method || "POST",
+    headers: {
+      apikey: options.admin ? SUPABASE_SERVICE_ROLE_KEY : SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${options.admin ? SUPABASE_SERVICE_ROLE_KEY : SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.msg || payload.message || payload.error_description || "Supabase Auth không phản hồi hợp lệ");
+    error.statusCode = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+function signInSupabase(email, password) {
+  return supabaseRequest("/auth/v1/token?grant_type=password", { body: { email, password } });
+}
+
+async function migrateLegacyLogin(payload, password) {
+  const email = String(payload.user?.email || "").trim().toLowerCase();
+  if (!email || !supabaseConfigured()) return payload;
+  try {
+    let authPayload;
+    try {
+      authPayload = await signInSupabase(email, password);
+    } catch (_signInError) {
+      const created = await supabaseRequest("/auth/v1/admin/users", {
+        admin: true,
+        body: {
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { username: payload.user.username || "", full_name: payload.user.full_name || "" },
+        },
+      });
+      authPayload = await signInSupabase(email, password);
+      if (!authPayload.user?.id && created.id) authPayload.user = created;
+    }
+    if (!authPayload.user?.id) throw new Error("Supabase không trả user ID sau khi chuyển đổi");
+    await callGoogleScript("markSupabaseMigration", [email, authPayload.user.id, payload.token]);
+    payload.user.auth_provider = "SUPABASE";
+  } catch (error) {
+    console.error(JSON.stringify({ event: "auth_migration_pending", error: error.name || "Error" }));
+    payload.auth_migration_pending = true;
+  }
+  return payload;
+}
+
+async function login(credentials) {
+  const identifier = String(credentials.username || credentials.email || "").trim().toLowerCase();
+  const password = String(credentials.password || "");
+  if (!identifier || !password) throw new Error("Vui lòng nhập email và mật khẩu");
+
+  if (supabaseConfigured() && identifier.includes("@")) {
+    try {
+      const authPayload = await signInSupabase(identifier, password);
+      if (authPayload.user?.id) return callGoogleScript("loginSupabaseUser", [identifier]);
+    } catch (_error) {
+      // Tài khoản chưa chuyển đổi sẽ được xác minh bằng mật khẩu cũ bên dưới.
+    }
+  }
+  const legacyPayload = await callGoogleScript("loginUser", [{ username: identifier, password }]);
+  return migrateLegacyLogin(legacyPayload, password);
+}
+
+async function syncSupabasePassword(fn, args, token) {
+  if (!supabaseConfigured() || (fn !== "changeOwnPassword" && fn !== "resetUserPassword")) return;
+  const authPayload = fn === "changeOwnPassword"
+    ? await callGoogleScript("getCurrentAuthLink", [token])
+    : await callGoogleScript("getUserAuthLink", [args[0], token]);
+  const auth = authPayload.auth || {};
+  if (String(auth.auth_provider || "").toUpperCase() !== "SUPABASE") return;
+  if (!auth.supabase_user_id) throw new Error("Tài khoản Supabase chưa có user ID");
+  const password = fn === "changeOwnPassword" ? args[0] : args[1];
+  await supabaseRequest(`/auth/v1/admin/users/${encodeURIComponent(auth.supabase_user_id)}`, {
+    admin: true,
+    method: "PUT",
+    body: { password },
+  });
 }
 
 module.exports = async function handler(req, res) {
@@ -152,7 +245,8 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const payload = await callGoogleScript(body.fn, body.fn === "loginUser" ? args : [...args, token]);
+    if (body.fn !== "loginUser") await syncSupabasePassword(body.fn, args, token);
+    const payload = body.fn === "loginUser" ? await login(args[0] || {}) : await callGoogleScript(body.fn, [...args, token]);
     if (payload.token) {
       res.setHeader("Set-Cookie", sessionCookie(payload.token));
       delete payload.token;
