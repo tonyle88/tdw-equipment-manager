@@ -1285,7 +1285,7 @@
     .brand-logo { width: 54px; height: 40px; }
     .brand strong { font-size: 15px; }
     .brand span { max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
-    .top-actions { width: auto; min-width: 0; }
+    .top-actions { grid-column: 2; grid-row: 1; width: auto; min-width: 0; }
     .user-menu { margin-left: 0; }
     .user-menu-trigger { min-height: 40px; padding: 4px 8px 4px 5px; }
     .user-menu-avatar { width: 30px; height: 30px; }
@@ -1294,6 +1294,7 @@
     .user-menu-popover { position: fixed; top: 68px; right: 12px; width: min(280px, calc(100vw - 24px)); }
     .nav-pills {
       grid-column: 1 / -1;
+      grid-row: 2;
       order: initial;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1319,12 +1320,41 @@
       white-space: nowrap;
     }
     .nav-pills .tdw-icon { width: 19px; height: 19px; }
-    .hero-title-blue { overflow-wrap: anywhere; font-size: clamp(28px, 10vw, 42px); line-height: 1.02; }
-    .hero-copy { font-size: 13px; }
+    .hero { margin-bottom: 14px; }
+    .hero-title-blue { overflow-wrap: anywhere; font-size: clamp(25px, 8vw, 34px); line-height: 1.04; }
+    .hero-copy { margin-top: 6px; font-size: 12px; line-height: 1.45; }
     .primary-button { flex: 1; }
     .hero, .hero > div:first-child { display: block; }
     .back-button { margin-bottom: 10px; }
-    .metrics, .detail .detail-grid { grid-template-columns: 1fr; }
+    .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+    .metric { min-height: 100px; padding: 13px 12px 12px 14px; }
+    .metric:nth-child(5) { grid-column: 1 / -1; }
+    .metric::before { width: 4px; }
+    .metric::after { right: -42px; bottom: -58px; width: 104px; height: 104px; }
+    .metric .label { min-height: 24px; margin-bottom: 4px; font-size: 10px; line-height: 1.2; }
+    .metric .value { font-size: 29px; }
+    .metric .hint { margin-top: 6px; font-size: 10px; line-height: 1.2; }
+    .dashboard-insights { gap: 10px; margin-bottom: 12px; }
+    .insight-card { min-width: 0; min-height: 0; padding: 14px; border-radius: 14px; overflow: hidden; }
+    .insight-head { display: block; margin-bottom: 12px; }
+    .insight-head .eyebrow { margin-bottom: 4px; font-size: 10px; }
+    .insight-head h2 { max-width: 100%; font-size: 16px; line-height: 1.2; overflow-wrap: anywhere; }
+    .insight-card .pie-wrap { grid-template-columns: 1fr; justify-items: center; gap: 14px; }
+    .insight-card .pie-chart { width: 154px; height: 154px; }
+    .insight-card .pie-center { width: 86px; height: 86px; padding: 8px; }
+    .insight-card .pie-center strong { font-size: 25px; }
+    .insight-card .pie-center span { font-size: 9px; }
+    .insight-card .pie-legend { gap: 7px; font-size: 11px; }
+    .insight-card .legend-row { min-width: 0; }
+    .insight-card .legend-row span { min-width: 0; overflow-wrap: anywhere; }
+    .insight-card .bar-chart { gap: 11px; }
+    .insight-card .bar-row { grid-template-columns: minmax(0, 1fr) 30px; gap: 5px 8px; align-items: center; }
+    .insight-card .bar-label { grid-column: 1 / -1; min-width: 0; font-size: 11px; line-height: 1.25; overflow-wrap: anywhere; }
+    .insight-card .bar-track { height: 10px; }
+    .insight-card .bar-row strong { font-size: 11px; text-align: right; }
+    .shell[data-active-view="overview"] .toolbar,
+    .shell[data-active-view="overview"] .content { display: none; }
+    .detail .detail-grid { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
     .form-grid .span-2 { grid-column: auto; }
     .permission-grid { grid-template-columns: 1fr; }

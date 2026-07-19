@@ -1535,6 +1535,7 @@ const state = {
       return;
     }
     state.activeView = view;
+    if (els.appShell) els.appShell.dataset.activeView = view;
     els.navLinks.forEach((link) => link.classList.toggle("active", link.dataset.view === view));
     els.toolbar.style.display = view === "maintenance" || view === "software" || view === "departments" || view === "reports" || view === "settings" || view === "users" ? "none" : "";
     const dashboardInsights = document.querySelector("#dashboardInsights");
