@@ -9,8 +9,8 @@
     <link rel="apple-touch-icon" href="assets/favicon-192.png" />
     <link rel="preload" href="assets/tdw-logo.webp" as="image" type="image/webp" />
     <link rel="stylesheet" href="styles.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js" integrity="sha512-UnrKxsCMN9hFk7M56t4I4ckB4N/2HHi0w/7+B/1JsXIX3DmyBcsGpT3/BsuZMZf+6mAr0vP81syWtfynHJ69JA==" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" integrity="sha512-Qlv6VSKh1gDKGoJbnyA5RMXYcvnpIqhO++MhIM2fStMcGT9i2T//tSwYFlcyoRRDcDZ+TYHpH8azBBCyhpSeqw==" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
     <script src="assets/qrcode.js" defer></script>
     <script src="config.js" defer></script>
     <script src="app.js" defer></script>
@@ -62,8 +62,8 @@
         </div>
         <p class="modal-copy">Tài khoản này cần đổi mật khẩu trước khi sử dụng hệ thống.</p>
         <div class="form-grid">
-          <label class="span-2">Mật khẩu mới<input name="new_password" type="password" autocomplete="new-password" required minlength="6" /></label>
-          <label class="span-2">Nhập lại mật khẩu<input name="confirm_password" type="password" autocomplete="new-password" required minlength="6" /></label>
+          <label class="span-2">Mật khẩu mới<input name="new_password" type="password" autocomplete="new-password" required minlength="10" /></label>
+          <label class="span-2">Nhập lại mật khẩu<input name="confirm_password" type="password" autocomplete="new-password" required minlength="10" /></label>
         </div>
         <p class="login-error" id="passwordChangeError" hidden></p>
         <div class="modal-actions">
@@ -94,6 +94,7 @@
         </nav>
         <div class="top-actions">
           <span class="user-chip" id="currentUserChip"></span>
+          <button class="icon-button" id="logoutAllButton" type="button" aria-label="Đăng xuất mọi thiết bị" title="Đăng xuất mọi thiết bị">⎋×</button>
           <button class="icon-button" id="logoutButton" type="button" aria-label="Đăng xuất">⎋</button>
         </div>
       </header>
@@ -301,7 +302,7 @@
               </div>
               <p class="permission-admin-note">Cấu hình, Phòng ban, Người dùng và xem license key chỉ dành cho Admin.</p>
             </fieldset>
-            <label class="span-2">Mật khẩu mới (để trống khi chỉ sửa thông tin)<input name="password" type="password" autocomplete="new-password" placeholder="Bắt buộc khi tạo user; để trống sẽ giữ mật khẩu hiện tại" /></label>
+            <label class="span-2">Mật khẩu mới (để trống khi chỉ sửa thông tin)<input name="password" type="password" autocomplete="new-password" minlength="10" placeholder="Bắt buộc khi tạo user; để trống sẽ giữ mật khẩu hiện tại" /></label>
           </div>
           <div class="modal-actions">
             <button class="secondary-button" type="button" id="cancelUserForm">Hủy</button>

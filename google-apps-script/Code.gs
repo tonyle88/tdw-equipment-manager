@@ -14,6 +14,8 @@ const SHEET_NAMES = {
 };
 
 const AUDIT_LOG_HEADERS = ["audit_id", "created_at", "actor_user_id", "actor_username", "action", "entity_type", "entity_id", "entity_name"];
+const TDW_SCHEMA_VERSION = "2026.07.18.1";
+const MIN_PASSWORD_LENGTH = 10;
 const MAINTENANCE_REMINDER_DAYS = [7, 3, 1, 0];
 const MAINTENANCE_OVERDUE_REMINDER_INTERVAL_DAYS = 7;
 
@@ -52,27 +54,12 @@ const HEALTH_CHECK_HEADERS = {
 };
 
 function doGet(event) {
-  try {
-    if (!event.parameter.api && !event.parameter.sheet) {
-      return HtmlService.createTemplateFromFile("Index")
-        .evaluate()
-        .setTitle("TDW Equipment Manager")
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    }
-
-    const user = requireAuth_(event.parameter.token || "");
-    const sheetName = (event.parameter.sheet || SHEET_NAMES.assets).trim();
-    const rows = getReadableSheetRows_(user, sheetName);
-    return jsonResponse_({
-      ok: true,
-      sheet: sheetName,
-      count: rows.length,
-      data: rows,
-      updated_at: new Date().toISOString(),
-    });
-  } catch (error) {
-    return jsonResponse_({ ok: false, error: error.message });
-  }
+  return jsonResponse_({
+    ok: true,
+    service: "TDW Equipment Manager API",
+    message: "Frontend chỉ được triển khai trên Vercel.",
+    updated_at: new Date().toISOString(),
+  });
 }
 
 function getReadableSheetRows_(user, sheetName) {
@@ -84,28 +71,6 @@ function getReadableSheetRows_(user, sheetName) {
   if (sheetName === SHEET_NAMES.softwareLicenses && hasPermission_(user, "software.view")) return readSheetAsObjects_(SHEET_NAMES.softwareLicenses).map(publicSoftwareLicense_);
   if ([SHEET_NAMES.settings, SHEET_NAMES.departments].indexOf(sheetName) !== -1) return readSheetAsObjects_(sheetName);
   throw new Error("Không có quyền đọc sheet này");
-}
-
-function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
-}
-
-function getAssets() {
-  return {
-    ok: true,
-    sheet: SHEET_NAMES.assets,
-    data: readActiveAssets_(),
-    updated_at: new Date().toISOString(),
-  };
-}
-
-function getSettings() {
-  return {
-    ok: true,
-    sheet: SHEET_NAMES.settings,
-    data: readSheetAsObjects_(SHEET_NAMES.settings),
-    updated_at: new Date().toISOString(),
-  };
 }
 
 function getAppData(token) {
@@ -150,7 +115,7 @@ function publicMediaFile_(item) {
 
 function publicSoftwareLicense_(license) {
   const result = Object.assign({}, license);
-  const key = decodeLicenseKey_(result.license_key_or_note || "");
+  const key = licenseKeyFor_(result);
   delete result.license_key_or_note;
   result.license_key_masked = maskLicenseKey_(key);
   return result;
@@ -172,7 +137,7 @@ function getSoftwareLicenseKey(licenseId, token) {
     return {
       ok: true,
       license_id: licenseId,
-      license_key: decodeLicenseKey_(license.license_key_or_note || ""),
+      license_key: migrateLegacyLicenseKey_(license),
       updated_at: new Date().toISOString(),
     };
   } catch (error) {
@@ -205,11 +170,56 @@ function healthCheck(token) {
       healthy: sheets.every((sheet) => sheet.exists && sheet.missing.length === 0),
       checked_by: user.username,
       checked_at: new Date().toISOString(),
+      schema_version: PropertiesService.getScriptProperties().getProperty("TDW_SCHEMA_VERSION") || "not_migrated",
+      expected_schema_version: TDW_SCHEMA_VERSION,
       sheets,
     };
   } catch (error) {
     return { ok: false, error: error.message };
   }
+}
+
+function migrateSchema() {
+  ensureUsersReady_();
+  readSheetAsObjects_(SHEET_NAMES.softwareLicenses).forEach((license) => migrateLegacyLicenseKey_(license));
+  PropertiesService.getScriptProperties().setProperty("TDW_SCHEMA_VERSION", TDW_SCHEMA_VERSION);
+  return { ok: true, schema_version: TDW_SCHEMA_VERSION, migrated_at: new Date().toISOString() };
+}
+
+function backupSystemData() {
+  const properties = PropertiesService.getScriptProperties();
+  const rawBackupFolderId = properties.getProperty("TDW_BACKUP_FOLDER_ID") || "";
+  if (!rawBackupFolderId) throw new Error("Thiếu Script Property TDW_BACKUP_FOLDER_ID");
+  const backupFolderId = normalizeMediaFolderId_(rawBackupFolderId);
+  const backupRoot = DriveApp.getFolderById(backupFolderId);
+  const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd-HHmmss");
+  const snapshotFolder = backupRoot.createFolder(`TDW-backup-${timestamp}`);
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  DriveApp.getFileById(spreadsheet.getId()).makeCopy(`TDW-data-${timestamp}`, snapshotFolder);
+
+  const rawMediaFolderId = properties.getProperty("TDW_MEDIA_FOLDER_ID") || "";
+  if (rawMediaFolderId) copyDriveFolder_(DriveApp.getFolderById(normalizeMediaFolderId_(rawMediaFolderId)), snapshotFolder.createFolder("media"));
+  properties.setProperty("TDW_LAST_BACKUP_AT", new Date().toISOString());
+  properties.setProperty("TDW_LAST_BACKUP_FOLDER_ID", snapshotFolder.getId());
+  return { ok: true, folder_id: snapshotFolder.getId(), created_at: new Date().toISOString() };
+}
+
+function copyDriveFolder_(source, destination) {
+  const files = source.getFiles();
+  while (files.hasNext()) files.next().makeCopy(destination);
+  const folders = source.getFolders();
+  while (folders.hasNext()) {
+    const child = folders.next();
+    copyDriveFolder_(child, destination.createFolder(child.getName()));
+  }
+}
+
+function installDailyBackupTrigger() {
+  ScriptApp.getProjectTriggers()
+    .filter((trigger) => trigger.getHandlerFunction() === "backupSystemData")
+    .forEach((trigger) => ScriptApp.deleteTrigger(trigger));
+  ScriptApp.newTrigger("backupSystemData").timeBased().everyDays(1).atHour(2).create();
+  return { ok: true };
 }
 
 function saveAsset(asset) {
@@ -255,21 +265,37 @@ function deleteAsset(assetId) {
 // THIẾT LẬP HỆ THỐNG
 // ==========================================
 
-function encodeLicenseKey_(text) {
-  if (!text) return "";
-  try {
-    const b64 = Utilities.base64Encode(text, Utilities.Charset.UTF_8);
-    return "ENC:" + b64.split('').reverse().join('');
-  } catch(e) { return text; }
+const LICENSE_SECRET_MARKER = "SCRIPT_PROPERTY_V1";
+
+function licenseSecretProperty_(licenseId) {
+  return `TDW_LICENSE_KEY_${licenseId}`;
 }
 
-function decodeLicenseKey_(encoded) {
+function decodeLegacyLicenseKey_(encoded) {
   if (!encoded || typeof encoded !== "string" || !encoded.startsWith("ENC:")) return encoded;
   try {
     const b64 = encoded.substring(4).split('').reverse().join('');
     const decoded = Utilities.base64Decode(b64);
     return Utilities.newBlob(decoded).getDataAsString();
   } catch(e) { return encoded; }
+}
+
+function licenseKeyFor_(license) {
+  if (!license) return "";
+  if (license.license_key_or_note === LICENSE_SECRET_MARKER) {
+    return PropertiesService.getScriptProperties().getProperty(licenseSecretProperty_(license.license_id)) || "";
+  }
+  return decodeLegacyLicenseKey_(license.license_key_or_note || "");
+}
+
+function migrateLegacyLicenseKey_(license) {
+  const key = licenseKeyFor_(license);
+  if (key && license.license_key_or_note !== LICENSE_SECRET_MARKER) {
+    PropertiesService.getScriptProperties().setProperty(licenseSecretProperty_(license.license_id), key);
+    license.license_key_or_note = LICENSE_SECRET_MARKER;
+    upsertObject_(SHEET_NAMES.softwareLicenses, "license_id", license);
+  }
+  return key;
 }
 
 function saveSetting(setting, token) {
@@ -309,6 +335,7 @@ function deleteSetting(settingId) {
 function doPost(event) {
   try {
     const body = JSON.parse(event.postData.contents || "{}");
+    requireProxySecret_(body.proxy_secret);
     const action = body.action;
     const args = body.args || [];
 
@@ -320,6 +347,9 @@ function doPost(event) {
     }
     if (action === "logoutUser") {
       return jsonResponse_(logoutUser(args[0] || body.token || ""));
+    }
+    if (action === "logoutAllSessions") {
+      return jsonResponse_(logoutAllSessions(args[0] || body.token || ""));
     }
     if (action === "getAppData") {
       return jsonResponse_(getAppData(args[0] || body.token || ""));
@@ -407,6 +437,12 @@ function doPost(event) {
   } catch (error) {
     return jsonResponse_({ ok: false, error: error.message });
   }
+}
+
+function requireProxySecret_(providedSecret) {
+  const expectedSecret = PropertiesService.getScriptProperties().getProperty("TDW_API_PROXY_SECRET");
+  if (!expectedSecret) throw new Error("Thiếu Script Property TDW_API_PROXY_SECRET");
+  if (!constantTimeEqual_(String(providedSecret || ""), expectedSecret)) throw new Error("Yêu cầu API không hợp lệ");
 }
 
 function readSheetAsObjects_(sheetName) {
@@ -1075,9 +1111,12 @@ function normalizeSoftwareLicense_(license) {
     ? readSheetAsObjects_(SHEET_NAMES.softwareLicenses).find((item) => item.license_id === normalized.license_id)
     : null;
   const licenseKey = String(normalized.license_key || "");
-  normalized.license_key_or_note = licenseKey
-    ? encodeLicenseKey_(licenseKey)
-    : existing ? existing.license_key_or_note || "" : "";
+  if (licenseKey) {
+    PropertiesService.getScriptProperties().setProperty(licenseSecretProperty_(normalized.license_id), licenseKey);
+    normalized.license_key_or_note = LICENSE_SECRET_MARKER;
+  } else {
+    normalized.license_key_or_note = existing ? existing.license_key_or_note || "" : "";
+  }
   delete normalized.license_key;
 
   normalized.assigned_asset_id = normalized.assigned_asset_id || "";
@@ -1092,6 +1131,7 @@ function deleteSoftwareLicense(licenseId, token) {
   try {
     const actor = requirePermission_(token || "", "software.delete");
     const deleted = deleteObject_(SHEET_NAMES.softwareLicenses, "license_id", licenseId);
+    if (deleted) PropertiesService.getScriptProperties().deleteProperty(licenseSecretProperty_(licenseId));
     if (deleted) logAudit_(actor, "LICENSE_DELETED", "software_license", licenseId, licenseId);
     return { ok: deleted, deleted_id: licenseId, updated_at: new Date().toISOString() };
   } catch (error) {
@@ -1370,13 +1410,14 @@ function loginUser(credentials) {
     ensureUsersReady_();
     const user = findUserByUsername_(username);
     if (!user || String(user.active || "TRUE").toUpperCase() === "FALSE") throwInvalidLogin_(username);
-    if (hashPassword_(password, user.password_salt) !== user.password_hash) throwInvalidLogin_(username);
+    if (!verifyPassword_(password, user)) throwInvalidLogin_(username);
+
+    if (String(user.password_hash_version || "v1") !== PASSWORD_HASH_VERSION) setPassword_(user, password);
 
     user.last_login_at = new Date().toISOString();
     upsertObject_(SHEET_NAMES.users, "user_id", user);
 
-    const token = Utilities.getUuid() + Utilities.getUuid();
-    CacheService.getScriptCache().put(`session_${token}`, user.user_id, 21600);
+    const token = issueSession_(user);
     clearLoginFailures_(username);
     return { ok: true, token, user: publicUser_(user), updated_at: new Date().toISOString() };
   } catch (error) {
@@ -1387,6 +1428,18 @@ function loginUser(credentials) {
 function logoutUser(token) {
   if (token) CacheService.getScriptCache().remove(`session_${token}`);
   return { ok: true };
+}
+
+function logoutAllSessions(token) {
+  try {
+    const user = requireAuth_(token);
+    revokeUserSessions_(user);
+    upsertObject_(SHEET_NAMES.users, "user_id", user);
+    logAudit_(user, "ALL_SESSIONS_REVOKED", "user", user.user_id, user.username);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
 }
 
 function currentUser(token) {
@@ -1436,6 +1489,7 @@ function deleteUser(userId, token) {
     if (!user) throw new Error("Không tìm thấy user");
     assertUserCanRemainResponsible_(Object.assign({}, user, { active: "FALSE" }));
     user.active = "FALSE";
+    revokeUserSessions_(user);
     upsertObject_(SHEET_NAMES.users, "user_id", user);
     logAudit_(admin, "USER_DISABLED", "user", userId, user.username);
     return { ok: true, user_id: userId, updated_at: new Date().toISOString() };
@@ -1448,10 +1502,11 @@ function resetUserPassword(userId, newPassword, token) {
   try {
     const admin = requireAdmin_(token);
     if (!userId) throw new Error("Missing user_id");
-    if (String(newPassword || "").length < 6) throw new Error("Mật khẩu mới cần ít nhất 6 ký tự");
+    validateNewPassword_(newPassword);
     const user = findUserById_(userId);
     if (!user) throw new Error("Không tìm thấy user");
     setPassword_(user, newPassword);
+    revokeUserSessions_(user);
     user.must_change_password = "TRUE";
     upsertObject_(SHEET_NAMES.users, "user_id", user);
     logAudit_(admin, "PASSWORD_RESET", "user", userId, user.username);
@@ -1464,12 +1519,13 @@ function resetUserPassword(userId, newPassword, token) {
 function changeOwnPassword(newPassword, token) {
   try {
     const user = requireAuth_(token);
-    if (String(newPassword || "").length < 6) throw new Error("Mật khẩu mới cần ít nhất 6 ký tự");
+    validateNewPassword_(newPassword);
     setPassword_(user, newPassword);
+    revokeUserSessions_(user);
     user.must_change_password = "FALSE";
     const saved = upsertObject_(SHEET_NAMES.users, "user_id", user);
     logAudit_(user, "PASSWORD_CHANGED", "user", saved.user_id, saved.username);
-    return { ok: true, user: publicUser_(saved), updated_at: new Date().toISOString() };
+    return { ok: true, token: issueSession_(saved), user: publicUser_(saved), updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
   }
@@ -1477,11 +1533,30 @@ function changeOwnPassword(newPassword, token) {
 
 function requireAuth_(token) {
   ensureUsersReady_();
-  const userId = CacheService.getScriptCache().get(`session_${token || ""}`);
-  if (!userId) throw new Error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
-  const user = findUserById_(userId);
+  const rawSession = CacheService.getScriptCache().get(`session_${token || ""}`);
+  if (!rawSession) throw new Error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+  let session;
+  try {
+    session = JSON.parse(rawSession);
+  } catch (_error) {
+    throw new Error("Phiên đăng nhập cũ không còn hiệu lực, vui lòng đăng nhập lại");
+  }
+  const user = findUserById_(session.user_id);
   if (!user || String(user.active || "TRUE").toUpperCase() === "FALSE") throw new Error("Tài khoản không còn hiệu lực");
+  if (Number(session.version) !== Number(user.session_version || 1)) throw new Error("Phiên đăng nhập đã bị thu hồi, vui lòng đăng nhập lại");
   return user;
+}
+
+function issueSession_(user) {
+  const token = Utilities.getUuid() + Utilities.getUuid();
+  const session = JSON.stringify({ user_id: user.user_id, version: Number(user.session_version || 1) });
+  CacheService.getScriptCache().put(`session_${token}`, session, 21600);
+  return token;
+}
+
+function revokeUserSessions_(user) {
+  user.session_version = Number(user.session_version || 1) + 1;
+  return user.session_version;
 }
 
 function requireAdmin_(token) {
@@ -1557,7 +1632,7 @@ function ensureUsersReady_() {
 }
 
 function ensureUsersSheet_(sheet) {
-  const desired = ["user_id", "username", "full_name", "email", "role", "permissions", "active", "password_salt", "password_hash", "must_change_password", "created_at", "updated_at", "last_login_at"];
+  const desired = ["user_id", "username", "full_name", "email", "role", "permissions", "active", "password_salt", "password_hash", "password_hash_version", "session_version", "must_change_password", "created_at", "updated_at", "last_login_at"];
   const firstRow = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
   const headers = firstRow.map((header) => String(header).trim()).filter(Boolean);
   if (!headers.length) {
@@ -1602,7 +1677,7 @@ function ensureDefaultAdmin_(sheet, headers) {
 
 function bootstrapAdminPassword_() {
   const password = PropertiesService.getScriptProperties().getProperty("TDW_BOOTSTRAP_ADMIN_PASSWORD");
-  if (password && password.length >= 6) return password;
+  if (password && password.length >= MIN_PASSWORD_LENGTH) return password;
   throw new Error("Thiếu Script Property TDW_BOOTSTRAP_ADMIN_PASSWORD để tạo admin đầu tiên");
 }
 
@@ -1618,10 +1693,15 @@ function normalizeUser_(user) {
   if (["admin", "manager", "user", "viewer"].indexOf(normalized.role) === -1) normalized.role = "user";
   normalized.permissions = normalizePermissions_(normalized.permissions, normalized.role);
   normalized.active = String(normalized.active || "TRUE").toUpperCase() === "FALSE" ? "FALSE" : "TRUE";
+  normalized.password_hash_version = String(normalized.password_hash_version || "v1");
+  normalized.session_version = Number(normalized.session_version || 1);
   normalized.must_change_password = String(normalized.must_change_password || "FALSE").toUpperCase() === "TRUE" ? "TRUE" : "FALSE";
   normalized.created_at = normalized.created_at || now;
   normalized.updated_at = now;
-  if (normalized.password) setPassword_(normalized, normalized.password);
+  if (normalized.password) {
+    validateNewPassword_(normalized.password);
+    setPassword_(normalized, normalized.password);
+  }
   else if (!normalized.password_hash) throw new Error("Mật khẩu là bắt buộc khi tạo user mới");
   delete normalized.password;
   return normalized;
@@ -1665,11 +1745,44 @@ function findUserById_(userId) {
 function setPassword_(user, password) {
   user.password_salt = Utilities.getUuid();
   user.password_hash = hashPassword_(password, user.password_salt);
+  user.password_hash_version = PASSWORD_HASH_VERSION;
 }
 
+function validateNewPassword_(password) {
+  if (String(password || "").length < MIN_PASSWORD_LENGTH) throw new Error(`Mật khẩu mới cần ít nhất ${MIN_PASSWORD_LENGTH} ký tự`);
+}
+
+const PASSWORD_HASH_VERSION = "v2";
+const PASSWORD_HASH_ROUNDS = 10000;
+
 function hashPassword_(password, salt) {
-  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, `${salt}:${password}`, Utilities.Charset.UTF_8);
+  let value = `${salt}:${password}`;
+  for (let round = 0; round < PASSWORD_HASH_ROUNDS; round += 1) value = sha256Hex_(value);
+  return value;
+}
+
+function legacyHashPassword_(password, salt) {
+  return sha256Hex_(`${salt}:${password}`);
+}
+
+function verifyPassword_(password, user) {
+  const version = String(user.password_hash_version || "v1");
+  const actual = version === PASSWORD_HASH_VERSION
+    ? hashPassword_(password, user.password_salt)
+    : legacyHashPassword_(password, user.password_salt);
+  return constantTimeEqual_(actual, String(user.password_hash || ""));
+}
+
+function sha256Hex_(value) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, value, Utilities.Charset.UTF_8);
   return bytes.map((byte) => (`0${(byte < 0 ? byte + 256 : byte).toString(16)}`).slice(-2)).join("");
+}
+
+function constantTimeEqual_(left, right) {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  return difference === 0;
 }
 
 function publicUser_(user) {

@@ -31,18 +31,20 @@ function createResponse() {
   };
 }
 
-async function invokeProxy(body) {
+async function invokeProxy(body, options = {}) {
   const originalFetch = global.fetch;
   const originalUrl = process.env.GOOGLE_SCRIPT_URL;
+  const originalSecret = process.env.APPS_SCRIPT_PROXY_SECRET;
   let requestToAppsScript = null;
   process.env.GOOGLE_SCRIPT_URL = "https://example.test/apps-script";
+  process.env.APPS_SCRIPT_PROXY_SECRET = "proxy-secret";
   delete require.cache[require.resolve(proxyPath)];
-  global.fetch = async (url, options) => {
-    requestToAppsScript = { url, options };
+  global.fetch = async (url, fetchOptions) => {
+    requestToAppsScript = { url, options: fetchOptions };
     return {
       ok: true,
       status: 200,
-      text: async () => JSON.stringify({ ok: true, data: { connected: true } }),
+      text: async () => JSON.stringify(options.upstreamPayload || { ok: true, data: { connected: true } }),
     };
   };
 
@@ -50,6 +52,7 @@ async function invokeProxy(body) {
     const handler = require(proxyPath);
     const req = Readable.from([JSON.stringify(body)]);
     req.method = "POST";
+    req.headers = options.cookie ? { cookie: options.cookie } : {};
     const res = createResponse();
     await handler(req, res);
     return { res, requestToAppsScript };
@@ -57,6 +60,8 @@ async function invokeProxy(body) {
     global.fetch = originalFetch;
     if (originalUrl === undefined) delete process.env.GOOGLE_SCRIPT_URL;
     else process.env.GOOGLE_SCRIPT_URL = originalUrl;
+    if (originalSecret === undefined) delete process.env.APPS_SCRIPT_PROXY_SECRET;
+    else process.env.APPS_SCRIPT_PROXY_SECRET = originalSecret;
     delete require.cache[require.resolve(proxyPath)];
   }
 }
@@ -107,6 +112,24 @@ async function run() {
   assert.ok(appsScript.includes("function getReadableSheetRows_(user, sheetName)"));
   assert.ok(appsScript.includes("function assertUserCanRemainResponsible_(user)"));
   assert.ok(!app.includes("license.license_key)"));
+  assert.ok(!app.includes("AUTH_STORAGE_KEY"));
+  assert.ok(!app.includes("state.authToken"));
+  assert.ok(!app.includes("setAuthToken("));
+  assert.ok(app.includes('credentials: "same-origin"'));
+  assert.ok(!appsScript.includes("HtmlService.createTemplateFromFile"));
+  assert.ok(!appsScript.includes("function getAssets()"));
+  assert.ok(!appsScript.includes("function getSettings()"));
+  assert.ok(!appsScript.includes("event.parameter.token"));
+  assert.ok(appsScript.includes('"password_hash_version"'));
+  assert.ok(appsScript.includes('"session_version"'));
+  assert.ok(appsScript.includes("function issueSession_"));
+  assert.ok(appsScript.includes("function revokeUserSessions_"));
+  assert.ok(appsScript.includes("function logoutAllSessions(token)"));
+  assert.ok(appsScript.includes("function migrateSchema()"));
+  assert.ok(appsScript.includes("function backupSystemData()"));
+  assert.ok(appsScript.includes("function installDailyBackupTrigger()"));
+  assert.ok(appsScript.includes('const LICENSE_SECRET_MARKER = "SCRIPT_PROPERTY_V1"'));
+  assert.ok(!appsScript.includes('return "ENC:"'));
 
   const permissions = vm.createContext();
   vm.runInContext(appsScript, permissions, { filename: "google-apps-script/Code.gs" });
@@ -126,6 +149,10 @@ async function run() {
   assert.equal(vm.runInContext('hasPermission_({ role: "user", permissions: "view" }, "reports.assets.export")', permissions), false);
   assert.equal(vm.runInContext('hasPermission_({ role: "admin", permissions: "all" }, "settings.manage")', permissions), true);
   assert.equal(vm.runInContext('normalizeUser_({ user_id: "user-id", username: "user", role: "user", password_salt: "salt", password_hash: "hash" }).password_hash', permissions), "hash");
+  assert.equal(vm.runInContext('normalizeUser_({ user_id: "user-id", username: "user", role: "user", password_salt: "salt", password_hash: "hash" }).password_hash_version', permissions), "v1");
+  assert.equal(vm.runInContext('normalizeUser_({ user_id: "user-id", username: "user", role: "user", password_salt: "salt", password_hash: "hash" }).session_version', permissions), 1);
+  assert.equal(vm.runInContext('constantTimeEqual_("same", "same")', permissions), true);
+  assert.equal(vm.runInContext('constantTimeEqual_("same", "diff")', permissions), false);
   assert.equal(vm.runInContext('normalizeUser_({ user_id: "user-id", username: "user", email: "TDW@Example.com", role: "user", password_salt: "salt", password_hash: "hash" }).email', permissions), "tdw@example.com");
   assert.throws(() => vm.runInContext('normalizeEmail_("not-an-email")', permissions), /Email không đúng định dạng/);
   assert.equal(vm.runInContext('isNotificationReadyUser_({ active: "TRUE", email: "notice@example.com" })', permissions), true);
@@ -228,50 +255,90 @@ async function run() {
   const vercel = JSON.parse(read("vercel.json"));
   assert.equal(vercel.version, 2);
   assert.ok(vercel.rewrites.some((rule) => rule.source === "/" && rule.destination === "/app/index.html"));
+  assert.ok(vercel.headers.some((rule) => rule.headers?.some((header) => header.key === "Content-Security-Policy")));
+  assert.ok(index.includes('integrity="sha512-'));
 
-  const allowed = await invokeProxy({ fn: "healthCheck", args: ["session-token"] });
+  const unauthenticated = await invokeProxy({ fn: "healthCheck", args: [] });
+  assert.equal(unauthenticated.res.statusCode, 401);
+  assert.equal(unauthenticated.requestToAppsScript, null);
+
+  const allowed = await invokeProxy({ fn: "healthCheck", args: [] }, { cookie: "tdw_session=session-token" });
   assert.equal(allowed.res.statusCode, 200);
   assert.deepEqual(JSON.parse(allowed.res.body), { ok: true, data: { connected: true } });
   assert.equal(allowed.requestToAppsScript.url, "https://example.test/apps-script");
   assert.deepEqual(JSON.parse(allowed.requestToAppsScript.options.body), {
     action: "healthCheck",
     args: ["session-token"],
+    proxy_secret: "proxy-secret",
   });
 
-  const licenseKey = await invokeProxy({ fn: "getSoftwareLicenseKey", args: ["license-id", "session-token"] });
+  const licenseKey = await invokeProxy({ fn: "getSoftwareLicenseKey", args: ["license-id"] }, { cookie: "tdw_session=session-token" });
   assert.equal(licenseKey.res.statusCode, 200);
   assert.deepEqual(JSON.parse(licenseKey.requestToAppsScript.options.body), {
     action: "getSoftwareLicenseKey",
     args: ["license-id", "session-token"],
+    proxy_secret: "proxy-secret",
   });
 
-  const maintenancePlan = await invokeProxy({ fn: "saveMaintenancePlan", args: [{ asset_id: "asset-id" }, "session-token"] });
+  const maintenancePlan = await invokeProxy({ fn: "saveMaintenancePlan", args: [{ asset_id: "asset-id" }] }, { cookie: "tdw_session=session-token" });
   assert.equal(maintenancePlan.res.statusCode, 200);
   assert.deepEqual(JSON.parse(maintenancePlan.requestToAppsScript.options.body), {
     action: "saveMaintenancePlan",
     args: [{ asset_id: "asset-id" }, "session-token"],
+    proxy_secret: "proxy-secret",
   });
 
-  const maintenancePlans = await invokeProxy({ fn: "saveMaintenancePlans", args: [[{ asset_id: "asset-id" }], "session-token"] });
+  const maintenancePlans = await invokeProxy({ fn: "saveMaintenancePlans", args: [[{ asset_id: "asset-id" }]] }, { cookie: "tdw_session=session-token" });
   assert.equal(maintenancePlans.res.statusCode, 200);
   assert.deepEqual(JSON.parse(maintenancePlans.requestToAppsScript.options.body), {
     action: "saveMaintenancePlans",
     args: [[{ asset_id: "asset-id" }], "session-token"],
+    proxy_secret: "proxy-secret",
   });
 
-  const reminders = await invokeProxy({ fn: "sendMaintenancePlanReminders", args: ["session-token"] });
+  const reminders = await invokeProxy({ fn: "sendMaintenancePlanReminders", args: [] }, { cookie: "tdw_session=session-token" });
   assert.equal(reminders.res.statusCode, 200);
   assert.deepEqual(JSON.parse(reminders.requestToAppsScript.options.body), {
     action: "sendMaintenancePlanReminders",
     args: ["session-token"],
+    proxy_secret: "proxy-secret",
   });
 
-  const media = await invokeProxy({ fn: "saveMediaFile", args: [{ owner_type: "ASSET" }, "session-token"] });
+  const media = await invokeProxy({ fn: "saveMediaFile", args: [{ owner_type: "ASSET" }] }, { cookie: "tdw_session=session-token" });
   assert.equal(media.res.statusCode, 200);
   assert.deepEqual(JSON.parse(media.requestToAppsScript.options.body), {
     action: "saveMediaFile",
     args: [{ owner_type: "ASSET" }, "session-token"],
+    proxy_secret: "proxy-secret",
   });
+
+  const login = await invokeProxy(
+    { fn: "loginUser", args: [{ username: "admin", password: "secret" }] },
+    { upstreamPayload: { ok: true, token: "new-session", user: { username: "admin" } } },
+  );
+  assert.equal(login.res.statusCode, 200);
+  assert.match(String(login.res.headers["Set-Cookie"]), /^tdw_session=new-session;/);
+  assert.match(String(login.res.headers["Set-Cookie"]), /HttpOnly; Secure; SameSite=Strict/);
+  assert.equal(JSON.parse(login.res.body).token, undefined);
+
+  const changedPassword = await invokeProxy(
+    { fn: "changeOwnPassword", args: ["new-password"] },
+    { cookie: "tdw_session=old-session", upstreamPayload: { ok: true, token: "rotated-session", user: { username: "admin" } } },
+  );
+  assert.equal(changedPassword.res.statusCode, 200);
+  assert.match(String(changedPassword.res.headers["Set-Cookie"]), /^tdw_session=rotated-session;/);
+
+  const logout = await invokeProxy({ fn: "logoutUser", args: [] }, { cookie: "tdw_session=session-token" });
+  assert.equal(logout.res.statusCode, 200);
+  assert.match(String(logout.res.headers["Set-Cookie"]), /Max-Age=0/);
+
+  const logoutAll = await invokeProxy({ fn: "logoutAllSessions", args: [] }, { cookie: "tdw_session=session-token" });
+  assert.equal(logoutAll.res.statusCode, 200);
+  assert.match(String(logoutAll.res.headers["Set-Cookie"]), /Max-Age=0/);
+
+  const injectedToken = await invokeProxy({ fn: "healthCheck", args: ["attacker-token"] }, { cookie: "tdw_session=session-token" });
+  assert.equal(injectedToken.res.statusCode, 400);
+  assert.equal(injectedToken.requestToAppsScript, null);
 
   const denied = await invokeProxy({ fn: "notAllowed", args: [] });
   assert.equal(denied.res.statusCode, 400);

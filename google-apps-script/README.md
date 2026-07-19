@@ -1,57 +1,18 @@
-# Google Apps Script Web App
+# Google Apps Script API
 
-Copy cac file trong thu muc nay vao Apps Script gan voi Google Sheet database cua TDW.
+Thư mục này chỉ chứa backend `Code.gs` liên kết Google Sheet/Drive. Frontend duy nhất được triển khai trên Vercel.
 
-Sau khi deploy, mo Web app URL se hien giao dien TDW Equipment Manager truc tiep tren ha tang Google. App doc/ghi du lieu tu Google Sheet bang `google.script.run`, khong can chay local server.
+## Cấu hình bắt buộc
 
-## Files can tao trong Apps Script
-
-```text
-Code.gs
-Index.html
-Styles.html
-Client.html
-```
-
-## Deploy
-
-1. Mo Google Sheet database.
-2. Extensions > Apps Script.
-3. Tao/cap nhat 4 file: `Code.gs`, `Index.html`, `Styles.html`, `Client.html`.
-4. Save tat ca file.
-5. Deploy > New deployment.
-6. Type: Web app.
-7. Execute as: Me.
-8. Who has access: Anyone with the link hoac tai khoan Google trong cong ty.
-9. Copy Web app URL va mo trong trinh duyet.
-
-## URL su dung
-
-Mo app:
+Trong `Project Settings > Script Properties`:
 
 ```text
-https://script.google.com/macros/s/WEB_APP_ID/exec
+TDW_API_PROXY_SECRET=<chuoi-ngau-nhien-toi-thieu-32-ky-tu>
+TDW_BOOTSTRAP_ADMIN_PASSWORD=<chi-can-khi-tao-admin-dau-tien>
+TDW_MEDIA_FOLDER_ID=<id-thu-muc-anh>
+TDW_BACKUP_FOLDER_ID=<id-thu-muc-backup>
 ```
 
-Test API JSON:
+`TDW_API_PROXY_SECRET` phải trùng với biến `APPS_SCRIPT_PROXY_SECRET` trên Vercel. Không lưu các giá trị này trong Git.
 
-```text
-https://script.google.com/macros/s/WEB_APP_ID/exec?api=assets
-```
-
-Hoac:
-
-```text
-https://script.google.com/macros/s/WEB_APP_ID/exec?sheet=Assets
-```
-
-Ket qua dung se co dang:
-
-```json
-{
-  "ok": true,
-  "sheet": "Assets",
-  "count": 72,
-  "data": []
-}
-```
+Sau khi cập nhật và deploy Web App phiên bản mới, chạy thủ công `migrateSchema()`, rồi kiểm tra `backupSystemData()` trước khi cài lịch bằng `installDailyBackupTrigger()`.

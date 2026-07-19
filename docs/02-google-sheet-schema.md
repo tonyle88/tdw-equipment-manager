@@ -71,6 +71,8 @@ permissions
 active
 password_salt
 password_hash
+password_hash_version
+session_version
 must_change_password
 created_at
 updated_at
@@ -290,4 +292,5 @@ LUU_KHO_THANH_LY
 
 - Khong nhap mat khau thuan vao sheet `Users`.
 - User moi nen duoc tao tu man hinh Quan ly nguoi dung de he thong sinh `password_salt` va `password_hash`.
+- `password_hash_version` va `session_version` duoc `migrateSchema()` tao/quan ly; khong sua tay hai cot nay.
 - Admin dau tien chi duoc bootstrap khi chua co admin dang hoat dong va Apps Script da co Script Property `TDW_BOOTSTRAP_ADMIN_PASSWORD`.

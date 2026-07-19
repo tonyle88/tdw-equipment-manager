@@ -22,7 +22,6 @@ const state = {
     isSaving: false,
     editingSettingId: "",
     editingUserId: "",
-    authToken: "",
     currentUser: null,
     users: [],
     usersLoaded: false,
@@ -31,7 +30,6 @@ const state = {
     dialogResolve: null,
   };
 
-  const AUTH_STORAGE_KEY = "tdw_equipment_auth_token";
   const REMEMBER_USERNAME_KEY = "tdw_equipment_remember_username";
   const USER_PERMISSION_CODES = [
     "assets.view", "assets.manage", "assets.delete",
@@ -231,6 +229,7 @@ const state = {
       form: document.querySelector("#assetForm"),
       formTitle: document.querySelector("#assetFormTitle"),
       logoutButton: document.querySelector("#logoutButton"),
+      logoutAllButton: document.querySelector("#logoutAllButton"),
       currentUserChip: document.querySelector("#currentUserChip"),
       closeModal: document.querySelector("#closeAssetModal"),
       cancelForm: document.querySelector("#cancelAssetForm"),
@@ -311,11 +310,11 @@ const state = {
   }
 
   async function callServer(fn, ...args) {
-    const serverArgs = fn === "loginUser" ? args : [...args, state.authToken];
     const response = await fetch(window.TDW_ASSET_CONFIG.apiProxyUrl || "/api/google-script", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fn, args: serverArgs }),
+      credentials: "same-origin",
+      body: JSON.stringify({ fn, args }),
     });
     const payload = await response.json().catch(() => null);
     if (!response.ok) throw new Error(payload?.error || `API proxy lỗi ${response.status}`);
@@ -431,12 +430,6 @@ const state = {
       const dependent = els.userForm.querySelector(`[name="permission_code"][value="${code}"]`);
       if (dependent) dependent.checked = true;
     });
-  }
-
-  function setAuthToken(token) {
-    state.authToken = token || "";
-    if (state.authToken) localStorage.setItem(AUTH_STORAGE_KEY, state.authToken);
-    else localStorage.removeItem(AUTH_STORAGE_KEY);
   }
 
   function showLogin(error = "") {
@@ -599,7 +592,6 @@ const state = {
       const payload = await callServer("loginUser", credentials);
       if (els.rememberLogin?.checked) localStorage.setItem(REMEMBER_USERNAME_KEY, String(credentials.username || ""));
       else localStorage.removeItem(REMEMBER_USERNAME_KEY);
-      setAuthToken(payload.token);
       state.currentUser = payload.user;
       if (state.currentUser?.must_change_password) {
         setLoginBusy(false);
@@ -615,15 +607,26 @@ const state = {
   }
 
   async function handleLogout() {
-    const token = state.authToken;
-    if (token) {
-      try {
-        await callServer("logoutUser");
-      } catch (error) {
-        console.warn("Không thể hủy phiên trên server", error);
-      }
+    try {
+      await callServer("logoutUser");
+    } catch (error) {
+      console.warn("Không thể hủy phiên trên server", error);
     }
-    setAuthToken("");
+    state.currentUser = null;
+    state.users = [];
+    state.usersLoaded = false;
+    state.usersLoading = null;
+    state.usersError = "";
+    showLogin();
+  }
+
+  async function handleLogoutAll() {
+    if (!await showConfirmModal("ĐĂNG XUẤT MỌI THIẾT BỊ", "Tất cả phiên đăng nhập của tài khoản này sẽ bị thu hồi. Tiếp tục?", "Đăng xuất tất cả")) return;
+    try {
+      await callServer("logoutAllSessions");
+    } catch (error) {
+      console.warn("Không thể thu hồi mọi phiên", error);
+    }
     state.currentUser = null;
     state.users = [];
     state.usersLoaded = false;
@@ -3382,6 +3385,7 @@ const state = {
       if (await requestFormClose(els.passwordChangeForm, () => {})) handleLogout();
     });
     els.logoutButton?.addEventListener("click", handleLogout);
+    els.logoutAllButton?.addEventListener("click", handleLogoutAll);
     [els.search, els.group, els.year, els.department, els.status]
       .filter(Boolean)
       .forEach((el) => el.addEventListener("input", () => applyFilters({ resetPage: true })));
@@ -3475,16 +3479,10 @@ const state = {
     collectElements();
     bindEvents();
     hydrateLoginMemory();
-    state.authToken = localStorage.getItem(AUTH_STORAGE_KEY) || "";
-    if (!state.authToken) {
-      showLogin();
-      return;
-    }
     try {
       await startApp();
     } catch (error) {
-      setAuthToken("");
-      showLogin(error.message);
+      showLogin("");
     }
   }
 
