@@ -1798,7 +1798,7 @@ const state = {
         </div>
         
         <div class="table-wrap" style="margin-top: 16px;">
-          <table class="data-table" style="min-width: 800px;">
+          <table class="data-table mobile-card-table software-table">
             <thead>
               <tr>
                 <th style="width: 20%">PHẦN MỀM</th>
@@ -1831,22 +1831,22 @@ const state = {
 
               return `
                 <tr>
-                  <td style="font-weight: 500;">${escapeHtml(license.software_name)}</td>
-                  <td>${escapeHtml(license.version)}</td>
-                  <td>
+                  <td data-label="Phần mềm" style="font-weight: 500;">${escapeHtml(license.software_name)}</td>
+                  <td data-label="Phiên bản">${escapeHtml(license.version)}</td>
+                  <td data-label="License key">
                     <div class="license-key-cell">
                       <code class="license-key-value">${escapeHtml(license.license_key_masked || "Chưa có")}</code>
                       ${isAdmin() && license.license_key_masked !== "Chưa có" ? `<button class="license-key-toggle" type="button" data-license-id="${escapeHtml(license.license_id)}" data-masked="${escapeHtml(license.license_key_masked)}" aria-label="Xem license key">👁</button>` : ""}
                     </div>
                   </td>
-                  <td>
+                  <td data-label="Gán cho">
                     ${assignedAssets.map(asset => `<div style="margin-bottom: 2px;"><span>🖥 ${escapeHtml(asset.asset_name)}</span></div>`).join('')}
                     ${license.assigned_user ? `<div style="margin-top: 2px;">👤 ${escapeHtml(license.assigned_user)}</div>` : ""}
                   </td>
-                  <td style="color: ${isExpired || isExpiringSoon ? statusColor : 'inherit'}; font-weight: ${isExpired || isExpiringSoon ? '600' : 'normal'}">${license.expiry_date ? escapeHtml(formatDate(license.expiry_date)) : '<span style="color: var(--color-success);">Vĩnh Viễn</span>'}</td>
-                  <td><span class="badge" style="color: ${statusColor}; border: 1px solid ${statusColor}; background: transparent;">${escapeHtml(statusLabel)}</span></td>
+                  <td data-label="Hết hạn" style="color: ${isExpired || isExpiringSoon ? statusColor : 'inherit'}; font-weight: ${isExpired || isExpiringSoon ? '600' : 'normal'}">${license.expiry_date ? escapeHtml(formatDate(license.expiry_date)) : '<span style="color: var(--color-success);">Vĩnh Viễn</span>'}</td>
+                  <td data-label="Trạng thái"><span class="badge" style="color: ${statusColor}; border: 1px solid ${statusColor}; background: transparent;">${escapeHtml(statusLabel)}</span></td>
                   ${(canManageSoftware || canDeleteSoftware) ? `
-                    <td class="table-actions">
+                    <td class="table-actions" data-label="Thao tác">
                       ${canManageSoftware ? `<button class="table-action-btn edit-software-btn" data-id="${escapeHtml(license.license_id)}" type="button" aria-label="Sửa">✎</button>` : ""}
                       ${canDeleteSoftware ? `<button class="table-action-btn danger delete-software-btn" data-id="${escapeHtml(license.license_id)}" data-name="${escapeHtml(license.software_name)}" type="button" aria-label="Xóa">×</button>` : ""}
                     </td>
@@ -1924,7 +1924,7 @@ const state = {
         </div>
         
         <div class="table-wrap" style="margin-top: 16px;">
-          <table class="data-table" style="min-width: 600px;">
+          <table class="data-table mobile-card-table department-table">
             <thead>
               <tr>
                 <th style="width: 25%">PHÒNG BAN</th>
@@ -1937,12 +1937,12 @@ const state = {
           <tbody>
             ${state.departments.map(dept => `
                 <tr>
-                  <td style="font-weight: 500;">${escapeHtml(dept.department_name)}</td>
-                  <td>${escapeHtml(dept.manager)}</td>
-                  <td>${escapeHtml(dept.location)}</td>
-                  <td>${escapeHtml(dept.note)}</td>
+                  <td data-label="Phòng ban" style="font-weight: 500;">${escapeHtml(dept.department_name)}</td>
+                  <td data-label="Trưởng phòng">${escapeHtml(dept.manager)}</td>
+                  <td data-label="Vị trí">${escapeHtml(dept.location)}</td>
+                  <td data-label="Ghi chú">${escapeHtml(dept.note)}</td>
                   ${isAdmin() ? `
-                    <td class="table-actions">
+                    <td class="table-actions" data-label="Thao tác">
                       <button class="table-action-btn edit-dept-btn" data-id="${escapeHtml(dept.department_id)}" type="button" aria-label="Sửa">✎</button>
                       <button class="table-action-btn danger delete-dept-btn" data-id="${escapeHtml(dept.department_id)}" data-name="${escapeHtml(dept.department_name)}" type="button" aria-label="Xóa">×</button>
                     </td>
