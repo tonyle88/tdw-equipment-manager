@@ -4,6 +4,7 @@ const ALLOWED_FUNCTIONS = new Set([
   "healthCheck",
   "createBackup",
   "listBackups",
+  "verifyBackup",
   "restoreBackup",
   "loginUser",
   "logoutUser",
@@ -39,7 +40,7 @@ const MAX_REQUEST_BYTES = 3500000;
 const SESSION_COOKIE = "tdw_session";
 const SESSION_MAX_AGE = 21600;
 const USER_ARG_COUNTS = {
-  getAppData: 0, getSoftwareLicenseKey: 1, healthCheck: 0, createBackup: 0, listBackups: 0, restoreBackup: 1,
+  getAppData: 0, getSoftwareLicenseKey: 1, healthCheck: 0, createBackup: 0, listBackups: 0, verifyBackup: 1, restoreBackup: 1,
   loginUser: 1, logoutUser: 0, logoutAllSessions: 0,
   saveAsset: 1, deleteAsset: 1, saveSetting: 1, deleteSetting: 1, listUsers: 0,
   saveUser: 1, deleteUser: 1, resetUserPassword: 2, changeOwnPassword: 1,

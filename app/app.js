@@ -2182,6 +2182,7 @@ const state = {
     els.content.querySelectorAll("[data-delete-setting]").forEach((button) => {
       button.addEventListener("click", () => handleDeleteSetting(button.dataset.deleteSetting));
     });
+    if (isAdmin()) handleLoadBackups();
   }
 
   async function handleCreateBackup(event) {
@@ -2208,11 +2209,26 @@ const state = {
     container.innerHTML = "<p>Đang tải danh sách backup...</p>";
     try {
       const result = await callServer("listBackups");
-      container.innerHTML = result.backups?.length ? `<div class="backup-list">${result.backups.map((backup) => `
+      const latestText = result.latest_backup_at ? new Date(result.latest_backup_at).toLocaleString("vi-VN") : "Chưa có";
+      const restoreText = result.last_restore_at ? new Date(result.last_restore_at).toLocaleString("vi-VN") : "Chưa thực hiện";
+      const healthText = result.healthy ? "HOẠT ĐỘNG TỐT" : "CẦN KIỂM TRA";
+      const summary = `<div class="backup-health ${result.healthy ? "is-healthy" : "needs-attention"}">
+        <strong>${healthText}</strong>
+        <span>Backup gần nhất: ${escapeHtml(latestText)}</span>
+        <span>${result.age_hours === null ? "Chưa có dữ liệu tuổi backup" : `${escapeHtml(result.age_hours)} giờ trước`} · ${escapeHtml(result.backup_count || 0)} bản</span>
+        <span>Restore gần nhất: ${escapeHtml(restoreText)}</span>
+      </div>`;
+      container.innerHTML = result.backups?.length ? `${summary}<div class="backup-list">${result.backups.map((backup) => `
         <div class="backup-row">
           <div><strong>${escapeHtml(backup.name)}</strong><small>${escapeHtml(new Date(backup.created_at).toLocaleString("vi-VN"))}</small></div>
-          <button class="danger-button" type="button" data-restore-backup="${escapeHtml(backup.folder_id)}" data-backup-name="${escapeHtml(backup.name)}">Khôi phục</button>
-        </div>`).join("")}</div>` : "<p>Chưa có bản backup hợp lệ.</p>";
+          <div class="backup-row-actions">
+            <button class="secondary-button" type="button" data-verify-backup="${escapeHtml(backup.folder_id)}" data-backup-name="${escapeHtml(backup.name)}">Kiểm tra</button>
+            <button class="danger-button" type="button" data-restore-backup="${escapeHtml(backup.folder_id)}" data-backup-name="${escapeHtml(backup.name)}">Khôi phục</button>
+          </div>
+        </div>`).join("")}</div>` : `${summary}<p>Chưa có bản backup hợp lệ.</p>`;
+      container.querySelectorAll("[data-verify-backup]").forEach((verifyButton) => {
+        verifyButton.addEventListener("click", () => handleVerifyBackup(verifyButton));
+      });
       container.querySelectorAll("[data-restore-backup]").forEach((restoreButton) => {
         restoreButton.addEventListener("click", () => handleRestoreBackup(restoreButton));
       });
@@ -2220,6 +2236,27 @@ const state = {
       container.innerHTML = `<p class="backup-error">${escapeHtml(error.message)}</p>`;
     } finally {
       if (button) button.disabled = false;
+    }
+  }
+
+  async function handleVerifyBackup(button) {
+    button.disabled = true;
+    button.classList.add("is-loading");
+    try {
+      const result = await callServer("verifyBackup", button.dataset.verifyBackup);
+      const invalidSheets = (result.sheets || []).filter((sheet) => !sheet.exists || sheet.missing_headers.length);
+      if (!result.valid) {
+        const details = invalidSheets.map((sheet) => `${sheet.name}: ${sheet.exists ? `thiếu ${sheet.missing_headers.join(", ")}` : "không tồn tại"}`).join("; ");
+        showMessageModal("Backup cần kiểm tra", details || "Cấu trúc backup chưa hợp lệ.");
+        return;
+      }
+      const rowCount = (result.sheets || []).reduce((total, sheet) => total + Number(sheet.rows || 0), 0);
+      showToast("Backup hợp lệ", `${result.sheets.length} sheet · ${rowCount} dòng dữ liệu đã được kiểm tra.`);
+    } catch (error) {
+      showMessageModal("Không thể kiểm tra backup", error.message);
+    } finally {
+      button.disabled = false;
+      button.classList.remove("is-loading");
     }
   }
 
@@ -2235,7 +2272,7 @@ const state = {
     button.classList.add("is-loading");
     try {
       const result = await callServer("restoreBackup", button.dataset.restoreBackup);
-      showToast("Khôi phục thành công", `${result.restored_sheets || 0} sheet đã được phục hồi.`);
+      showToast("Khôi phục và đối chiếu thành công", `${result.restored_sheets || 0} sheet đã được phục hồi đúng số dòng.`);
       await loadAppData();
       renderSettingsView();
     } catch (error) {

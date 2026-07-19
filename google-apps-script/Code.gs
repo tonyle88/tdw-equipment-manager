@@ -224,7 +224,26 @@ function listBackups(token) {
     backups.push({ folder_id: folder.getId(), name: folder.getName(), created_at: folder.getDateCreated().toISOString() });
   }
   backups.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-  return { ok: true, backups: backups.slice(0, 30) };
+  const latest = backups[0] || null;
+  const ageHours = latest ? (Date.now() - new Date(latest.created_at).getTime()) / 3600000 : null;
+  return {
+    ok: true,
+    healthy: ageHours !== null && ageHours <= 48,
+    backup_count: backups.length,
+    latest_backup_at: latest ? latest.created_at : "",
+    age_hours: ageHours === null ? null : Math.round(ageHours * 10) / 10,
+    last_restore_at: PropertiesService.getScriptProperties().getProperty("TDW_LAST_RESTORE_AT") || "",
+    backups: backups.slice(0, 30),
+  };
+}
+
+function verifyBackup(folderId, token) {
+  requireAdmin_(token);
+  const backupFolder = findBackupFolder_(folderId);
+  const spreadsheetFile = findBackupSpreadsheetFile_(backupFolder);
+  if (!spreadsheetFile) throw new Error("Bản backup không chứa file dữ liệu Google Sheet.");
+  const inspection = inspectBackupSpreadsheet_(SpreadsheetApp.openById(spreadsheetFile.getId()));
+  return Object.assign({ ok: true, backup_name: backupFolder.getName() }, inspection);
 }
 
 function restoreBackup(folderId, token) {
@@ -240,6 +259,7 @@ function restoreBackup(folderId, token) {
     const safetyBackup = backupSystemData({ includeMedia: false });
     const target = SpreadsheetApp.getActiveSpreadsheet();
     const protectedSheets = [SHEET_NAMES.users, SHEET_NAMES.auditLogs];
+    const verification = [];
     let restoredSheets = 0;
     source.getSheets().forEach((sourceSheet) => {
       if (protectedSheets.indexOf(sourceSheet.getName()) !== -1) return;
@@ -254,15 +274,41 @@ function restoreBackup(folderId, token) {
       const restoredValues = values.map((row, rowIndex) => row.map((value, columnIndex) => formulas[rowIndex][columnIndex] || value));
       targetSheet.clearContents();
       targetSheet.getRange(1, 1, rows, columns).setValues(restoredValues);
+      verification.push({ sheet: sourceSheet.getName(), expected_rows: rows });
       restoredSheets += 1;
     });
     SpreadsheetApp.flush();
+    verification.forEach((item) => {
+      item.actual_rows = Math.max(target.getSheetByName(item.sheet).getLastRow(), 1);
+      item.matched = item.actual_rows === item.expected_rows;
+    });
+    if (verification.some((item) => !item.matched)) throw new Error("Dữ liệu đã khôi phục nhưng kiểm tra số dòng không khớp. Hãy dùng safety backup để phục hồi lại.");
     PropertiesService.getScriptProperties().setProperty("TDW_LAST_RESTORE_AT", new Date().toISOString());
     logAudit_(actor, "SYSTEM_BACKUP_RESTORED", "backup", backupFolder.getId(), backupFolder.getName());
-    return { ok: true, restored_sheets: restoredSheets, restored_from: backupFolder.getName(), safety_backup_folder_id: safetyBackup.folder_id, restored_at: new Date().toISOString() };
+    return { ok: true, verified: true, verification: verification, restored_sheets: restoredSheets, restored_from: backupFolder.getName(), safety_backup_folder_id: safetyBackup.folder_id, restored_at: new Date().toISOString() };
   } finally {
     lock.releaseLock();
   }
+}
+
+function inspectBackupSpreadsheet_(spreadsheet) {
+  const sheets = Object.entries(HEALTH_CHECK_HEADERS).map(([name, requiredHeaders]) => {
+    const sheet = spreadsheet.getSheetByName(name);
+    if (!sheet) return { name: name, exists: false, rows: 0, missing_headers: requiredHeaders };
+    const columns = Math.max(sheet.getLastColumn(), 1);
+    const headers = sheet.getRange(1, 1, 1, columns).getDisplayValues()[0].map((header) => String(header).trim()).filter(Boolean);
+    return {
+      name: name,
+      exists: true,
+      rows: Math.max(sheet.getLastRow() - 1, 0),
+      missing_headers: requiredHeaders.filter((header) => headers.indexOf(header) === -1),
+    };
+  });
+  return {
+    valid: sheets.every((sheet) => sheet.exists && sheet.missing_headers.length === 0),
+    expected_schema_version: TDW_SCHEMA_VERSION,
+    sheets: sheets,
+  };
 }
 
 function getBackupRoot_() {
@@ -456,6 +502,9 @@ function doPost(event) {
     }
     if (action === "listBackups") {
       return jsonResponse_(listBackups(args[0] || body.token || ""));
+    }
+    if (action === "verifyBackup") {
+      return jsonResponse_(verifyBackup(args[0] || body.folder_id || "", args[1] || body.token || ""));
     }
     if (action === "restoreBackup") {
       return jsonResponse_(restoreBackup(args[0] || body.folder_id || "", args[1] || body.token || ""));
