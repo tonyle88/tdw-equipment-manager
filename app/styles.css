@@ -1282,6 +1282,8 @@
       align-items: center;
       gap: 12px 8px;
       margin-bottom: 18px;
+      position: relative;
+      z-index: 20;
     }
     .brand { min-width: 0; gap: 8px; }
     .brand-logo { width: 54px; height: 40px; }
@@ -1320,6 +1322,8 @@
       line-height: 1.1;
       text-align: center;
       white-space: nowrap;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
     .nav-pills .tdw-icon { width: 19px; height: 19px; }
     .hero { margin-bottom: 14px; }

@@ -3582,11 +3582,11 @@ const state = {
       if (event.key === "ArrowRight") moveLightbox(1);
       if (event.key === "Escape") els.mediaLightbox.hidden = true;
     });
-    els.navLinks.forEach((link) => {
-      link.addEventListener("click", (event) => {
-        event.preventDefault();
-        setView(link.dataset.view);
-      });
+    document.querySelector(".nav-pills")?.addEventListener("click", (event) => {
+      const link = event.target.closest("[data-view]");
+      if (!link) return;
+      event.preventDefault();
+      setView(link.dataset.view);
     });
     bindDynamicEvents();
   }
