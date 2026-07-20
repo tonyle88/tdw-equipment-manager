@@ -19,6 +19,7 @@ const state = {
     page: 1,
     pageSize: 13,
     activeView: "overview",
+    maintenanceSection: "logs",
     isSaving: false,
     editingSettingId: "",
     editingUserId: "",
@@ -1534,7 +1535,9 @@ const state = {
       showMessageModal("Không đủ quyền", "Tài khoản không có quyền truy cập module này.");
       return;
     }
+    const previousView = state.activeView;
     state.activeView = view;
+    if (view === "maintenance" && previousView !== "maintenance") state.maintenanceSection = "logs";
     if (els.appShell) els.appShell.dataset.activeView = view;
     els.navLinks.forEach((link) => link.classList.toggle("active", link.dataset.view === view));
     els.toolbar.style.display = view === "maintenance" || view === "software" || view === "departments" || view === "reports" || view === "settings" || view === "users" ? "none" : "";
@@ -1600,6 +1603,8 @@ const state = {
   function renderMaintenanceView() {
     const canManageMaintenance = hasPermission("maintenance.manage");
     const canDeleteMaintenance = hasPermission("maintenance.delete");
+    const maintenanceSections = ["logs", "plans", "alerts"];
+    if (!maintenanceSections.includes(state.maintenanceSection)) state.maintenanceSection = "logs";
     const today = new Date().toISOString().slice(0, 10);
     const watchList = state.assets.filter((asset) => ["KEM_PHAM_CHAT", "CAN_KIEM_TRA", "KHONG_SU_DUNG", "LUU_KHO_THANH_LY"].includes(asset.status));
     const byStatus = countBy(watchList, "status", "status");
@@ -1637,45 +1642,11 @@ const state = {
     });
     if (!tableHtml) tableHtml = `<tr><td colspan="4">CHƯA CÓ THIẾT BỊ CẦN XỬ LÝ.</td></tr>`;
 
-    els.content.innerHTML = `
-      <div class="view-only-panel">
-        <div class="panel-head maintenance-title-row"><h2>BẢO TRÌ THIẾT BỊ</h2><span>${watchList.length} THIẾT BỊ CẦN THEO DÕI</span></div>
-        <div class="report-grid">
-          <article class="module-card wide-card">
-            <h3>TÌNH TRẠNG CẦN XỬ LÝ</h3>
-            ${renderBarChart(byStatus)}
-          </article>
-          <article class="module-card maintenance-list-card" style="grid-column: 1 / -1;">
-            <h3>DANH SÁCH CHI TIẾT THEO TÌNH TRẠNG</h3>
-            <table class="mini-table maintenance-table" style="table-layout: fixed; width: 100%; min-width: 600px;">
-              <thead>
-                <tr>
-                  <th style="width: 50px; text-align: center;">STT</th>
-                  <th style="width: 40%;">THIẾT BỊ</th>
-                  <th style="width: 150px; text-align: center;">TÌNH TRẠNG</th>
-                  <th style="width: 35%;">NGƯỜI DÙNG</th>
-                </tr>
-              </thead>
-              <tbody>${tableHtml}</tbody>
-            </table>
-          </article>
-          <article class="module-card maintenance-list-card" style="grid-column: 1 / -1; margin-top: 24px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px;">
-              <div><h3 style="margin: 0;">KẾ HOẠCH BẢO TRÌ</h3><p style="margin: 4px 0 0;">Theo dõi lịch tháng, quý, năm và nhắc email cho người phụ trách.</p></div>
-              <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-                ${isAdmin() ? `<button class="secondary-button" type="button" id="sendMaintenancePlanReminders">GỬI NHẮC EMAIL</button>` : ""}
-                ${canManageMaintenance ? `<button class="primary-button" type="button" id="openAddMaintenancePlanModal">+ THÊM KẾ HOẠCH</button>` : ""}
-              </div>
-            </div>
-            <table class="mini-table maintenance-table" style="min-width: 760px;">
-              <thead><tr><th>THIẾT BỊ</th><th>NỘI DUNG</th><th style="width: 130px; text-align: center;">CHU KỲ</th><th style="width: 130px; text-align: center;">ĐẾN HẠN</th><th style="width: 120px; text-align: center;">TRẠNG THÁI</th>${(canManageMaintenance || canDeleteMaintenance) ? `<th style="width: 90px;"></th>` : ""}</tr></thead>
-              <tbody>${planRows || `<tr><td colspan="${canManageMaintenance || canDeleteMaintenance ? 6 : 5}" style="text-align: center; color: var(--text-secondary); padding: 24px 0;">Chưa có kế hoạch bảo trì.</td></tr>`}</tbody>
-            </table>
-          </article>
-          <article class="module-card maintenance-list-card" style="grid-column: 1 / -1; margin-top: 24px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-              <h3 style="margin: 0;">LỊCH SỬ BẢO TRÌ GẦN ĐÂY</h3>
-              ${canManageMaintenance ? `<button class="primary-button" type="button" id="openAddLogModal" style="padding: 6px 12px; font-size: 12px;">+ GHI NHẬN BẢO TRÌ</button>` : ""}
+    const logsSection = `
+          <article class="module-card maintenance-list-card">
+            <div class="maintenance-card-head">
+              <div><h3 style="margin: 0;">GHI NHẬN BẢO TRÌ</h3><p style="margin: 4px 0 0;">Cập nhật công việc bảo trì và theo dõi lịch sử gần đây.</p></div>
+              ${canManageMaintenance ? `<div class="maintenance-card-actions"><button class="primary-button" type="button" id="openAddLogModal">+ GHI NHẬN BẢO TRÌ</button></div>` : ""}
             </div>
             <div class="maintenance-history-scroll">
             <table class="mini-table maintenance-history-table">
@@ -1719,10 +1690,67 @@ const state = {
               </tbody>
             </table>
             </div>
+          </article>`;
+
+    const plansSection = `
+          <article class="module-card maintenance-list-card">
+            <div class="maintenance-card-head">
+              <div><h3>KẾ HOẠCH BẢO TRÌ</h3><p>Theo dõi lịch tháng, quý, năm và nhắc email cho người phụ trách.</p></div>
+              <div class="maintenance-card-actions">
+                ${isAdmin() ? `<button class="secondary-button" type="button" id="sendMaintenancePlanReminders">GỬI NHẮC EMAIL</button>` : ""}
+                ${canManageMaintenance ? `<button class="primary-button" type="button" id="openAddMaintenancePlanModal">+ THÊM KẾ HOẠCH</button>` : ""}
+              </div>
+            </div>
+            <div class="maintenance-table-scroll">
+              <table class="mini-table maintenance-table" style="min-width: 760px;">
+                <thead><tr><th>THIẾT BỊ</th><th>NỘI DUNG</th><th style="width: 130px; text-align: center;">CHU KỲ</th><th style="width: 130px; text-align: center;">ĐẾN HẠN</th><th style="width: 120px; text-align: center;">TRẠNG THÁI</th>${(canManageMaintenance || canDeleteMaintenance) ? `<th style="width: 90px;"></th>` : ""}</tr></thead>
+                <tbody>${planRows || `<tr><td colspan="${canManageMaintenance || canDeleteMaintenance ? 6 : 5}" style="text-align: center; color: var(--text-secondary); padding: 24px 0;">Chưa có kế hoạch bảo trì.</td></tr>`}</tbody>
+              </table>
+            </div>
+          </article>`;
+
+    const alertsSection = `
+          <article class="module-card wide-card">
+            <h3>TÌNH TRẠNG CẦN XỬ LÝ</h3>
+            ${renderBarChart(byStatus)}
           </article>
-        </div>
+          <article class="module-card maintenance-list-card">
+            <h3>DANH SÁCH CHI TIẾT THEO TÌNH TRẠNG</h3>
+            <div class="maintenance-table-scroll">
+              <table class="mini-table maintenance-table" style="table-layout: fixed; width: 100%; min-width: 600px;">
+                <thead><tr><th style="width: 50px; text-align: center;">STT</th><th style="width: 40%;">THIẾT BỊ</th><th style="width: 150px; text-align: center;">TÌNH TRẠNG</th><th style="width: 35%;">NGƯỜI DÙNG</th></tr></thead>
+                <tbody>${tableHtml}</tbody>
+              </table>
+            </div>
+          </article>`;
+
+    const sectionContent = { logs: logsSection, plans: plansSection, alerts: alertsSection }[state.maintenanceSection];
+    const sectionButtons = [
+      { id: "logs", icon: "maintenance-log", label: "GHI NHẬN BẢO TRÌ", summary: `${state.maintenanceLogs.length} ghi nhận` },
+      { id: "plans", icon: "maintenance-plan", label: "LÊN KẾ HOẠCH", summary: `${state.maintenancePlans.length} kế hoạch` },
+      { id: "alerts", icon: "maintenance-alert", label: "CẢNH BÁO TÌNH TRẠNG", summary: `${watchList.length} cần theo dõi` },
+    ];
+
+    els.content.innerHTML = `
+      <div class="view-only-panel maintenance-view">
+        <div class="panel-head maintenance-title-row"><h2>BẢO TRÌ THIẾT BỊ</h2><span>${watchList.length} THIẾT BỊ CẦN THEO DÕI</span></div>
+        <nav class="maintenance-section-nav" aria-label="Nội dung bảo trì">
+          ${sectionButtons.map((section) => `
+            <button class="maintenance-section-button${state.maintenanceSection === section.id ? " active" : ""}" type="button" data-maintenance-section="${section.id}" aria-pressed="${state.maintenanceSection === section.id}">
+              <span class="maintenance-section-icon"><svg class="tdw-icon" aria-hidden="true"><use href="assets/tdw-icons.svg?v=20260720#${section.icon}"></use></svg></span>
+              <span class="maintenance-section-copy"><strong>${section.label}</strong><small>${section.summary}</small></span>
+            </button>`).join("")}
+        </nav>
+        <div class="report-grid maintenance-section-content">${sectionContent}</div>
       </div>
     `;
+
+    els.content.querySelectorAll("[data-maintenance-section]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.maintenanceSection = button.dataset.maintenanceSection;
+        renderMaintenanceView();
+      });
+    });
     
     const openBtn = els.content.querySelector("#openAddLogModal");
     if (openBtn) {

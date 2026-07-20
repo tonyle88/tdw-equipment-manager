@@ -813,6 +813,51 @@
   .mini-table { width: 100%; min-width: 0; table-layout: auto; }
   .mini-table th, .mini-table td { padding: 10px 0; }
   .maintenance-title-row h2, .maintenance-title-row span { text-transform: uppercase; }
+  .maintenance-section-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    padding: 0 20px;
+  }
+  .maintenance-section-button {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    min-height: 78px;
+    padding: 12px;
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 12px;
+    background: rgba(255,255,255,.06);
+    color: #fff;
+    text-align: left;
+    cursor: pointer;
+  }
+  .maintenance-section-button:hover,
+  .maintenance-section-button.active { border-color: #38bdf8; background: rgba(14,116,168,.34); }
+  .maintenance-section-icon {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    border-radius: 10px;
+    background: rgba(56,189,248,.14);
+    color: #67e8f9;
+  }
+  .maintenance-section-icon .tdw-icon { width: 24px; height: 24px; }
+  .maintenance-section-copy { min-width: 0; }
+  .maintenance-section-copy strong,
+  .maintenance-section-copy small { display: block; }
+  .maintenance-section-copy strong { font-size: 13px; line-height: 1.25; }
+  .maintenance-section-copy small { margin-top: 4px; color: rgba(255,255,255,.62); font-size: 11px; }
+  .maintenance-section-content { padding-top: 16px; }
+  .maintenance-section-content .maintenance-list-card { grid-column: 1 / -1; }
+  .maintenance-card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .maintenance-card-head h3 { margin: 0; }
+  .maintenance-card-head p { margin: 4px 0 0; }
+  .maintenance-card-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+  .maintenance-table-scroll { width: 100%; overflow-x: auto; }
   .maintenance-table th, .maintenance-table td { vertical-align: middle; }
   .maintenance-table th:nth-child(2), .maintenance-table td:nth-child(2) { text-align: center; }
   .maintenance-table th:nth-child(3), .maintenance-table td:nth-child(3) { text-align: center; }
@@ -1391,7 +1436,27 @@
     .module-card h3 { font-size: 17px; line-height: 1.25; }
     .module-card p { font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
     .table-wrap,
-    .maintenance-history-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
+    .maintenance-history-scroll,
+    .maintenance-table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
+    .maintenance-view .maintenance-title-row { margin-bottom: 10px; }
+    .maintenance-section-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 0; }
+    .maintenance-section-button {
+      grid-template-columns: 1fr;
+      justify-items: center;
+      gap: 6px;
+      min-height: 84px;
+      padding: 8px 4px;
+      text-align: center;
+    }
+    .maintenance-section-icon { width: 34px; height: 34px; border-radius: 8px; }
+    .maintenance-section-icon .tdw-icon { width: 19px; height: 19px; }
+    .maintenance-section-copy strong { font-size: 9px; line-height: 1.2; overflow-wrap: anywhere; }
+    .maintenance-section-copy small { display: none; }
+    .maintenance-section-content { padding: 10px 0 0; }
+    .maintenance-card-head { align-items: stretch; flex-direction: column; }
+    .maintenance-card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .maintenance-card-actions .primary-button,
+    .maintenance-card-actions .secondary-button { min-width: 0; width: 100%; padding: 0 8px; font-size: 9px; }
 
     .users-panel { gap: 12px; }
     .users-list { gap: 8px; }

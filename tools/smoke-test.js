@@ -97,6 +97,7 @@ async function run() {
   const app = read("app/app.js");
   const index = read("app/index.html");
   const styles = read("app/styles.css");
+  const icons = read("app/assets/tdw-icons.svg");
   const assetForm = index.match(/id="assetForm"[\s\S]*?<\/form>/)?.[0] || "";
   const assetFormFields = [...assetForm.matchAll(/name="([^"]+)"/g)]
     .map((match) => match[1])
@@ -293,6 +294,17 @@ async function run() {
   assert.ok(app.includes('<th>THAO TÁC</th>'));
   assert.ok(styles.includes('.maintenance-history-scroll'));
   assert.ok(styles.includes('.maintenance-history-actions-col'));
+  assert.ok(app.includes('maintenanceSection: "logs"'));
+  assert.ok(app.includes('if (view === "maintenance" && previousView !== "maintenance") state.maintenanceSection = "logs"'));
+  assert.ok(app.includes('data-maintenance-section="${section.id}"'));
+  assert.ok(app.includes('id: "logs", icon: "maintenance-log"'));
+  assert.ok(app.includes('id: "plans", icon: "maintenance-plan"'));
+  assert.ok(app.includes('id: "alerts", icon: "maintenance-alert"'));
+  assert.ok(styles.includes(".maintenance-section-nav"));
+  assert.ok(styles.includes(".maintenance-table-scroll"));
+  assert.ok(icons.includes('id="maintenance-log"'));
+  assert.ok(icons.includes('id="maintenance-plan"'));
+  assert.ok(icons.includes('id="maintenance-alert"'));
   assert.ok(app.includes("async function convertImageToWebp(file)"));
   assert.ok(app.includes("1280 / Math.max(bitmap.width, bitmap.height)"));
   assert.ok(app.includes('canvas.toBlob(resolve, "image/webp", 0.72)'));
