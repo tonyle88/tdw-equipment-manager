@@ -237,6 +237,8 @@ async function run() {
   assert.ok(index.includes('tdw-icons.svg?v=20260719#users'));
   assert.ok(styles.includes(".tdw-icon"));
   assert.ok(styles.includes(".user-menu-popover"));
+  assert.ok(styles.includes("padding: 0 clamp(9px, .8vw, 14px)"));
+  assert.ok(styles.includes("max-width: 132px"));
   assert.ok(app.includes('document.querySelector(".user-menu[open]")'));
   assert.ok(app.includes('els.appShell.dataset.activeView = view'));
   assert.ok(app.includes('function setUserPermissionCodes(rawPermissions, role)'));
