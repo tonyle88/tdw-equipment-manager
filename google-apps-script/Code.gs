@@ -530,6 +530,9 @@ function doPost(event) {
     if (action === "saveMaintenanceLog") {
       return jsonResponse_(saveMaintenanceLog(args[0] || body.log || {}, args[1] || body.token || ""));
     }
+    if (action === "saveMaintenanceLogs") {
+      return jsonResponse_(saveMaintenanceLogs(args[0] || body.logs || [], args[1] || body.token || ""));
+    }
     if (action === "deleteMaintenanceLog") {
       const logId = args[0] && typeof args[0] === "object" ? args[0].logId : args[0] || body.logId || "";
       return jsonResponse_(deleteMaintenanceLog(logId, args[1] || body.token || ""));
@@ -772,6 +775,38 @@ function saveMaintenanceLog(log, token) {
     if (isNew && linkedPlan) completeMaintenancePlan_(linkedPlan, saved.date);
     logAudit_(actor, action, "maintenance_log", saved.log_id, saved.action_type || saved.asset_id);
     return { ok: true, data: saved, updated_at: new Date().toISOString() };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function saveMaintenanceLogs(logs, token) {
+  try {
+    const actor = requirePermission_(token || "", "maintenance.manage");
+    if (!Array.isArray(logs) || !logs.length) throw new Error("Danh sách thiết bị bảo trì đang trống");
+    if (logs.length > 200) throw new Error("Mỗi lần chỉ được ghi nhận tối đa 200 thiết bị");
+    const activeAssetIds = new Set(readActiveAssets_().map((asset) => asset.asset_id));
+    const normalizedLogs = logs.map((log) => {
+      if (log && log.log_id) throw new Error("Ghi nhận hàng loạt không hỗ trợ cập nhật lịch sử đã có");
+      const normalized = normalizeMaintenanceLog_(log || {});
+      if (!activeAssetIds.has(normalized.asset_id)) throw new Error("Thiết bị không tồn tại hoặc đã bị xóa");
+      if (normalized.plan_id) throw new Error("Không thể liên kết một kế hoạch khi ghi nhận cho nhiều thiết bị");
+      return normalized;
+    });
+    const assetIds = normalizedLogs.map((log) => log.asset_id);
+    if (new Set(assetIds).size !== assetIds.length) throw new Error("Danh sách có thiết bị bị trùng");
+    const sheet = getSheet_(SHEET_NAMES.maintenanceLogs);
+    ensureSheetHeaders_(SHEET_NAMES.maintenanceLogs, sheet);
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map((header) => String(header).trim());
+    const now = new Date().toISOString();
+    normalizedLogs.forEach((log) => {
+      log.created_at = log.created_at || now;
+      log.updated_at = now;
+    });
+    sheet.getRange(sheet.getLastRow() + 1, 1, normalizedLogs.length, headers.length)
+      .setValues(normalizedLogs.map((log) => headers.map((header) => log[header] || "")));
+    logAudit_(actor, "MAINTENANCE_LOGS_CREATED", "maintenance_log", "", `${normalizedLogs.length} thiết bị`);
+    return { ok: true, created: normalizedLogs.length, data: normalizedLogs, updated_at: now };
   } catch (error) {
     return { ok: false, error: error.message };
   }

@@ -1176,6 +1176,17 @@
   }
   .asset-tag-remove { cursor: pointer; font-size: 14px; line-height: 1; color: #1d4ed8; opacity: .7; }
   .asset-tag-remove:hover { opacity: 1; }
+  .maintenance-device-field { display: grid; gap: 8px; }
+  .maintenance-device-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-secondary); font-weight: 700; }
+  .maintenance-device-heading strong { color: #dc2626; }
+  .maintenance-device-heading .secondary-button { min-height: 34px; padding: 6px 10px; font-size: 12px; }
+  .maintenance-device-list { max-height: 190px; overflow-y: auto; display: grid; gap: 5px; padding: 7px; border: 1px solid var(--border); border-radius: 10px; background: #f8fafc; }
+  .maintenance-device-option { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px; cursor: pointer; color: var(--text-primary); font-size: 13px; }
+  .maintenance-device-option:hover, .maintenance-device-option.selected { background: #dbeafe; }
+  .maintenance-device-option input { width: 17px; height: 17px; min-height: 17px; margin: 0; accent-color: var(--tdw-blue); }
+  .maintenance-device-option span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .maintenance-device-option small { color: var(--text-secondary); font-weight: 600; }
+  .maintenance-device-empty { margin: 8px; color: var(--text-secondary); text-align: center; }
   .modal-head {
     position: sticky;
     top: -22px;

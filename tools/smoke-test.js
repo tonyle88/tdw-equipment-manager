@@ -114,6 +114,8 @@ async function run() {
   assert.ok(appsScript.includes("function saveMaintenancePlans(plans, token)"));
   assert.ok(appsScript.includes("function nextMaintenanceDueDate_(currentDueDate, frequency, completionDate)"));
   assert.ok(appsScript.includes("function ensureMaintenanceLogsSheet_(sheet)"));
+  assert.ok(appsScript.includes("function saveMaintenanceLogs(logs, token)"));
+  assert.ok(app.includes('callServer("saveMaintenanceLogs"'));
   assert.ok(appsScript.includes("plans.length > 200"));
   assert.ok(appsScript.includes("function runMaintenancePlanReminders()"));
   assert.ok(appsScript.includes("function installMaintenancePlanReminderTrigger()"));
@@ -389,6 +391,14 @@ async function run() {
   assert.equal(maintenancePlans.res.statusCode, 200);
   assert.deepEqual(JSON.parse(maintenancePlans.requestToAppsScript.options.body), {
     action: "saveMaintenancePlans",
+    args: [[{ asset_id: "asset-id" }], "session-token"],
+    proxy_secret: "proxy-secret",
+  });
+
+  const maintenanceLogs = await invokeProxy({ fn: "saveMaintenanceLogs", args: [[{ asset_id: "asset-id" }]] }, { cookie: "tdw_session=session-token" });
+  assert.equal(maintenanceLogs.res.statusCode, 200);
+  assert.deepEqual(JSON.parse(maintenanceLogs.requestToAppsScript.options.body), {
+    action: "saveMaintenanceLogs",
     args: [[{ asset_id: "asset-id" }], "session-token"],
     proxy_secret: "proxy-secret",
   });

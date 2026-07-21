@@ -341,9 +341,15 @@
                 <option value="">-- Tất cả thiết bị --</option>
               </select>
             </label>
-            <label class="span-2">Thiết bị
-              <select name="asset_id" required></select>
-            </label>
+            <div class="span-2 maintenance-device-field">
+              <div class="maintenance-device-heading">
+                <span>Thiết bị <strong aria-hidden="true">*</strong></span>
+                <button class="secondary-button" id="maintenanceSelectVisibleAssets" type="button">Chọn tất cả đang hiển thị</button>
+              </div>
+              <input type="hidden" name="asset_id" />
+              <div class="maintenance-device-list" id="maintenanceLogAssetList" role="group" aria-label="Chọn thiết bị bảo trì"></div>
+              <span class="field-help" id="maintenanceLogSelectionCount">Chưa chọn thiết bị.</span>
+            </div>
             <label class="span-2">Kế hoạch liên quan
               <select name="plan_id">
                 <option value="">-- Không liên kết kế hoạch --</option>
