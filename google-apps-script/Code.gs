@@ -786,11 +786,18 @@ function saveMaintenanceLogs(logs, token) {
     if (!Array.isArray(logs) || !logs.length) throw new Error("Danh sách thiết bị bảo trì đang trống");
     if (logs.length > 200) throw new Error("Mỗi lần chỉ được ghi nhận tối đa 200 thiết bị");
     const activeAssetIds = new Set(readActiveAssets_().map((asset) => asset.asset_id));
+    const plans = readSheetAsObjects_(SHEET_NAMES.maintenancePlans);
+    const linkedPlans = [];
     const normalizedLogs = logs.map((log) => {
       if (log && log.log_id) throw new Error("Ghi nhận hàng loạt không hỗ trợ cập nhật lịch sử đã có");
       const normalized = normalizeMaintenanceLog_(log || {});
       if (!activeAssetIds.has(normalized.asset_id)) throw new Error("Thiết bị không tồn tại hoặc đã bị xóa");
-      if (normalized.plan_id) throw new Error("Không thể liên kết một kế hoạch khi ghi nhận cho nhiều thiết bị");
+      if (!normalized.plan_id) throw new Error("Mỗi thiết bị phải thuộc một kế hoạch bảo trì");
+      const linkedPlan = plans.find((plan) => plan.plan_id === normalized.plan_id);
+      if (!linkedPlan) throw new Error("Kế hoạch bảo trì liên kết không tồn tại");
+      if (linkedPlan.asset_id !== normalized.asset_id) throw new Error("Kế hoạch bảo trì không thuộc thiết bị đã chọn");
+      if (linkedPlan.active === "FALSE") throw new Error("Kế hoạch bảo trì liên kết đang tạm dừng");
+      linkedPlans.push(linkedPlan);
       return normalized;
     });
     const assetIds = normalizedLogs.map((log) => log.asset_id);
@@ -805,6 +812,7 @@ function saveMaintenanceLogs(logs, token) {
     });
     sheet.getRange(sheet.getLastRow() + 1, 1, normalizedLogs.length, headers.length)
       .setValues(normalizedLogs.map((log) => headers.map((header) => log[header] || "")));
+    linkedPlans.forEach((plan, index) => completeMaintenancePlan_(plan, normalizedLogs[index].date));
     logAudit_(actor, "MAINTENANCE_LOGS_CREATED", "maintenance_log", "", `${normalizedLogs.length} thiết bị`);
     return { ok: true, created: normalizedLogs.length, data: normalizedLogs, updated_at: now };
   } catch (error) {

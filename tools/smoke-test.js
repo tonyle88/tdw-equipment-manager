@@ -116,6 +116,9 @@ async function run() {
   assert.ok(appsScript.includes("function ensureMaintenanceLogsSheet_(sheet)"));
   assert.ok(appsScript.includes("function saveMaintenanceLogs(logs, token)"));
   assert.ok(app.includes('callServer("saveMaintenanceLogs"'));
+  assert.ok(app.includes("const planGroups = new Map()"));
+  assert.ok(app.includes("plan_id: planByAsset.get(assetId)?.plan_id"));
+  assert.ok(index.includes("Nhóm kế hoạch bảo trì"));
   assert.ok(appsScript.includes("plans.length > 200"));
   assert.ok(appsScript.includes("function runMaintenancePlanReminders()"));
   assert.ok(appsScript.includes("function installMaintenancePlanReminderTrigger()"));

@@ -2566,10 +2566,21 @@ const state = {
     const planSelect = els.maintenanceLogForm.querySelector('[name="plan_id"]');
     const selectedAssetIds = new Set(assetId ? [assetId] : []);
     els.maintenanceLogForm.selectedAssetIds = selectedAssetIds;
+    const planKey = (plan) => [plan.title, plan.frequency, plan.next_due_date].map((value) => String(value || "")).join("\u001f");
+    const pendingPlans = state.maintenancePlans.filter((plan) => plan.active !== "FALSE");
+    const planGroups = new Map();
+    pendingPlans.forEach((plan) => {
+      const key = planKey(plan);
+      if (!planGroups.has(key)) planGroups.set(key, []);
+      planGroups.get(key).push(plan);
+    });
+    let visiblePlanByAsset = new Map();
     
-    // Populate Group Filter
-    const groups = settingOptions("asset_group");
-    els.maintenanceLogGroupFilter.innerHTML = `<option value="">-- Tất cả thiết bị --</option>` + groups.map(([val, label]) => `<option value="${escapeHtml(val)}">${escapeHtml(label)}</option>`).join('');
+    // Chỉ hiển thị các nhóm kế hoạch còn thiết bị chưa được ghi nhận.
+    els.maintenanceLogGroupFilter.innerHTML = `<option value="">-- Chọn nhóm kế hoạch --</option>` + [...planGroups.entries()].map(([key, plans]) => {
+      const sample = plans[0];
+      return `<option value="${escapeHtml(key)}">${escapeHtml(sample.title)} · ${escapeHtml(formatDate(sample.next_due_date))} · ${plans.length} thiết bị</option>`;
+    }).join("");
     els.maintenanceLogGroupFilter.value = "";
 
     // Populate Maintenance Types
@@ -2580,7 +2591,8 @@ const state = {
     }
     
     const populatePlans = (selectedAssetId, selectedPlanId = "") => {
-      const plans = state.maintenancePlans.filter((plan) => plan.asset_id === selectedAssetId);
+      const scopedPlan = visiblePlanByAsset.get(selectedAssetId);
+      const plans = scopedPlan ? [scopedPlan] : state.maintenancePlans.filter((plan) => plan.asset_id === selectedAssetId);
       planSelect.innerHTML = `<option value="">-- Không liên kết kế hoạch --</option>` + plans.map((plan) => `<option value="${escapeHtml(plan.plan_id)}">${escapeHtml(plan.title)} · ${escapeHtml(formatDate(plan.next_due_date))}${plan.active === "FALSE" ? " · Tạm dừng" : ""}</option>`).join("");
       planSelect.value = selectedPlanId;
       planSelect.disabled = !selectedAssetId;
@@ -2598,13 +2610,16 @@ const state = {
     };
 
     const populateAssets = (groupFilter) => {
-      const filteredAssets = groupFilter ? state.assets.filter(a => a.asset_group === groupFilter) : state.assets;
+      const groupPlans = planGroups.get(groupFilter) || [];
+      visiblePlanByAsset = new Map(groupPlans.map((plan) => [plan.asset_id, plan]));
+      els.maintenanceLogForm.planByAsset = visiblePlanByAsset;
+      const filteredAssets = state.assets.filter((asset) => visiblePlanByAsset.has(asset.asset_id));
       els.maintenanceLogAssetList.innerHTML = filteredAssets.length ? filteredAssets.map((asset) => `
         <label class="maintenance-device-option">
           <input type="checkbox" value="${escapeHtml(asset.asset_id)}" ${selectedAssetIds.has(asset.asset_id) ? "checked" : ""} />
           <span>${escapeHtml(asset.asset_name)}</span>
           <small>${escapeHtml(asset.asset_code || "Chưa có mã")}</small>
-        </label>`).join("") : `<p class="maintenance-device-empty">Không có thiết bị trong danh mục này.</p>`;
+        </label>`).join("") : `<p class="maintenance-device-empty">${groupFilter ? "Tất cả thiết bị trong nhóm này đã được ghi nhận." : "Chọn một nhóm kế hoạch để xem thiết bị chưa thực hiện."}</p>`;
       els.maintenanceLogAssetList.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
         checkbox.onchange = () => {
           if (checkbox.checked) selectedAssetIds.add(checkbox.value);
@@ -2618,7 +2633,10 @@ const state = {
     };
     
     // Bind filter change
-    els.maintenanceLogGroupFilter.onchange = (e) => populateAssets(e.target.value);
+    els.maintenanceLogGroupFilter.onchange = (e) => {
+      selectedAssetIds.clear();
+      populateAssets(e.target.value);
+    };
     els.maintenanceSelectVisibleAssets.onclick = () => {
       const visibleCheckboxes = [...els.maintenanceLogAssetList.querySelectorAll('input[type="checkbox"]')];
       const shouldSelect = visibleCheckboxes.some((checkbox) => !checkbox.checked);
@@ -2640,8 +2658,18 @@ const state = {
         selectedAssetIds.add(log.asset_id);
         const logAsset = state.assets.find(a => a.asset_id === log.asset_id);
         if (logAsset) {
-          els.maintenanceLogGroupFilter.value = logAsset.asset_group;
-          populateAssets(logAsset.asset_group);
+          const logPlan = state.maintenancePlans.find((plan) => plan.plan_id === log.plan_id);
+          if (logPlan && !planGroups.has(planKey(logPlan))) {
+            planGroups.set(planKey(logPlan), [logPlan]);
+            els.maintenanceLogGroupFilter.insertAdjacentHTML("beforeend", `<option value="${escapeHtml(planKey(logPlan))}">${escapeHtml(logPlan.title)} · ${escapeHtml(formatDate(logPlan.next_due_date))}</option>`);
+          }
+          const editGroupKey = logPlan ? planKey(logPlan) : "";
+          els.maintenanceLogGroupFilter.value = editGroupKey;
+          populateAssets(editGroupKey);
+          if (!visiblePlanByAsset.has(log.asset_id)) {
+            visiblePlanByAsset.set(log.asset_id, logPlan || null);
+            els.maintenanceLogAssetList.innerHTML = `<label class="maintenance-device-option selected"><input type="checkbox" value="${escapeHtml(log.asset_id)}" checked /><span>${escapeHtml(logAsset.asset_name)}</span><small>${escapeHtml(logAsset.asset_code || "Chưa có mã")}</small></label>`;
+          }
         } else {
           populateAssets("");
         }
@@ -2657,11 +2685,12 @@ const state = {
     if (!isEditing) {
       els.maintenanceLogForm.querySelector('[name="log_id"]').value = "";
       if (assetId) {
-        const asset = state.assets.find(a => a.asset_id === assetId);
-        if (asset) {
-          els.maintenanceLogGroupFilter.value = asset.asset_group;
-          populateAssets(asset.asset_group);
-          populatePlans(assetId);
+        const assetPlan = pendingPlans.find((plan) => plan.asset_id === assetId);
+        if (assetPlan) {
+          const groupKey = planKey(assetPlan);
+          els.maintenanceLogGroupFilter.value = groupKey;
+          populateAssets(groupKey);
+          populatePlans(assetId, assetPlan.plan_id);
         } else {
           populateAssets("");
         }
@@ -2670,6 +2699,7 @@ const state = {
       }
       els.maintenanceLogForm.querySelector('[name="date"]').value = new Date().toISOString().split('T')[0];
     }
+    els.maintenanceLogForm.planByAsset = visiblePlanByAsset;
     els.maintenanceLogGroupFilter.disabled = isEditing;
     els.maintenanceSelectVisibleAssets.hidden = isEditing;
     els.maintenanceLogAssetList.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => { checkbox.disabled = isEditing; });
@@ -2686,6 +2716,7 @@ const state = {
     els.maintenanceLogModal.hidden = true;
     els.maintenanceLogForm.reset();
     els.maintenanceLogForm.selectedAssetIds = null;
+    els.maintenanceLogForm.planByAsset = null;
   }
 
   async function handleMaintenanceLogSubmit(event) {
@@ -2693,6 +2724,7 @@ const state = {
     const log = Object.fromEntries(new FormData(event.target).entries());
     delete log.pending_images;
     const selectedAssetIds = [...(event.target.selectedAssetIds || [])];
+    const planByAsset = event.target.planByAsset || new Map();
     if (!selectedAssetIds.length) {
       showMessageModal("Chưa chọn thiết bị", "Vui lòng chọn ít nhất một thiết bị cần ghi nhận bảo trì.");
       return;
@@ -2712,8 +2744,8 @@ const state = {
     try {
       const isBatch = !log.log_id && selectedAssetIds.length > 1;
       const response = isBatch
-        ? await callServer("saveMaintenanceLogs", selectedAssetIds.map((assetId) => ({ ...log, asset_id: assetId, plan_id: "" })))
-        : await callServer("saveMaintenanceLog", { ...log, asset_id: selectedAssetIds[0] });
+        ? await callServer("saveMaintenanceLogs", selectedAssetIds.map((assetId) => ({ ...log, asset_id: assetId, plan_id: planByAsset.get(assetId)?.plan_id || "" })))
+        : await callServer("saveMaintenanceLog", { ...log, asset_id: selectedAssetIds[0], plan_id: log.plan_id || planByAsset.get(selectedAssetIds[0])?.plan_id || "" });
       const savedLogs = isBatch ? response.data : [response.data];
       let imageWarning = "";
       try {
