@@ -746,9 +746,10 @@ const state = {
 
     Object.entries(fallbackLabels).forEach(([type, items]) => {
       Object.entries(items).forEach(([value, label], index) => {
-        if (!normalized.some((item) => item.setting_type === type && item.setting_value === value)) {
+        const fallbackId = `${type}_${value}`;
+        if (!normalized.some((item) => item.setting_id === fallbackId || (item.setting_type === type && item.setting_value === value))) {
           normalized.push({
-            setting_id: `${type}_${value}`,
+            setting_id: fallbackId,
             setting_type: type,
             setting_value: value,
             display_name: label,
@@ -2348,6 +2349,9 @@ const state = {
     state.editingSettingId = "";
     form.reset();
     form.elements.setting_id.value = "";
+    form.elements.original_setting_type.value = "";
+    form.elements.original_setting_value.value = "";
+    form.elements.original_display_name.value = "";
     form.elements.sort_order.value = nextSettingOrder(form.elements.setting_type.value);
     els.settingFormTitle.textContent = "THÊM CẤU HÌNH";
   }
@@ -2364,6 +2368,9 @@ const state = {
     if (setting) {
       state.editingSettingId = setting.setting_id;
       els.settingForm.elements.setting_id.value = setting.setting_id;
+      els.settingForm.elements.original_setting_type.value = setting.setting_type;
+      els.settingForm.elements.original_setting_value.value = setting.setting_value;
+      els.settingForm.elements.original_display_name.value = setting.display_name;
       els.settingForm.elements.setting_type.value = setting.setting_type;
       els.settingForm.elements.setting_value.value = setting.setting_value;
       els.settingForm.elements.display_name.value = setting.display_name;
@@ -2451,7 +2458,7 @@ const state = {
     const deleteBtn = els.content?.querySelector(`[data-delete-setting="${settingId}"]`);
     if (deleteBtn) { deleteBtn.classList.add("is-loading"); deleteBtn.disabled = true; }
     try {
-      await callServer("deleteSetting", settingId);
+      await callServer("deleteSetting", setting || { setting_id: settingId });
       showToast("Đã xóa cấu hình", setting?.display_name || "Cấu hình TDW");
       await refreshAppData();
     } catch (error) {

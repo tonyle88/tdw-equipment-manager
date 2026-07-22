@@ -18,6 +18,19 @@ const TDW_SCHEMA_VERSION = "2026.07.18.1";
 const MIN_PASSWORD_LENGTH = 10;
 const MAINTENANCE_REMINDER_DAYS = [7, 3, 1, 0];
 const MAINTENANCE_OVERDUE_REMINDER_INTERVAL_DAYS = 7;
+const DEFAULT_SETTING_IDS = new Set([
+  "asset_group_MAY_TINH_LAPTOP",
+  "asset_group_SCADA_LOGGER_DATA",
+  "asset_group_O_CUNG_THIET_BI_DIEN_TU",
+  "asset_group_MAY_IN_PHOTOCOPY_MAY_CHIEU_TV_DIEN_THOAI",
+  "asset_group_LUU_KHO_KEM_PHAM_CHAT",
+  "status_CON_SU_DUNG",
+  "status_MOI_100",
+  "status_KEM_PHAM_CHAT",
+  "status_KHONG_SU_DUNG",
+  "status_LUU_KHO_THANH_LY",
+  "status_CAN_KIEM_TRA",
+]);
 
 const LEGACY_PERMISSION_PRESETS = {
   view: ["overview.view", "assets.view", "maintenance.view", "movement.view", "software.view", "reports.view", "settings.view"],
@@ -442,12 +455,17 @@ function saveSetting(setting, token) {
     const existing = setting && setting.setting_id
       ? readSheetAsObjects_(SHEET_NAMES.settings).find((item) => item.setting_id === setting.setting_id)
       : null;
+    const previous = existing || (setting && setting.setting_id ? {
+      setting_type: String(setting.original_setting_type || setting.setting_type || "").trim(),
+      setting_value: String(setting.original_setting_value || "").trim(),
+      display_name: String(setting.original_display_name || "").trim(),
+    } : null);
     const normalized = normalizeSetting_(setting || {});
     assertUniqueSettingValue_(normalized);
     const saved = upsertObject_(SHEET_NAMES.settings, "setting_id", normalized);
-    const updatedReferences = existing
-      && (existing.setting_value !== saved.setting_value || existing.display_name !== saved.display_name)
-      ? replaceSettingReferences_(existing.setting_type, existing.setting_value, saved.setting_value, saved.display_name)
+    const updatedReferences = previous && previous.setting_value
+      && (previous.setting_value !== saved.setting_value || previous.display_name !== saved.display_name)
+      ? replaceSettingReferences_(previous.setting_type, previous.setting_value, saved.setting_value, saved.display_name)
       : 0;
     logAudit_(actor, action, "setting", saved.setting_id, saved.display_name);
     return { ok: true, data: saved, updated_references: updatedReferences, updated_at: new Date().toISOString() };
@@ -456,9 +474,11 @@ function saveSetting(setting, token) {
   }
 }
 
-function deleteSetting(settingId) {
+function deleteSetting(settingOrId) {
   try {
     const actor = requireAdmin_(arguments[1] || "");
+    const settingPayload = settingOrId && typeof settingOrId === "object" ? settingOrId : null;
+    const settingId = settingPayload ? settingPayload.setting_id : settingOrId;
     if (!settingId) throw new Error("Missing setting_id");
     const sheet = getSheet_(SHEET_NAMES.settings);
     const values = sheet.getDataRange().getValues();
@@ -466,6 +486,14 @@ function deleteSetting(settingId) {
     const keyIndex = headers.indexOf("setting_id");
     if (keyIndex === -1) throw new Error("Missing setting_id column");
     const rowIndex = values.findIndex((row, index) => index > 0 && row[keyIndex] === settingId);
+    if (DEFAULT_SETTING_IDS.has(settingId)) {
+      const existing = rowIndex >= 1 ? readSheetAsObjects_(SHEET_NAMES.settings).find((item) => item.setting_id === settingId) : null;
+      const disabled = normalizeSetting_(Object.assign({}, settingPayload || {}, existing || {}, { setting_id: settingId }));
+      disabled.active = "FALSE";
+      upsertObject_(SHEET_NAMES.settings, "setting_id", disabled);
+      logAudit_(actor, "SETTING_DISABLED", "setting", settingId, disabled.display_name);
+      return { ok: true, setting_id: settingId, disabled: true, updated_at: new Date().toISOString() };
+    }
     if (rowIndex < 1) throw new Error("Không tìm thấy cấu hình để xóa");
     const nameIndex = headers.indexOf("display_name");
     const settingName = nameIndex >= 0 ? String(values[rowIndex][nameIndex] || "") : "";

@@ -183,9 +183,16 @@ async function run() {
   assert.ok(appsScript.includes('const LICENSE_SECRET_MARKER = "SCRIPT_PROPERTY_V1"'));
   assert.ok(!appsScript.includes('return "ENC:"'));
   assert.ok(index.includes('name="setting_value" required readonly'));
+  assert.ok(index.includes('name="original_setting_value"'));
   assert.ok(app.includes("function settingValueFromDisplayName(displayName)"));
+  assert.ok(app.includes("item.setting_id === fallbackId"));
+  assert.ok(app.includes("elements.original_setting_value.value = setting.setting_value"));
+  assert.ok(app.includes('callServer("deleteSetting", setting || { setting_id: settingId })'));
   assert.ok(app.includes('display_name.addEventListener("input", syncSettingValueFromDisplayName)'));
   assert.ok(appsScript.includes("function replaceSettingReferences_(settingType, oldValue, newValue, displayName)"));
+  assert.ok(appsScript.includes("const previous = existing ||"));
+  assert.ok(appsScript.includes("const DEFAULT_SETTING_IDS = new Set(["));
+  assert.ok(appsScript.includes('disabled.active = "FALSE"'));
 
   const permissions = vm.createContext();
   vm.runInContext(appsScript, permissions, { filename: "google-apps-script/Code.gs" });
