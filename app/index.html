@@ -243,7 +243,7 @@
           <input type="hidden" name="sort_order" value="1" />
           <div class="form-grid">
             <label>Loại<select name="setting_type"></select></label>
-            <label class="span-2">Giá trị<input name="setting_value" required placeholder="VD: PHONG_HCNS hoặc Office 2016" /></label>
+            <label class="span-2">Giá trị<input name="setting_value" required readonly aria-describedby="settingValueHelp" placeholder="Tự tạo theo tên hiển thị" /><span class="field-help" id="settingValueHelp">Biến được tự tạo theo cú pháp IN_HOA_CACH_NHAU_BANG_GACH_DUOI.</span></label>
             <label class="span-2">Tên hiển thị<input name="display_name" required placeholder="VD: Phòng HCNS" /></label>
           </div>
           <div class="modal-actions">

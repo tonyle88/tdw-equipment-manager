@@ -2379,6 +2379,23 @@ const state = {
     return String(Math.max(0, ...orders) + 1);
   }
 
+  function settingValueFromDisplayName(displayName) {
+    return String(displayName || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .trim()
+      .replace(/[^A-Za-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .toUpperCase();
+  }
+
+  function syncSettingValueFromDisplayName() {
+    const form = els.settingForm;
+    form.elements.setting_value.value = settingValueFromDisplayName(form.elements.display_name.value);
+  }
+
   function closeSettingModal() {
     els.settingModal.hidden = true;
     resetSettingForm();
@@ -2410,6 +2427,7 @@ const state = {
 
   async function handleSettingSubmit(event) {
     event.preventDefault();
+    syncSettingValueFromDisplayName();
     const setting = Object.fromEntries(new FormData(event.target).entries());
     const submitBtn = event.target.querySelector("[type=submit]");
     if (submitBtn) { submitBtn.classList.add("is-loading"); submitBtn.disabled = true; }
@@ -3638,6 +3656,7 @@ const state = {
     els.form.addEventListener("submit", handleAssetSubmit);
     els.assetImageInput?.addEventListener("change", () => previewSelectedImages(els.assetImageInput, els.assetImagePreview));
     els.settingForm.addEventListener("submit", handleSettingSubmit);
+    els.settingForm.elements.display_name.addEventListener("input", syncSettingValueFromDisplayName);
     els.settingForm.elements.setting_type.addEventListener("change", () => {
       if (!state.editingSettingId) els.settingForm.elements.sort_order.value = nextSettingOrder(els.settingForm.elements.setting_type.value);
     });

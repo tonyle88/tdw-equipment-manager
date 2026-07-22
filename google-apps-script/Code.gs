@@ -439,10 +439,18 @@ function saveSetting(setting, token) {
   try {
     const actor = requireAdmin_(token || "");
     const action = setting && setting.setting_id ? "SETTING_UPDATED" : "SETTING_CREATED";
+    const existing = setting && setting.setting_id
+      ? readSheetAsObjects_(SHEET_NAMES.settings).find((item) => item.setting_id === setting.setting_id)
+      : null;
     const normalized = normalizeSetting_(setting || {});
+    assertUniqueSettingValue_(normalized);
     const saved = upsertObject_(SHEET_NAMES.settings, "setting_id", normalized);
+    const updatedReferences = existing
+      && (existing.setting_value !== saved.setting_value || existing.display_name !== saved.display_name)
+      ? replaceSettingReferences_(existing.setting_type, existing.setting_value, saved.setting_value, saved.display_name)
+      : 0;
     logAudit_(actor, action, "setting", saved.setting_id, saved.display_name);
-    return { ok: true, data: saved, updated_at: new Date().toISOString() };
+    return { ok: true, data: saved, updated_references: updatedReferences, updated_at: new Date().toISOString() };
   } catch (error) {
     return { ok: false, error: error.message };
   }
@@ -752,16 +760,68 @@ function responsibilitiesSignature_(responsibles) {
 function normalizeSetting_(setting) {
   const normalized = Object.assign({}, setting);
   const type = String(normalized.setting_type || "").trim();
-  const value = String(normalized.setting_value || "").trim();
+  const displayName = String(normalized.display_name || "").trim();
+  const value = settingValueFromDisplayName_(displayName);
   if (!type) throw new Error("Loại cấu hình là bắt buộc");
-  if (!value) throw new Error("Giá trị cấu hình là bắt buộc");
+  if (!displayName) throw new Error("Tên hiển thị là bắt buộc");
+  if (!value) throw new Error("Tên hiển thị phải có ít nhất một chữ cái hoặc chữ số");
   normalized.setting_id = normalized.setting_id || `${type}_${Utilities.getUuid()}`;
   normalized.setting_type = type;
   normalized.setting_value = value;
-  normalized.display_name = String(normalized.display_name || value).trim();
+  normalized.display_name = displayName;
   normalized.sort_order = normalized.sort_order || "999";
   normalized.active = normalized.active || "TRUE";
   return normalized;
+}
+
+function settingValueFromDisplayName_(displayName) {
+  return String(displayName || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .trim()
+    .replace(/[^A-Za-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase();
+}
+
+function assertUniqueSettingValue_(setting) {
+  const duplicate = readSheetAsObjects_(SHEET_NAMES.settings).find((item) =>
+    item.setting_id !== setting.setting_id
+      && item.setting_type === setting.setting_type
+      && item.setting_value === setting.setting_value
+  );
+  if (duplicate) throw new Error(`Tên hiển thị tạo ra biến đã tồn tại: ${setting.setting_value}`);
+}
+
+function replaceSettingReferences_(settingType, oldValue, newValue, displayName) {
+  const references = {
+    asset_group: [{ sheetName: SHEET_NAMES.assets, field: "asset_group", labelField: "asset_group_label" }],
+    asset_type: [{ sheetName: SHEET_NAMES.assets, field: "asset_type" }],
+    status: [{ sheetName: SHEET_NAMES.assets, field: "status" }],
+    maintenance_type: [{ sheetName: SHEET_NAMES.maintenanceLogs, field: "action_type" }],
+  }[settingType] || [];
+
+  return references.reduce((total, reference) => {
+    const sheet = getSheet_(reference.sheetName);
+    ensureSheetHeaders_(reference.sheetName, sheet);
+    const values = sheet.getDataRange().getValues();
+    if (values.length < 2) return total;
+    const headers = values[0].map((header) => String(header).trim());
+    const fieldIndex = headers.indexOf(reference.field);
+    const labelIndex = reference.labelField ? headers.indexOf(reference.labelField) : -1;
+    if (fieldIndex === -1) throw new Error(`Missing reference field: ${reference.sheetName}.${reference.field}`);
+    let changed = 0;
+    for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+      if (String(values[rowIndex][fieldIndex] || "") !== oldValue) continue;
+      values[rowIndex][fieldIndex] = newValue;
+      if (labelIndex >= 0) values[rowIndex][labelIndex] = displayName;
+      changed += 1;
+    }
+    if (changed) sheet.getRange(2, 1, values.length - 1, headers.length).setValues(values.slice(1));
+    return total + changed;
+  }, 0);
 }
 
 function saveMaintenanceLog(log, token) {

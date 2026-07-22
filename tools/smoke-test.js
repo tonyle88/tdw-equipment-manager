@@ -182,9 +182,33 @@ async function run() {
   assert.ok(appsScript.includes("function installDailyBackupTrigger()"));
   assert.ok(appsScript.includes('const LICENSE_SECRET_MARKER = "SCRIPT_PROPERTY_V1"'));
   assert.ok(!appsScript.includes('return "ENC:"'));
+  assert.ok(index.includes('name="setting_value" required readonly'));
+  assert.ok(app.includes("function settingValueFromDisplayName(displayName)"));
+  assert.ok(app.includes('display_name.addEventListener("input", syncSettingValueFromDisplayName)'));
+  assert.ok(appsScript.includes("function replaceSettingReferences_(settingType, oldValue, newValue, displayName)"));
 
   const permissions = vm.createContext();
   vm.runInContext(appsScript, permissions, { filename: "google-apps-script/Code.gs" });
+  assert.equal(vm.runInContext('settingValueFromDisplayName_("Đã thanh lý")', permissions), "DA_THANH_LY");
+  assert.equal(vm.runInContext('settingValueFromDisplayName_(" Phòng  HCNS ")', permissions), "PHONG_HCNS");
+  vm.runInContext(`
+    (() => {
+      const rows = [
+        ["asset_id", "asset_group", "asset_group_label", "status"],
+        ["a1", "NHOM_CU", "Nhóm cũ", "CON_SU_DUNG"],
+        ["a2", "NHOM_KHAC", "Nhóm khác", "NHOM_CU"]
+      ];
+      getSheet_ = () => ({
+        getDataRange: () => ({ getValues: () => rows.map((row) => row.slice()) }),
+        getRange: () => ({ setValues: (updated) => { rows.splice(1, updated.length, ...updated); } })
+      });
+      ensureSheetHeaders_ = () => {};
+      const changed = replaceSettingReferences_("asset_group", "NHOM_CU", "NHOM_MOI", "Nhóm mới");
+      if (changed !== 1 || rows[1][1] !== "NHOM_MOI" || rows[1][2] !== "Nhóm mới" || rows[2][3] !== "NHOM_CU") {
+        throw new Error("Setting references were not updated precisely");
+      }
+    })()
+  `, permissions);
   assert.equal(vm.runInContext('normalizeMediaFolderId_("https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOp?usp=sharing")', permissions), "1AbCdEfGhIjKlMnOp");
   assert.equal(vm.runInContext('normalizeMediaFolderId_("1AbCdEfGhIjKlMnOp")', permissions), "1AbCdEfGhIjKlMnOp");
   assert.throws(() => vm.runInContext('normalizeMediaFolderId_("not-an-id")', permissions), /phải là ID hoặc URL/);
