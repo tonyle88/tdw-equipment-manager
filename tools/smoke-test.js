@@ -467,62 +467,50 @@ async function run() {
     {
       supabase: true,
       fetchHandler: async (url, fetchOptions) => {
+        if (String(url).includes("example.test/apps-script")) {
+          const request = JSON.parse(fetchOptions.body);
+          if (request.action === "loginUser") {
+            return {
+              ok: true,
+              status: 200,
+              text: async () => JSON.stringify({ ok: false, error: "Tài khoản này sử dụng đăng nhập Supabase" }),
+            };
+          }
+          return {
+            ok: true,
+            status: 200,
+            text: async () => JSON.stringify({ ok: true, token: "supabase-session", user: { username: "admin", email: "admin@example.com" } }),
+          };
+        }
         if (String(url).includes("/auth/v1/token")) {
           return { ok: true, status: 200, json: async () => ({ user: { id: "supabase-user" } }) };
         }
-        return {
-          ok: true,
-          status: 200,
-          text: async () => JSON.stringify({ ok: true, token: "supabase-session", user: { username: "admin", email: "admin@example.com" } }),
-        };
+        throw new Error(`Unexpected request: ${url}`);
       },
     },
   );
   assert.equal(supabaseLogin.res.statusCode, 200);
   assert.match(String(supabaseLogin.res.headers["Set-Cookie"]), /^tdw_session=supabase-session;/);
-  assert.equal(supabaseLogin.requests.length, 2);
-  assert.deepEqual(JSON.parse(supabaseLogin.requests[1].options.body), {
+  assert.equal(supabaseLogin.requests.length, 3);
+  assert.deepEqual(JSON.parse(supabaseLogin.requests[2].options.body), {
     action: "loginSupabaseUser",
     args: ["admin@example.com"],
     proxy_secret: "proxy-secret",
   });
 
-  let legacyMigrationStep = 0;
-  const legacyMigration = await invokeProxy(
+  const legacyLogin = await invokeProxy(
     { fn: "loginUser", args: [{ username: "legacy@example.com", password: "old-secret" }] },
     {
       supabase: true,
-      fetchHandler: async (url, fetchOptions) => {
-        legacyMigrationStep += 1;
-        if (legacyMigrationStep === 1) {
-          return { ok: false, status: 400, json: async () => ({ error_description: "Invalid login" }) };
-        }
-        if (legacyMigrationStep === 2) {
-          return {
-            ok: true,
-            status: 200,
-            text: async () => JSON.stringify({ ok: true, token: "legacy-session", user: { username: "legacy", email: "legacy@example.com" } }),
-          };
-        }
-        if (legacyMigrationStep === 3) {
-          return { ok: false, status: 400, json: async () => ({ error_description: "Invalid login" }) };
-        }
-        if (legacyMigrationStep === 4) {
-          return { ok: true, status: 200, json: async () => ({ id: "migrated-user" }) };
-        }
-        if (legacyMigrationStep === 5) {
-          return { ok: true, status: 200, json: async () => ({ user: { id: "migrated-user" } }) };
-        }
-        return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true }) };
-      },
+      upstreamPayload: { ok: true, token: "legacy-session", user: { username: "legacy", email: "legacy@example.com", auth_provider: "LEGACY" } },
     },
   );
-  assert.equal(legacyMigration.res.statusCode, 200);
-  assert.match(String(legacyMigration.res.headers["Set-Cookie"]), /^tdw_session=legacy-session;/);
-  assert.equal(legacyMigrationStep, 6);
-  assert.deepEqual(JSON.parse(legacyMigration.requests[5].options.body), {
-    action: "markSupabaseMigration",
-    args: ["legacy@example.com", "migrated-user", "legacy-session"],
+  assert.equal(legacyLogin.res.statusCode, 200);
+  assert.match(String(legacyLogin.res.headers["Set-Cookie"]), /^tdw_session=legacy-session;/);
+  assert.equal(legacyLogin.requests.length, 1);
+  assert.deepEqual(JSON.parse(legacyLogin.requests[0].options.body), {
+    action: "loginUser",
+    args: [{ username: "legacy@example.com", password: "old-secret" }],
     proxy_secret: "proxy-secret",
   });
 

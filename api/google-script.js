@@ -152,51 +152,21 @@ function signInSupabase(email, password) {
   return supabaseRequest("/auth/v1/token?grant_type=password", { body: { email, password } });
 }
 
-async function migrateLegacyLogin(payload, password) {
-  const email = String(payload.user?.email || "").trim().toLowerCase();
-  if (!email || !supabaseConfigured()) return payload;
-  try {
-    let authPayload;
-    try {
-      authPayload = await signInSupabase(email, password);
-    } catch (_signInError) {
-      const created = await supabaseRequest("/auth/v1/admin/users", {
-        admin: true,
-        body: {
-          email,
-          password,
-          email_confirm: true,
-          user_metadata: { username: payload.user.username || "", full_name: payload.user.full_name || "" },
-        },
-      });
-      authPayload = await signInSupabase(email, password);
-      if (!authPayload.user?.id && created.id) authPayload.user = created;
-    }
-    if (!authPayload.user?.id) throw new Error("Supabase không trả user ID sau khi chuyển đổi");
-    await callGoogleScript("markSupabaseMigration", [email, authPayload.user.id, payload.token]);
-    payload.user.auth_provider = "SUPABASE";
-  } catch (error) {
-    console.error(JSON.stringify({ event: "auth_migration_pending", error: error.name || "Error" }));
-    payload.auth_migration_pending = true;
-  }
-  return payload;
-}
-
 async function login(credentials) {
   const identifier = String(credentials.username || credentials.email || "").trim().toLowerCase();
   const password = String(credentials.password || "");
   if (!identifier || !password) throw new Error("Vui lòng nhập email và mật khẩu");
 
-  if (supabaseConfigured() && identifier.includes("@")) {
-    try {
-      const authPayload = await signInSupabase(identifier, password);
-      if (authPayload.user?.id) return callGoogleScript("loginSupabaseUser", [identifier]);
-    } catch (_error) {
-      // Tài khoản chưa chuyển đổi sẽ được xác minh bằng mật khẩu cũ bên dưới.
-    }
+  try {
+    return await callGoogleScript("loginUser", [{ username: identifier, password }]);
+  } catch (error) {
+    const usesSupabase = /sử dụng đăng nhập Supabase/i.test(String(error.message || ""));
+    if (!usesSupabase || !supabaseConfigured() || !identifier.includes("@")) throw error;
   }
-  const legacyPayload = await callGoogleScript("loginUser", [{ username: identifier, password }]);
-  return migrateLegacyLogin(legacyPayload, password);
+
+  const authPayload = await signInSupabase(identifier, password);
+  if (!authPayload.user?.id) throw new Error("Supabase không trả user ID sau khi đăng nhập");
+  return callGoogleScript("loginSupabaseUser", [identifier]);
 }
 
 async function syncSupabasePassword(fn, args, token) {
